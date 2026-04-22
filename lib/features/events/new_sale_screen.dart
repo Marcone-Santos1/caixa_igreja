@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../data/sale_line_draft.dart';
 import '../../domain/payment_method.dart';
@@ -247,7 +248,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
         title: const Text('Nova venda'),
       ),
       body: StreamBuilder<List<ChurchProduct>>(
-        stream: db.watchActiveProducts(),
+        stream: db.watchActiveProductsForEvent(widget.eventId),
         builder: (context, prodSnap) {
           if (prodSnap.hasError) {
             return Center(child: Text('Erro: ${prodSnap.error}'));
@@ -273,17 +274,18 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (hasCart)
-                    Material(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      child: ExpansionTile(
-                        initiallyExpanded: true,
-                        title: Text(
-                          'Resumo · ${formatCents(total)}',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                      child: Card(
+                        child: ExpansionTile(
+                          initiallyExpanded: true,
+                          title: Text(
+                            'Resumo · ${formatCents(total)}',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          children: [
                           for (final p in products)
                             if ((_productQty[p.id] ?? 0) > 0)
                               ListTile(
@@ -348,12 +350,16 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                 },
                               ),
                             ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   Expanded(
                     child: ListView(
-                      padding: const EdgeInsets.all(12),
+                      padding: kCaixaScreenPadding.copyWith(
+                        top: 4,
+                        bottom: 8,
+                      ),
                       children: [
                         Row(
                           children: [
@@ -490,7 +496,10 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                   ),
                   SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(12),
+                      padding: kCaixaScreenPadding.copyWith(
+                        top: 8,
+                        bottom: 12,
+                      ),
                       child: Row(
                         children: [
                           Expanded(
@@ -512,6 +521,9 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                               onPressed: !hasCart
                                   ? null
                                   : () => _checkout(total, products, denoms),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
                               child: Text('Pagar ${formatCents(total)}'),
                             ),
                           ),

@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/date_time_utils.dart';
@@ -101,13 +102,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: kCaixaScreenPadding.copyWith(bottom: 32),
           children: [
             TextFormField(
               controller: _title,
               decoration: const InputDecoration(
                 labelText: 'Título',
-                border: OutlineInputBorder(),
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Informe o título' : null,
@@ -117,23 +117,30 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
               controller: _notes,
               decoration: const InputDecoration(
                 labelText: 'Observações',
-                border: OutlineInputBorder(),
               ),
               maxLines: 4,
             ),
             const SizedBox(height: 12),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Data do evento'),
-              subtitle: Text(
-                MaterialLocalizations.of(context).formatFullDate(_day),
+            Card(
+              child: ListTile(
+                leading: Icon(
+                  Icons.calendar_today_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: const Text('Data do evento'),
+                subtitle: Text(
+                  MaterialLocalizations.of(context).formatFullDate(_day),
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _pickDay,
               ),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _pickDay,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             FilledButton(
               onPressed: _save,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+              ),
               child: const Text('Salvar'),
             ),
           ],

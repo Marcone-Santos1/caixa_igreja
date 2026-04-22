@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import 'event_form_screen.dart';
@@ -21,31 +22,39 @@ class EventsListScreen extends ConsumerWidget {
         stream: db.watchAllEvents(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return Center(child: Text('Erro: ${snapshot.error}'));
+            return Center(
+              child: Text(
+                'Erro: ${snapshot.error}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            );
           }
           final list = snapshot.data;
           if (list == null) {
             return const Center(child: CircularProgressIndicator());
           }
           if (list.isEmpty) {
-            return const Center(
-              child: Text('Nenhum evento. Toque em + para cadastrar.'),
+            return const CaixaEmptyHint(
+              icon: Icons.event_available_outlined,
+              message: 'Nenhum evento ainda',
+              detail: 'Toque em + para cadastrar o primeiro.',
             );
           }
           return ListView.separated(
+            padding: const EdgeInsets.only(top: 8, bottom: 88),
             itemCount: list.length,
-            separatorBuilder: (context, _) => const Divider(height: 1),
+            separatorBuilder: (context, index) => const SizedBox(height: 2),
             itemBuilder: (context, i) {
               final e = list[i];
               final day = DateTime.fromMillisecondsSinceEpoch(e.dateEpochMs);
-              return ListTile(
-                title: Text(e.title),
-                subtitle: Text(
-                  '${_dateFmt.format(day)}\n${e.notes.isEmpty ? '—' : e.notes}',
-                ),
+              return CaixaListRow(
+                title: e.title,
+                subtitle:
+                    '${_dateFmt.format(day)}\n${e.notes.isEmpty ? '—' : e.notes}',
                 isThreeLine: true,
                 onTap: () => context.go('/event/${e.id}'),
                 trailing: IconButton(
+                  tooltip: 'Editar',
                   icon: const Icon(Icons.edit_outlined),
                   onPressed: () async {
                     await Navigator.of(context).push<bool>(
@@ -60,14 +69,14 @@ class EventsListScreen extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         heroTag: 'fab_events_list',
         onPressed: () async {
           await Navigator.of(context).push<bool>(
             MaterialPageRoute(builder: (_) => const EventFormScreen()),
           );
         },
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add_rounded),
       ),
     );
   }

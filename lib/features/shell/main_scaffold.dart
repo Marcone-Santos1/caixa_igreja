@@ -34,14 +34,14 @@ class MainScaffold extends StatelessWidget {
             label: 'Eventos',
           ),
           NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2),
-            label: 'Produtos',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.ios_share_outlined),
             selectedIcon: Icon(Icons.ios_share),
             label: 'Exportar',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
+            label: 'Configurações',
           ),
         ],
       ),

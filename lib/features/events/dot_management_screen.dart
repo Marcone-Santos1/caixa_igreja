@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/app_theme.dart';
+import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/money_format.dart';
@@ -142,42 +144,44 @@ class DotManagementScreen extends ConsumerWidget {
         stream: db.watchDotDenominations(eventId),
         builder: (context, snap) {
           if (snap.hasError) {
-            return Center(child: Text('Erro: ${snap.error}'));
+            return Center(
+              child: Text(
+                'Erro: ${snap.error}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            );
           }
           final list = snap.data;
           if (list == null) {
             return const Center(child: CircularProgressIndicator());
           }
           if (list.isEmpty) {
-            return Center(
-              child: Text(
-                'Nenhuma ficha cadastrada.\nToque em + para criar denominações (ex: R\$ 5, R\$ 10).',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
+            return const CaixaEmptyHint(
+              icon: Icons.toll_outlined,
+              message: 'Nenhuma ficha cadastrada',
+              detail: 'Toque em + para criar valores (ex.: R\$ 5, R\$ 10).',
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.all(12),
+            padding: kCaixaScreenPadding.copyWith(top: 8, bottom: 88),
             itemCount: list.length,
-            separatorBuilder: (context, _) => const Divider(height: 1),
+            separatorBuilder: (context, index) => const SizedBox(height: 2),
             itemBuilder: (context, i) {
               final d = list[i];
-              return ListTile(
-                title: Text(d.label),
-                subtitle: Text(
-                  '${formatCents(d.valueCents)} · Estoque: ${d.stockQty}',
-                ),
+              return CaixaListRow(
+                title: d.label,
+                subtitle:
+                    '${formatCents(d.valueCents)} · Estoque: ${d.stockQty}',
                 onTap: () => _openForm(context, ref, existing: d),
               );
             },
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         heroTag: 'fab_dot_management',
         onPressed: () => _openForm(context, ref),
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add_rounded),
       ),
     );
   }

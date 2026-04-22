@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/app_theme.dart';
+import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../domain/payment_method.dart';
 import '../../providers/database_provider.dart';
@@ -23,42 +25,56 @@ class EventSalesRegisterScreen extends ConsumerWidget {
         stream: db.watchSalesForEvent(eventId),
         builder: (context, snap) {
           if (snap.hasError) {
-            return Center(child: Text('Erro: ${snap.error}'));
+            return Center(
+              child: Text(
+                'Erro: ${snap.error}',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            );
           }
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
           final list = snap.data!;
           if (list.isEmpty) {
-            return const Center(
-              child: Text('Nenhuma venda registrada neste evento.'),
+            return const CaixaEmptyHint(
+              icon: Icons.receipt_long_outlined,
+              message: 'Nenhuma venda neste evento',
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            padding: kCaixaScreenPadding.copyWith(top: 8, bottom: 24),
             itemCount: list.length,
-            separatorBuilder: (context, index) =>
-                const Divider(height: 1),
+            separatorBuilder: (context, index) => const SizedBox(height: 6),
             itemBuilder: (context, i) {
               final s = list[i];
               final when = DateTime.fromMillisecondsSinceEpoch(s.soldAtMs);
               final change = s.amountReceivedCents - s.totalCents;
               final pay = PaymentMethod.label(s.paymentMethod);
-              return ExpansionTile(
-                key: ValueKey(s.id),
-                leading: CircleAvatar(
-                  child: Text('${s.id}'),
-                ),
-                title: Text(
-                  _dateTimeFmt.format(when),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                subtitle: Text(
-                  '$pay · Total ${formatCents(s.totalCents)}'
-                  '${change != 0 ? ' · Troco ${formatCents(change)}' : ''}',
-                ),
-                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                children: [
+              return Card(
+                child: ExpansionTile(
+                  key: ValueKey(s.id),
+                  leading: CircleAvatar(
+                    radius: 18,
+                    child: Text(
+                      '${s.id}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  title: Text(
+                    _dateTimeFmt.format(when),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  subtitle: Text(
+                    '$pay · Total ${formatCents(s.totalCents)}'
+                    '${change != 0 ? ' · Troco ${formatCents(change)}' : ''}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  childrenPadding:
+                      const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  children: [
                   FutureBuilder<List<EventSaleLineRow>>(
                     future: db.saleLinesForSale(s.id),
                     builder: (context, lineSnap) {
@@ -146,6 +162,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                     },
                   ),
                 ],
+                ),
               );
             },
           );

@@ -673,6 +673,20 @@ class $ProductsTable extends Products
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<int> eventId = GeneratedColumn<int>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES events (id)',
+    ),
+  );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -748,6 +762,7 @@ class $ProductsTable extends Products
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    eventId,
     name,
     description,
     priceCents,
@@ -769,6 +784,14 @@ class $ProductsTable extends Products
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -826,6 +849,10 @@ class $ProductsTable extends Products
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}event_id'],
+      )!,
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -861,6 +888,7 @@ class $ProductsTable extends Products
 
 class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   final int id;
+  final int eventId;
   final String name;
   final String description;
   final int priceCents;
@@ -869,6 +897,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   final bool active;
   const ChurchProduct({
     required this.id,
+    required this.eventId,
     required this.name,
     required this.description,
     required this.priceCents,
@@ -880,6 +909,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    map['event_id'] = Variable<int>(eventId);
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
     map['price_cents'] = Variable<int>(priceCents);
@@ -892,6 +922,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   ProductsCompanion toCompanion(bool nullToAbsent) {
     return ProductsCompanion(
       id: Value(id),
+      eventId: Value(eventId),
       name: Value(name),
       description: Value(description),
       priceCents: Value(priceCents),
@@ -908,6 +939,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChurchProduct(
       id: serializer.fromJson<int>(json['id']),
+      eventId: serializer.fromJson<int>(json['eventId']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
       priceCents: serializer.fromJson<int>(json['priceCents']),
@@ -921,6 +953,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'eventId': serializer.toJson<int>(eventId),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
       'priceCents': serializer.toJson<int>(priceCents),
@@ -932,6 +965,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
 
   ChurchProduct copyWith({
     int? id,
+    int? eventId,
     String? name,
     String? description,
     int? priceCents,
@@ -940,6 +974,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     bool? active,
   }) => ChurchProduct(
     id: id ?? this.id,
+    eventId: eventId ?? this.eventId,
     name: name ?? this.name,
     description: description ?? this.description,
     priceCents: priceCents ?? this.priceCents,
@@ -950,6 +985,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   ChurchProduct copyWithCompanion(ProductsCompanion data) {
     return ChurchProduct(
       id: data.id.present ? data.id.value : this.id,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
       name: data.name.present ? data.name.value : this.name,
       description: data.description.present
           ? data.description.value
@@ -969,6 +1005,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   String toString() {
     return (StringBuffer('ChurchProduct(')
           ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('priceCents: $priceCents, ')
@@ -982,6 +1019,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   @override
   int get hashCode => Object.hash(
     id,
+    eventId,
     name,
     description,
     priceCents,
@@ -994,6 +1032,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
       identical(this, other) ||
       (other is ChurchProduct &&
           other.id == this.id &&
+          other.eventId == this.eventId &&
           other.name == this.name &&
           other.description == this.description &&
           other.priceCents == this.priceCents &&
@@ -1004,6 +1043,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
 
 class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   final Value<int> id;
+  final Value<int> eventId;
   final Value<String> name;
   final Value<String> description;
   final Value<int> priceCents;
@@ -1012,6 +1052,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   final Value<bool> active;
   const ProductsCompanion({
     this.id = const Value.absent(),
+    this.eventId = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.priceCents = const Value.absent(),
@@ -1021,16 +1062,19 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   });
   ProductsCompanion.insert({
     this.id = const Value.absent(),
+    required int eventId,
     required String name,
     this.description = const Value.absent(),
     required int priceCents,
     this.trackStock = const Value.absent(),
     this.stockQty = const Value.absent(),
     this.active = const Value.absent(),
-  }) : name = Value(name),
+  }) : eventId = Value(eventId),
+       name = Value(name),
        priceCents = Value(priceCents);
   static Insertable<ChurchProduct> custom({
     Expression<int>? id,
+    Expression<int>? eventId,
     Expression<String>? name,
     Expression<String>? description,
     Expression<int>? priceCents,
@@ -1040,6 +1084,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (eventId != null) 'event_id': eventId,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (priceCents != null) 'price_cents': priceCents,
@@ -1051,6 +1096,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
 
   ProductsCompanion copyWith({
     Value<int>? id,
+    Value<int>? eventId,
     Value<String>? name,
     Value<String>? description,
     Value<int>? priceCents,
@@ -1060,6 +1106,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   }) {
     return ProductsCompanion(
       id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
       name: name ?? this.name,
       description: description ?? this.description,
       priceCents: priceCents ?? this.priceCents,
@@ -1074,6 +1121,9 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<int>(eventId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1100,6 +1150,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   String toString() {
     return (StringBuffer('ProductsCompanion(')
           ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('priceCents: $priceCents, ')
@@ -2480,6 +2531,24 @@ final class $$EventsTableReferences
     );
   }
 
+  static MultiTypedResultKey<$ProductsTable, List<ChurchProduct>>
+  _productsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.products,
+    aliasName: $_aliasNameGenerator(db.events.id, db.products.eventId),
+  );
+
+  $$ProductsTableProcessedTableManager get productsRefs {
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.eventId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_productsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
   static MultiTypedResultKey<$SalesTable, List<PosSale>> _salesRefsTable(
     _$AppDatabase db,
   ) => MultiTypedResultKey.fromTable(
@@ -2552,6 +2621,31 @@ class $$EventsTableFilterComposer
                     $removeJoinBuilderFromRootComposer,
               ),
         );
+    return f(composer);
+  }
+
+  Expression<bool> productsRefs(
+    Expression<bool> Function($$ProductsTableFilterComposer f) f,
+  ) {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.eventId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
     return f(composer);
   }
 
@@ -2660,6 +2754,31 @@ class $$EventsTableAnnotationComposer
     return f(composer);
   }
 
+  Expression<T> productsRefs<T extends Object>(
+    Expression<T> Function($$ProductsTableAnnotationComposer a) f,
+  ) {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.eventId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<T> salesRefs<T extends Object>(
     Expression<T> Function($$SalesTableAnnotationComposer a) f,
   ) {
@@ -2701,6 +2820,7 @@ class $$EventsTableTableManager
           ChurchEvent,
           PrefetchHooks Function({
             bool eventDotDenominationsRefs,
+            bool productsRefs,
             bool salesRefs,
           })
         > {
@@ -2746,11 +2866,16 @@ class $$EventsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({eventDotDenominationsRefs = false, salesRefs = false}) {
+              ({
+                eventDotDenominationsRefs = false,
+                productsRefs = false,
+                salesRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (eventDotDenominationsRefs) db.eventDotDenominations,
+                    if (productsRefs) db.products,
                     if (salesRefs) db.sales,
                   ],
                   addJoins: null,
@@ -2771,6 +2896,27 @@ class $$EventsTableTableManager
                                 table,
                                 p0,
                               ).eventDotDenominationsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.eventId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (productsRefs)
+                        await $_getPrefetchedData<
+                          ChurchEvent,
+                          $EventsTable,
+                          ChurchProduct
+                        >(
+                          currentTable: table,
+                          referencedTable: $$EventsTableReferences
+                              ._productsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$EventsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).productsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
                                 (e) => e.eventId == item.id,
@@ -2814,7 +2960,11 @@ typedef $$EventsTableProcessedTableManager =
       $$EventsTableUpdateCompanionBuilder,
       (ChurchEvent, $$EventsTableReferences),
       ChurchEvent,
-      PrefetchHooks Function({bool eventDotDenominationsRefs, bool salesRefs})
+      PrefetchHooks Function({
+        bool eventDotDenominationsRefs,
+        bool productsRefs,
+        bool salesRefs,
+      })
     >;
 typedef $$EventDotDenominationsTableCreateCompanionBuilder =
     EventDotDenominationsCompanion Function({
@@ -3367,6 +3517,7 @@ typedef $$EventDotDenominationsTableProcessedTableManager =
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
+      required int eventId,
       required String name,
       Value<String> description,
       required int priceCents,
@@ -3377,6 +3528,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
+      Value<int> eventId,
       Value<String> name,
       Value<String> description,
       Value<int> priceCents,
@@ -3388,6 +3540,24 @@ typedef $$ProductsTableUpdateCompanionBuilder =
 final class $$ProductsTableReferences
     extends BaseReferences<_$AppDatabase, $ProductsTable, ChurchProduct> {
   $$ProductsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $EventsTable _eventIdTable(_$AppDatabase db) => db.events.createAlias(
+    $_aliasNameGenerator(db.products.eventId, db.events.id),
+  );
+
+  $$EventsTableProcessedTableManager get eventId {
+    final $_column = $_itemColumn<int>('event_id')!;
+
+    final manager = $$EventsTableTableManager(
+      $_db,
+      $_db.events,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_eventIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$SaleLinesTable, List<PosSaleLine>>
   _saleLinesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -3451,6 +3621,29 @@ class $$ProductsTableFilterComposer
     column: $table.active,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$EventsTableFilterComposer get eventId {
+    final $$EventsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.events,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventsTableFilterComposer(
+            $db: $db,
+            $table: $db.events,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> saleLinesRefs(
     Expression<bool> Function($$SaleLinesTableFilterComposer f) f,
@@ -3521,6 +3714,29 @@ class $$ProductsTableOrderingComposer
     column: $table.active,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$EventsTableOrderingComposer get eventId {
+    final $$EventsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.events,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventsTableOrderingComposer(
+            $db: $db,
+            $table: $db.events,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ProductsTableAnnotationComposer
@@ -3558,6 +3774,29 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<bool> get active =>
       $composableBuilder(column: $table.active, builder: (column) => column);
+
+  $$EventsTableAnnotationComposer get eventId {
+    final $$EventsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.eventId,
+      referencedTable: $db.events,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$EventsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.events,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<T> saleLinesRefs<T extends Object>(
     Expression<T> Function($$SaleLinesTableAnnotationComposer a) f,
@@ -3598,7 +3837,7 @@ class $$ProductsTableTableManager
           $$ProductsTableUpdateCompanionBuilder,
           (ChurchProduct, $$ProductsTableReferences),
           ChurchProduct,
-          PrefetchHooks Function({bool saleLinesRefs})
+          PrefetchHooks Function({bool eventId, bool saleLinesRefs})
         > {
   $$ProductsTableTableManager(_$AppDatabase db, $ProductsTable table)
     : super(
@@ -3614,6 +3853,7 @@ class $$ProductsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int> eventId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<int> priceCents = const Value.absent(),
@@ -3622,6 +3862,7 @@ class $$ProductsTableTableManager
                 Value<bool> active = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
+                eventId: eventId,
                 name: name,
                 description: description,
                 priceCents: priceCents,
@@ -3632,6 +3873,7 @@ class $$ProductsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                required int eventId,
                 required String name,
                 Value<String> description = const Value.absent(),
                 required int priceCents,
@@ -3640,6 +3882,7 @@ class $$ProductsTableTableManager
                 Value<bool> active = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
+                eventId: eventId,
                 name: name,
                 description: description,
                 priceCents: priceCents,
@@ -3655,11 +3898,42 @@ class $$ProductsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({saleLinesRefs = false}) {
+          prefetchHooksCallback: ({eventId = false, saleLinesRefs = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [if (saleLinesRefs) db.saleLines],
-              addJoins: null,
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (eventId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.eventId,
+                                referencedTable: $$ProductsTableReferences
+                                    ._eventIdTable(db),
+                                referencedColumn: $$ProductsTableReferences
+                                    ._eventIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
               getPrefetchedDataCallback: (items) async {
                 return [
                   if (saleLinesRefs)
@@ -3700,7 +3974,7 @@ typedef $$ProductsTableProcessedTableManager =
       $$ProductsTableUpdateCompanionBuilder,
       (ChurchProduct, $$ProductsTableReferences),
       ChurchProduct,
-      PrefetchHooks Function({bool saleLinesRefs})
+      PrefetchHooks Function({bool eventId, bool saleLinesRefs})
     >;
 typedef $$SalesTableCreateCompanionBuilder =
     SalesCompanion Function({

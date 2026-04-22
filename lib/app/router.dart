@@ -10,6 +10,9 @@ import '../features/events/events_list_screen.dart';
 import '../features/events/new_sale_screen.dart';
 import '../features/export/export_screen.dart';
 import '../features/products/products_list_screen.dart';
+import '../features/settings/appearance_screen.dart';
+import '../features/settings/security_screen.dart';
+import '../features/settings/settings_screen.dart';
 import '../features/shell/main_scaffold.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -35,16 +38,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/products',
-                builder: (context, state) => const ProductsListScreen(),
+                path: '/export',
+                builder: (context, state) => const ExportScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/export',
-                builder: (context, state) => const ExportScreen(),
+                path: '/settings',
+                builder: (context, state) => const SettingsScreen(),
               ),
             ],
           ),
@@ -56,6 +59,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = int.parse(state.pathParameters['eventId']!);
           return EventHubScreen(eventId: id);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/event/:eventId/produtos',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['eventId']!);
+          return ProductsListScreen(eventId: id);
         },
       ),
       GoRoute(
@@ -81,6 +92,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final id = int.parse(state.pathParameters['eventId']!);
           return NewSaleScreen(eventId: id);
         },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/settings/security',
+        builder: (context, state) => const SecurityScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/settings/appearance',
+        builder: (context, state) => const AppearanceScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

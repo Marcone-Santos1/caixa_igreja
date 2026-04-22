@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import '../domain/payment_method.dart';
+import '../domain/stock_constants.dart';
+import 'drift_database_paths.dart';
 import '../domain/sale_line_kind.dart';
 import 'sale_line_draft.dart';
 
@@ -28,6 +32,7 @@ class EventDotDenominations extends Table {
 @DataClassName('ChurchProduct')
 class Products extends Table {
   IntColumn get id => integer().autoIncrement()();
+  IntColumn get eventId => integer().references(Events, #id)();
   TextColumn get name => text()();
   TextColumn get description => text().withDefault(const Constant(''))();
   IntColumn get priceCents => integer()();
@@ -114,6 +119,93 @@ class SaleLineExportRow {
   int get changeCents => amountReceivedCents - saleTotalCents;
 }
 
+/// Agregação por método de pagamento (totais de venda).
+class PaymentMethodBreakdown {
+  const PaymentMethodBreakdown({
+    required this.method,
+    required this.saleCount,
+    required this.totalCents,
+  });
+
+  final String method;
+  final int saleCount;
+  final int totalCents;
+}
+
+/// Resumo financeiro de um evento (vendas agregadas).
+class EventFinanceSummary {
+  const EventFinanceSummary({
+    required this.saleCount,
+    required this.totalCents,
+    required this.cashChangeGivenCents,
+    required this.byMethod,
+  });
+
+  final int saleCount;
+  final int totalCents;
+
+  /// Troco em dinheiro devolvido ao cliente (soma de `recebido - total` quando
+  /// método é dinheiro e o valor é positivo).
+  final int cashChangeGivenCents;
+  final List<PaymentMethodBreakdown> byMethod;
+
+  static EventFinanceSummary fromSales(List<PosSale> sales) {
+    if (sales.isEmpty) {
+      return const EventFinanceSummary(
+        saleCount: 0,
+        totalCents: 0,
+        cashChangeGivenCents: 0,
+        byMethod: [],
+      );
+    }
+    final map = <String, ({int n, int cents})>{};
+    var total = 0;
+    var cashChange = 0;
+    for (final s in sales) {
+      total += s.totalCents;
+      final cur = map[s.paymentMethod];
+      if (cur == null) {
+        map[s.paymentMethod] = (n: 1, cents: s.totalCents);
+      } else {
+        map[s.paymentMethod] = (n: cur.n + 1, cents: cur.cents + s.totalCents);
+      }
+      if (s.paymentMethod == PaymentMethod.dinheiro) {
+        final ch = s.amountReceivedCents - s.totalCents;
+        if (ch > 0) cashChange += ch;
+      }
+    }
+    final byMethod = map.entries
+        .map(
+          (e) => PaymentMethodBreakdown(
+            method: e.key,
+            saleCount: e.value.n,
+            totalCents: e.value.cents,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => b.totalCents.compareTo(a.totalCents));
+    return EventFinanceSummary(
+      saleCount: sales.length,
+      totalCents: total,
+      cashChangeGivenCents: cashChange,
+      byMethod: byMethod,
+    );
+  }
+}
+
+/// Contagens de itens com stock baixo (produtos com rastreio + fichas).
+class EventLowStockCounts {
+  const EventLowStockCounts({
+    required this.lowProductCount,
+    required this.lowDotCount,
+  });
+
+  final int lowProductCount;
+  final int lowDotCount;
+
+  bool get hasAny => lowProductCount > 0 || lowDotCount > 0;
+}
+
 @DriftDatabase(
   tables: [
     Events,
@@ -128,7 +220,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -166,11 +258,50 @@ ALTER TABLE sale_lines_new RENAME TO sale_lines;
 PRAGMA foreign_keys = ON;
 ''');
           }
+          if (from < 3) {
+            // Produtos passam a pertencer a um evento; dados antigos vão para um evento “legado” se necessário.
+            await customStatement('''
+INSERT INTO events (title, notes, date_epoch_ms)
+SELECT 'Catálogo legado', 'Criado na migração: produtos sem evento.', 0
+WHERE NOT EXISTS (SELECT 1 FROM events LIMIT 1);
+''');
+            await customStatement('''
+PRAGMA foreign_keys = OFF;
+CREATE TABLE products_new (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  event_id INTEGER NOT NULL REFERENCES events (id) ON UPDATE NO ACTION ON DELETE NO ACTION,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  price_cents INTEGER NOT NULL,
+  track_stock INTEGER NOT NULL DEFAULT 0,
+  stock_qty INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1
+);
+INSERT INTO products_new (id, event_id, name, description, price_cents, track_stock, stock_qty, active)
+SELECT
+  p.id,
+  COALESCE(
+    (SELECT e.id FROM events e ORDER BY e.date_epoch_ms DESC, e.id DESC LIMIT 1),
+    (SELECT e2.id FROM events e2 ORDER BY e2.id ASC LIMIT 1)
+  ),
+  p.name,
+  p.description,
+  p.price_cents,
+  p.track_stock,
+  p.stock_qty,
+  p.active
+FROM products p;
+DROP TABLE products;
+ALTER TABLE products_new RENAME TO products;
+CREATE INDEX IF NOT EXISTS products_event_id_idx ON products (event_id);
+PRAGMA foreign_keys = ON;
+''');
+          }
         },
       );
 
   static QueryExecutor _openConnection() {
-    return driftDatabase(name: 'caixa_igreja');
+    return driftDatabase(name: kCaixaIgrejaDriftDbName);
   }
 
   Stream<ChurchEvent?> watchEvent(int id) {
@@ -185,15 +316,18 @@ PRAGMA foreign_keys = ON;
         .watch();
   }
 
-  Stream<List<ChurchProduct>> watchActiveProducts() {
+  Stream<List<ChurchProduct>> watchActiveProductsForEvent(int eventId) {
     return (select(products)
+          ..where((p) => p.eventId.equals(eventId))
           ..where((p) => p.active.equals(true))
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
         .watch();
   }
 
-  Stream<List<ChurchProduct>> watchAllProducts() {
-    return (select(products)..orderBy([(p) => OrderingTerm.asc(p.name)]))
+  Stream<List<ChurchProduct>> watchAllProductsForEvent(int eventId) {
+    return (select(products)
+          ..where((p) => p.eventId.equals(eventId))
+          ..orderBy([(p) => OrderingTerm.asc(p.name)]))
         .watch();
   }
 
@@ -210,9 +344,75 @@ PRAGMA foreign_keys = ON;
         .watch();
   }
 
+  Stream<EventFinanceSummary> watchEventFinanceSummary(int eventId) {
+    return (select(sales)..where((s) => s.eventId.equals(eventId)))
+        .watch()
+        .map(EventFinanceSummary.fromSales);
+  }
+
+  Future<EventFinanceSummary> eventFinanceSummary(int eventId) {
+    return (select(sales)..where((s) => s.eventId.equals(eventId)))
+        .get()
+        .then(EventFinanceSummary.fromSales);
+  }
+
+  /// Emite contagens sempre que produtos ou fichas do evento mudam.
+  Stream<EventLowStockCounts> watchEventLowStockCounts(int eventId) {
+    final threshold = kLowStockThreshold;
+    late StreamSubscription<List<ChurchProduct>> sub1;
+    late StreamSubscription<List<EventDotDenom>> sub2;
+    var latestP = <ChurchProduct>[];
+    var latestD = <EventDotDenom>[];
+
+    late final StreamController<EventLowStockCounts> controller;
+
+    void emit() {
+      if (controller.isClosed) return;
+      final lowP = latestP
+          .where(
+            (p) =>
+                p.active &&
+                p.trackStock &&
+                p.stockQty <= threshold,
+          )
+          .length;
+      final lowD = latestD.where((d) => d.stockQty <= threshold).length;
+      controller.add(EventLowStockCounts(lowProductCount: lowP, lowDotCount: lowD));
+    }
+
+    controller = StreamController<EventLowStockCounts>(
+      onListen: () {
+        sub1 = (select(products)..where((p) => p.eventId.equals(eventId)))
+            .watch()
+            .listen((list) {
+          latestP = list;
+          emit();
+        });
+        sub2 =
+            (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId)))
+                .watch()
+                .listen((list) {
+          latestD = list;
+          emit();
+        });
+      },
+      onCancel: () {
+        sub1.cancel();
+        sub2.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
   Future<List<EventSaleLineRow>> saleLinesForSale(int saleId) {
     final q = select(saleLines).join([
-      leftOuterJoin(products, products.id.equalsExp(saleLines.productId)),
+      innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
+      leftOuterJoin(
+        products,
+        products.id.equalsExp(saleLines.productId) &
+            products.eventId.equalsExp(sales.eventId),
+      ),
       leftOuterJoin(
         eventDotDenominations,
         eventDotDenominations.id.equalsExp(saleLines.dotDenominationId),
@@ -272,9 +472,11 @@ PRAGMA foreign_keys = ON;
           case SaleLineKind.product:
             final pid = l.productId;
             if (pid == null) throw ArgumentError('Produto inválido');
-            final p = await (select(products)..where((t) => t.id.equals(pid)))
+            final p = await (select(products)
+                  ..where((t) => t.id.equals(pid))
+                  ..where((t) => t.eventId.equals(eventId)))
                 .getSingleOrNull();
-            if (p == null) throw StateError('Produto não encontrado');
+            if (p == null) throw StateError('Produto não encontrado neste evento');
             if (!p.active) throw StateError('Produto inativo: ${p.name}');
             if (p.trackStock && p.stockQty < l.qty) {
               throw StateError('Estoque insuficiente para ${p.name}');
@@ -344,7 +546,9 @@ PRAGMA foreign_keys = ON;
         switch (l.kind) {
           case SaleLineKind.product:
             final pid = l.productId!;
-            final p = await (select(products)..where((t) => t.id.equals(pid)))
+            final p = await (select(products)
+                  ..where((t) => t.id.equals(pid))
+                  ..where((t) => t.eventId.equals(eventId)))
                 .getSingle();
             if (p.trackStock) {
               await (update(products)..where((t) => t.id.equals(pid))).write(
@@ -449,23 +653,22 @@ PRAGMA foreign_keys = ON;
     });
   }
 
-  Future<List<SaleLineExportRow>> exportSaleLinesBetween({
-    required int startMs,
-    required int endMs,
-  }) async {
+  /// Linhas de venda (itens) de um único evento, ordenadas por data da venda.
+  Future<List<SaleLineExportRow>> exportSaleLinesForEvent(int eventId) async {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
       innerJoin(events, events.id.equalsExp(sales.eventId)),
-      leftOuterJoin(products, products.id.equalsExp(saleLines.productId)),
+      leftOuterJoin(
+        products,
+        products.id.equalsExp(saleLines.productId) &
+            products.eventId.equalsExp(sales.eventId),
+      ),
       leftOuterJoin(
         eventDotDenominations,
         eventDotDenominations.id.equalsExp(saleLines.dotDenominationId),
       ),
     ])
-      ..where(
-        sales.soldAtMs.isBiggerOrEqualValue(startMs) &
-            sales.soldAtMs.isSmallerOrEqualValue(endMs),
-      )
+      ..where(sales.eventId.equals(eventId))
       ..orderBy([
         OrderingTerm.asc(sales.soldAtMs),
         OrderingTerm.asc(saleLines.id),
