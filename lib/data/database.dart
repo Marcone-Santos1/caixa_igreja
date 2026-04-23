@@ -701,4 +701,78 @@ PRAGMA foreign_keys = ON;
       );
     }).get();
   }
+
+  /// Remove o produto se não existir linha de venda referenciando-o.
+  /// Retorna `null` em caso de sucesso, ou mensagem para o utilizador.
+  Future<String?> deleteProduct({
+    required int eventId,
+    required int productId,
+  }) async {
+    final p = await (select(products)
+          ..where((t) => t.id.equals(productId))
+          ..where((t) => t.eventId.equals(eventId)))
+        .getSingleOrNull();
+    if (p == null) return 'Produto não encontrado';
+    final used = await (select(saleLines)
+          ..where((sl) => sl.productId.equals(productId)))
+        .get();
+    if (used.isNotEmpty) {
+      return 'Este produto já entrou em vendas. Inative-o em vez de excluir.';
+    }
+    await (delete(products)
+          ..where((t) => t.id.equals(productId))
+          ..where((t) => t.eventId.equals(eventId)))
+        .go();
+    return null;
+  }
+
+  /// Remove a ficha se não existir venda ou troco referenciando-a.
+  Future<String?> deleteDotDenomination({
+    required int eventId,
+    required int dotDenominationId,
+  }) async {
+    final d = await (select(eventDotDenominations)
+          ..where((t) => t.id.equals(dotDenominationId))
+          ..where((t) => t.eventId.equals(eventId)))
+        .getSingleOrNull();
+    if (d == null) return 'Ficha não encontrada';
+    final lines = await (select(saleLines)
+          ..where((sl) => sl.dotDenominationId.equals(dotDenominationId)))
+        .get();
+    if (lines.isNotEmpty) {
+      return 'Esta ficha já entrou em vendas e não pode ser excluída.';
+    }
+    final changeRows = await (select(saleChangeDotAllocations)
+          ..where((t) => t.dotDenominationId.equals(dotDenominationId)))
+        .get();
+    if (changeRows.isNotEmpty) {
+      return 'Esta ficha já foi usada no troco de uma venda e não pode ser excluída.';
+    }
+    await (delete(eventDotDenominations)
+          ..where((t) => t.id.equals(dotDenominationId))
+          ..where((t) => t.eventId.equals(eventId)))
+        .go();
+    return null;
+  }
+
+  /// Apaga o evento e todos os dados associados (vendas, linhas, produtos, fichas).
+  Future<void> deleteEventCascade(int eventId) async {
+    await transaction(() async {
+      final saleRows =
+          await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
+      final saleIds = saleRows.map((s) => s.id).toList();
+      if (saleIds.isNotEmpty) {
+        await (delete(saleChangeDotAllocations)
+              ..where((t) => t.saleId.isIn(saleIds)))
+            .go();
+        await (delete(saleLines)..where((t) => t.saleId.isIn(saleIds))).go();
+      }
+      await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
+      await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
+      await (delete(eventDotDenominations)
+            ..where((d) => d.eventId.equals(eventId)))
+          .go();
+      await (delete(events)..where((e) => e.id.equals(eventId))).go();
+    });
+  }
 }

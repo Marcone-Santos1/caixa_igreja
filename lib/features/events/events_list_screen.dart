@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
+import 'event_delete_dialog.dart';
 import 'event_form_screen.dart';
 
 final _dateFmt = DateFormat.yMMMEd('pt_BR');
@@ -53,16 +54,38 @@ class EventsListScreen extends ConsumerWidget {
                     '${_dateFmt.format(day)}\n${e.notes.isEmpty ? '—' : e.notes}',
                 isThreeLine: true,
                 onTap: () => context.go('/event/${e.id}'),
-                trailing: IconButton(
-                  tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () async {
-                    await Navigator.of(context).push<bool>(
-                      MaterialPageRoute(
-                        builder: (_) => EventFormScreen(eventId: e.id),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Editar',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () async {
+                        await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) => EventFormScreen(eventId: e.id),
+                          ),
+                        );
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Excluir',
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: Theme.of(context).colorScheme.error,
                       ),
-                    );
-                  },
+                      onPressed: () async {
+                        final sure = await confirmDeleteEventDialog(
+                          context,
+                          eventTitle: e.title,
+                        );
+                        if (!sure || !context.mounted) return;
+                        await ref
+                            .read(appDatabaseProvider)
+                            .deleteEventCascade(e.id);
+                      },
+                    ),
+                  ],
                 ),
               );
             },

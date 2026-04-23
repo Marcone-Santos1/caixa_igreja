@@ -173,6 +173,49 @@ class DotManagementScreen extends ConsumerWidget {
                 subtitle:
                     '${formatCents(d.valueCents)} · Estoque: ${d.stockQty}',
                 onTap: () => _openForm(context, ref, existing: d),
+                trailing: IconButton(
+                  tooltip: 'Excluir ficha',
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Excluir ficha?'),
+                        content: Text('Remover "${d.label}" deste evento?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(ctx).colorScheme.error,
+                              foregroundColor:
+                                  Theme.of(ctx).colorScheme.onError,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Excluir'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true || !context.mounted) return;
+                    final err = await ref.read(appDatabaseProvider).deleteDotDenomination(
+                          eventId: eventId,
+                          dotDenominationId: d.id,
+                        );
+                    if (!context.mounted) return;
+                    if (err != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(err)),
+                      );
+                    }
+                  },
+                ),
               );
             },
           );

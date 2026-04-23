@@ -116,6 +116,44 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (mounted) Navigator.of(context).pop(true);
   }
 
+  Future<void> _confirmDelete() async {
+    final id = widget.productId;
+    if (id == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir produto?'),
+        content: const Text(
+          'O produto será removido do catálogo deste evento. '
+          'Não é possível excluir se já tiver sido vendido.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final db = ref.read(appDatabaseProvider);
+    final err = await db.deleteProduct(eventId: widget.eventId, productId: id);
+    if (!mounted) return;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+    Navigator.of(context).pop(true);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -125,7 +163,17 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     }
     final isEdit = widget.productId != null;
     return Scaffold(
-      appBar: AppBar(title: Text(isEdit ? 'Editar produto' : 'Novo produto')),
+      appBar: AppBar(
+        title: Text(isEdit ? 'Editar produto' : 'Novo produto'),
+        actions: [
+          if (isEdit)
+            IconButton(
+              tooltip: 'Excluir produto',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: _confirmDelete,
+            ),
+        ],
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

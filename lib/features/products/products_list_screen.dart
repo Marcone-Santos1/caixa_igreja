@@ -60,6 +60,48 @@ class ProductsListScreen extends ConsumerWidget {
                     ),
                   );
                 },
+                trailing: IconButton(
+                  tooltip: 'Excluir',
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Excluir produto?'),
+                        content: Text('Remover "${p.name}" deste evento?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancelar'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor:
+                                  Theme.of(ctx).colorScheme.error,
+                              foregroundColor:
+                                  Theme.of(ctx).colorScheme.onError,
+                            ),
+                            onPressed: () => Navigator.pop(ctx, true),
+                            child: const Text('Excluir'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (ok != true || !context.mounted) return;
+                    final err = await ref
+                        .read(appDatabaseProvider)
+                        .deleteProduct(eventId: eventId, productId: p.id);
+                    if (!context.mounted) return;
+                    if (err != null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(err)),
+                      );
+                    }
+                  },
+                ),
               );
             },
           );

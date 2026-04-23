@@ -1,11 +1,13 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/date_time_utils.dart';
+import 'event_delete_dialog.dart';
 
 class EventFormScreen extends ConsumerStatefulWidget {
   const EventFormScreen({super.key, this.eventId});
@@ -89,6 +91,18 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     if (mounted) Navigator.of(context).pop(true);
   }
 
+  Future<void> _confirmDeleteEvent() async {
+    final id = widget.eventId;
+    if (id == null) return;
+    final title = _title.text.trim().isEmpty ? 'este evento' : _title.text.trim();
+    final sure = await confirmDeleteEventDialog(context, eventTitle: title);
+    if (!sure || !mounted) return;
+    final db = ref.read(appDatabaseProvider);
+    await db.deleteEventCascade(id);
+    if (!mounted) return;
+    context.go('/events');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -97,6 +111,7 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       );
     }
     final isEdit = widget.eventId != null;
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: Text(isEdit ? 'Editar evento' : 'Novo evento')),
       body: Form(
@@ -143,6 +158,21 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
               ),
               child: const Text('Salvar'),
             ),
+            if (isEdit) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                onPressed: _confirmDeleteEvent,
+                icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
+                label: Text(
+                  'Excluir evento',
+                  style: TextStyle(color: scheme.error),
+                ),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  side: BorderSide(color: scheme.error.withValues(alpha: 0.65)),
+                ),
+              ),
+            ],
           ],
         ),
       ),

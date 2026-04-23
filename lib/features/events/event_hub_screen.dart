@@ -7,10 +7,12 @@ import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/stock_constants.dart';
+import '../../providers/database_provider.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../providers/event_finance_provider.dart';
 import '../../providers/event_low_stock_provider.dart';
 import '../../utils/money_format.dart';
+import 'event_delete_dialog.dart';
 import 'event_form_screen.dart';
 
 final _dateFmt = DateFormat.yMMMEd('pt_BR');
@@ -41,6 +43,7 @@ class EventHubScreen extends ConsumerWidget {
           title: const Text('Evento'),
           actions: [
             IconButton(
+              tooltip: 'Editar',
               icon: const Icon(Icons.edit_outlined),
               onPressed: () async {
                 await Navigator.of(context).push<bool>(
@@ -51,6 +54,23 @@ class EventHubScreen extends ConsumerWidget {
                 if (context.mounted) {
                   ref.invalidate(eventDetailProvider(eventId));
                 }
+              },
+            ),
+            IconButton(
+              tooltip: 'Excluir evento',
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              onPressed: () async {
+                final e = async.valueOrNull;
+                final title = e?.title ?? 'este evento';
+                final sure =
+                    await confirmDeleteEventDialog(context, eventTitle: title);
+                if (!sure || !context.mounted) return;
+                await ref.read(appDatabaseProvider).deleteEventCascade(eventId);
+                if (!context.mounted) return;
+                context.go('/events');
               },
             ),
           ],
