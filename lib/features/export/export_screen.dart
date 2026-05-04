@@ -42,44 +42,34 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
     setState(() => _busy = true);
     try {
       final db = ref.read(appDatabaseProvider);
-      final rows = await db.exportSaleLinesForEvent(event.id);
-
-      final dtFmt = DateFormat('yyyy-MM-dd HH:mm:ss', 'pt_BR');
-      final dayFmt = DateFormat.yMMMd('pt_BR');
+      final sales = await (db.select(db.sales)..where((s) => s.eventId.equals(event.id))).get();
 
       final csvData = <List<String>>[
         [
-          'data_hora_venda',
-          'evento_titulo',
-          'evento_data',
           'item',
-          'quantidade',
-          'preco_unitario',
-          'total_linha',
           'total_venda',
           'valor_recebido',
           'troco',
           'forma_pagamento',
+          'pendencia_troco',
+          'nome_pendencia',
         ],
-        ...rows.map((r) {
-          final sold = DateTime.fromMillisecondsSinceEpoch(r.soldAtMs);
-          final evDay =
-              DateTime.fromMillisecondsSinceEpoch(r.eventDateMs);
-          return [
-            dtFmt.format(sold),
-            r.eventTitle,
-            dayFmt.format(evDay),
-            r.itemDescription,
-            r.qty.toString(),
-            formatCents(r.unitPriceCents),
-            formatCents(r.lineTotalCents),
-            formatCents(r.saleTotalCents),
-            formatCents(r.amountReceivedCents),
-            formatCents(r.changeCents),
-            PaymentMethod.label(r.paymentMethod),
-          ];
-        }),
       ];
+
+      for (final s in sales) {
+        final lines = await db.saleLinesForSale(s.id);
+        final itemParts = lines.map((l) => '${l.itemLabel} (${l.qty}x ${formatCents(l.unitPriceCents)})').join('; ');
+
+        csvData.add([
+          itemParts,
+          formatCents(s.totalCents),
+          formatCents(s.amountReceivedCents),
+          formatCents(s.amountReceivedCents - s.totalCents),
+          PaymentMethod.label(s.paymentMethod),
+          s.changePending ? 'Sim' : 'Não',
+          s.customerName ?? '',
+        ]);
+      }
 
       final csvString = const ListToCsvConverter().convert(csvData);
       final bytes = utf8.encode('\ufeff$csvString');
@@ -108,7 +98,7 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
           ShareParams(
             files: [XFile(file.path)],
             subject: subject,
-            text: '${rows.length} linhas exportadas.',
+            text: '${sales.length} vendas exportadas.',
           ),
         );
       }

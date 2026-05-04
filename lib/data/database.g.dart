@@ -1238,6 +1238,41 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
     requiredDuringInsert: false,
     defaultValue: const Constant(PaymentMethod.dinheiro),
   );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _changePendingMeta = const VerificationMeta(
+    'changePending',
+  );
+  @override
+  late final GeneratedColumn<bool> changePending = GeneratedColumn<bool>(
+    'change_pending',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("change_pending" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _customerNameMeta = const VerificationMeta(
+    'customerName',
+  );
+  @override
+  late final GeneratedColumn<String> customerName = GeneratedColumn<String>(
+    'customer_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1246,6 +1281,9 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
     totalCents,
     amountReceivedCents,
     paymentMethod,
+    notes,
+    changePending,
+    customerName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1306,6 +1344,30 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
         ),
       );
     }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('change_pending')) {
+      context.handle(
+        _changePendingMeta,
+        changePending.isAcceptableOrUnknown(
+          data['change_pending']!,
+          _changePendingMeta,
+        ),
+      );
+    }
+    if (data.containsKey('customer_name')) {
+      context.handle(
+        _customerNameMeta,
+        customerName.isAcceptableOrUnknown(
+          data['customer_name']!,
+          _customerNameMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1339,6 +1401,18 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
         DriftSqlType.string,
         data['${effectivePrefix}payment_method'],
       )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      changePending: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}change_pending'],
+      )!,
+      customerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}customer_name'],
+      ),
     );
   }
 
@@ -1355,6 +1429,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   final int totalCents;
   final int amountReceivedCents;
   final String paymentMethod;
+  final String? notes;
+  final bool changePending;
+  final String? customerName;
   const PosSale({
     required this.id,
     required this.eventId,
@@ -1362,6 +1439,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     required this.totalCents,
     required this.amountReceivedCents,
     required this.paymentMethod,
+    this.notes,
+    required this.changePending,
+    this.customerName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1372,6 +1452,13 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     map['total_cents'] = Variable<int>(totalCents);
     map['amount_received_cents'] = Variable<int>(amountReceivedCents);
     map['payment_method'] = Variable<String>(paymentMethod);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['change_pending'] = Variable<bool>(changePending);
+    if (!nullToAbsent || customerName != null) {
+      map['customer_name'] = Variable<String>(customerName);
+    }
     return map;
   }
 
@@ -1383,6 +1470,13 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       totalCents: Value(totalCents),
       amountReceivedCents: Value(amountReceivedCents),
       paymentMethod: Value(paymentMethod),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      changePending: Value(changePending),
+      customerName: customerName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customerName),
     );
   }
 
@@ -1400,6 +1494,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
         json['amountReceivedCents'],
       ),
       paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      changePending: serializer.fromJson<bool>(json['changePending']),
+      customerName: serializer.fromJson<String?>(json['customerName']),
     );
   }
   @override
@@ -1412,6 +1509,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       'totalCents': serializer.toJson<int>(totalCents),
       'amountReceivedCents': serializer.toJson<int>(amountReceivedCents),
       'paymentMethod': serializer.toJson<String>(paymentMethod),
+      'notes': serializer.toJson<String?>(notes),
+      'changePending': serializer.toJson<bool>(changePending),
+      'customerName': serializer.toJson<String?>(customerName),
     };
   }
 
@@ -1422,6 +1522,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     int? totalCents,
     int? amountReceivedCents,
     String? paymentMethod,
+    Value<String?> notes = const Value.absent(),
+    bool? changePending,
+    Value<String?> customerName = const Value.absent(),
   }) => PosSale(
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
@@ -1429,6 +1532,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     totalCents: totalCents ?? this.totalCents,
     amountReceivedCents: amountReceivedCents ?? this.amountReceivedCents,
     paymentMethod: paymentMethod ?? this.paymentMethod,
+    notes: notes.present ? notes.value : this.notes,
+    changePending: changePending ?? this.changePending,
+    customerName: customerName.present ? customerName.value : this.customerName,
   );
   PosSale copyWithCompanion(SalesCompanion data) {
     return PosSale(
@@ -1444,6 +1550,13 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       paymentMethod: data.paymentMethod.present
           ? data.paymentMethod.value
           : this.paymentMethod,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      changePending: data.changePending.present
+          ? data.changePending.value
+          : this.changePending,
+      customerName: data.customerName.present
+          ? data.customerName.value
+          : this.customerName,
     );
   }
 
@@ -1455,7 +1568,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
           ..write('soldAtMs: $soldAtMs, ')
           ..write('totalCents: $totalCents, ')
           ..write('amountReceivedCents: $amountReceivedCents, ')
-          ..write('paymentMethod: $paymentMethod')
+          ..write('paymentMethod: $paymentMethod, ')
+          ..write('notes: $notes, ')
+          ..write('changePending: $changePending, ')
+          ..write('customerName: $customerName')
           ..write(')'))
         .toString();
   }
@@ -1468,6 +1584,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     totalCents,
     amountReceivedCents,
     paymentMethod,
+    notes,
+    changePending,
+    customerName,
   );
   @override
   bool operator ==(Object other) =>
@@ -1478,7 +1597,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
           other.soldAtMs == this.soldAtMs &&
           other.totalCents == this.totalCents &&
           other.amountReceivedCents == this.amountReceivedCents &&
-          other.paymentMethod == this.paymentMethod);
+          other.paymentMethod == this.paymentMethod &&
+          other.notes == this.notes &&
+          other.changePending == this.changePending &&
+          other.customerName == this.customerName);
 }
 
 class SalesCompanion extends UpdateCompanion<PosSale> {
@@ -1488,6 +1610,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   final Value<int> totalCents;
   final Value<int> amountReceivedCents;
   final Value<String> paymentMethod;
+  final Value<String?> notes;
+  final Value<bool> changePending;
+  final Value<String?> customerName;
   const SalesCompanion({
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
@@ -1495,6 +1620,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     this.totalCents = const Value.absent(),
     this.amountReceivedCents = const Value.absent(),
     this.paymentMethod = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.changePending = const Value.absent(),
+    this.customerName = const Value.absent(),
   });
   SalesCompanion.insert({
     this.id = const Value.absent(),
@@ -1503,6 +1631,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     required int totalCents,
     required int amountReceivedCents,
     this.paymentMethod = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.changePending = const Value.absent(),
+    this.customerName = const Value.absent(),
   }) : eventId = Value(eventId),
        soldAtMs = Value(soldAtMs),
        totalCents = Value(totalCents),
@@ -1514,6 +1645,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Expression<int>? totalCents,
     Expression<int>? amountReceivedCents,
     Expression<String>? paymentMethod,
+    Expression<String>? notes,
+    Expression<bool>? changePending,
+    Expression<String>? customerName,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1523,6 +1657,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
       if (amountReceivedCents != null)
         'amount_received_cents': amountReceivedCents,
       if (paymentMethod != null) 'payment_method': paymentMethod,
+      if (notes != null) 'notes': notes,
+      if (changePending != null) 'change_pending': changePending,
+      if (customerName != null) 'customer_name': customerName,
     });
   }
 
@@ -1533,6 +1670,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Value<int>? totalCents,
     Value<int>? amountReceivedCents,
     Value<String>? paymentMethod,
+    Value<String?>? notes,
+    Value<bool>? changePending,
+    Value<String?>? customerName,
   }) {
     return SalesCompanion(
       id: id ?? this.id,
@@ -1541,6 +1681,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
       totalCents: totalCents ?? this.totalCents,
       amountReceivedCents: amountReceivedCents ?? this.amountReceivedCents,
       paymentMethod: paymentMethod ?? this.paymentMethod,
+      notes: notes ?? this.notes,
+      changePending: changePending ?? this.changePending,
+      customerName: customerName ?? this.customerName,
     );
   }
 
@@ -1565,6 +1708,15 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     if (paymentMethod.present) {
       map['payment_method'] = Variable<String>(paymentMethod.value);
     }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (changePending.present) {
+      map['change_pending'] = Variable<bool>(changePending.value);
+    }
+    if (customerName.present) {
+      map['customer_name'] = Variable<String>(customerName.value);
+    }
     return map;
   }
 
@@ -1576,7 +1728,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
           ..write('soldAtMs: $soldAtMs, ')
           ..write('totalCents: $totalCents, ')
           ..write('amountReceivedCents: $amountReceivedCents, ')
-          ..write('paymentMethod: $paymentMethod')
+          ..write('paymentMethod: $paymentMethod, ')
+          ..write('notes: $notes, ')
+          ..write('changePending: $changePending, ')
+          ..write('customerName: $customerName')
           ..write(')'))
         .toString();
   }
@@ -3984,6 +4139,9 @@ typedef $$SalesTableCreateCompanionBuilder =
       required int totalCents,
       required int amountReceivedCents,
       Value<String> paymentMethod,
+      Value<String?> notes,
+      Value<bool> changePending,
+      Value<String?> customerName,
     });
 typedef $$SalesTableUpdateCompanionBuilder =
     SalesCompanion Function({
@@ -3993,6 +4151,9 @@ typedef $$SalesTableUpdateCompanionBuilder =
       Value<int> totalCents,
       Value<int> amountReceivedCents,
       Value<String> paymentMethod,
+      Value<String?> notes,
+      Value<bool> changePending,
+      Value<String?> customerName,
     });
 
 final class $$SalesTableReferences
@@ -4091,6 +4252,21 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<String> get paymentMethod => $composableBuilder(
     column: $table.paymentMethod,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get changePending => $composableBuilder(
+    column: $table.changePending,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customerName => $composableBuilder(
+    column: $table.customerName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4204,6 +4380,21 @@ class $$SalesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get changePending => $composableBuilder(
+    column: $table.changePending,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customerName => $composableBuilder(
+    column: $table.customerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$EventsTableOrderingComposer get eventId {
     final $$EventsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -4255,6 +4446,19 @@ class $$SalesTableAnnotationComposer
 
   GeneratedColumn<String> get paymentMethod => $composableBuilder(
     column: $table.paymentMethod,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<bool> get changePending => $composableBuilder(
+    column: $table.changePending,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customerName => $composableBuilder(
+    column: $table.customerName,
     builder: (column) => column,
   );
 
@@ -4372,6 +4576,9 @@ class $$SalesTableTableManager
                 Value<int> totalCents = const Value.absent(),
                 Value<int> amountReceivedCents = const Value.absent(),
                 Value<String> paymentMethod = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<bool> changePending = const Value.absent(),
+                Value<String?> customerName = const Value.absent(),
               }) => SalesCompanion(
                 id: id,
                 eventId: eventId,
@@ -4379,6 +4586,9 @@ class $$SalesTableTableManager
                 totalCents: totalCents,
                 amountReceivedCents: amountReceivedCents,
                 paymentMethod: paymentMethod,
+                notes: notes,
+                changePending: changePending,
+                customerName: customerName,
               ),
           createCompanionCallback:
               ({
@@ -4388,6 +4598,9 @@ class $$SalesTableTableManager
                 required int totalCents,
                 required int amountReceivedCents,
                 Value<String> paymentMethod = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<bool> changePending = const Value.absent(),
+                Value<String?> customerName = const Value.absent(),
               }) => SalesCompanion.insert(
                 id: id,
                 eventId: eventId,
@@ -4395,6 +4608,9 @@ class $$SalesTableTableManager
                 totalCents: totalCents,
                 amountReceivedCents: amountReceivedCents,
                 paymentMethod: paymentMethod,
+                notes: notes,
+                changePending: changePending,
+                customerName: customerName,
               ),
           withReferenceMapper: (p0) => p0
               .map(

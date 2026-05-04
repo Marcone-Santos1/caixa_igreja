@@ -95,6 +95,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,
+        path: '/event/:eventId/edit_sale/:saleId',
+        builder: (context, state) {
+          final eid = int.parse(state.pathParameters['eventId']!);
+          final sid = int.parse(state.pathParameters['saleId']!);
+          return NewSaleScreen(eventId: eid, editSaleId: sid);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/settings/security',
         builder: (context, state) => const SecurityScreen(),
       ),

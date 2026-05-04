@@ -50,6 +50,9 @@ class Sales extends Table {
   IntColumn get amountReceivedCents => integer()();
   TextColumn get paymentMethod =>
       text().withDefault(const Constant(PaymentMethod.dinheiro))();
+  TextColumn get notes => text().nullable()();
+  BoolColumn get changePending => boolean().withDefault(const Constant(false))();
+  TextColumn get customerName => text().nullable()();
 }
 
 @DataClassName('PosSaleLine')
@@ -220,7 +223,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -296,6 +299,11 @@ ALTER TABLE products_new RENAME TO products;
 CREATE INDEX IF NOT EXISTS products_event_id_idx ON products (event_id);
 PRAGMA foreign_keys = ON;
 ''');
+          }
+          if (from < 4) {
+            await m.addColumn(sales, sales.notes);
+            await m.addColumn(sales, sales.changePending);
+            await m.addColumn(sales, sales.customerName);
           }
         },
       );
@@ -449,6 +457,9 @@ PRAGMA foreign_keys = ON;
     required int eventId,
     required String paymentMethod,
     required int amountReceivedCents,
+    String? notes,
+    bool changePending = false,
+    String? customerName,
     required List<SaleLineDraft> lines,
   }) {
     if (lines.isEmpty) {
@@ -523,6 +534,9 @@ PRAGMA foreign_keys = ON;
           totalCents: totalCents,
           amountReceivedCents: amountReceivedCents,
           paymentMethod: Value(paymentMethod),
+          notes: Value(notes),
+          changePending: Value(changePending),
+          customerName: Value(customerName),
         ),
       );
 
@@ -574,6 +588,176 @@ PRAGMA foreign_keys = ON;
       }
 
       return saleId;
+    });
+  }
+
+  /// Atualiza a venda revertendo as linhas antigas e inserindo novas,
+  /// atualizando o valor recebido, método, etc, mas mantendo a mesma saleId.
+  Future<void> updateSaleWithLines({
+    required int saleId,
+    required int eventId,
+    required String paymentMethod,
+    required int amountReceivedCents,
+    String? notes,
+    bool changePending = false,
+    String? customerName,
+    required List<SaleLineDraft> lines,
+  }) {
+    if (lines.isEmpty) {
+      throw ArgumentError('Carrinho vazio');
+    }
+
+    return transaction(() async {
+      // 1. Validar a venda original
+      final sale = await (select(sales)..where((s) => s.id.equals(saleId))).getSingleOrNull();
+      if (sale == null) throw StateError('Venda não encontrada');
+      if (sale.eventId != eventId) throw StateError('Evento da venda inconsistente');
+
+      // 2. Reverter os estoques e deletar linhas antigas e troco
+      final oldLines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
+      for (final l in oldLines) {
+        if (l.lineKind == SaleLineKind.product && l.productId != null) {
+          final p = await (select(products)..where((t) => t.id.equals(l.productId!))).getSingleOrNull();
+          if (p != null && p.trackStock) {
+            await (update(products)..where((t) => t.id.equals(p.id))).write(
+              ProductsCompanion(stockQty: Value(p.stockQty + l.qty)),
+            );
+          }
+        } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
+          final d = await (select(eventDotDenominations)..where((t) => t.id.equals(l.dotDenominationId!))).getSingleOrNull();
+          if (d != null) {
+            await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
+              EventDotDenominationsCompanion(stockQty: Value(d.stockQty + l.qty)),
+            );
+          }
+        }
+      }
+
+      final changeAllocations = await (select(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).get();
+      for (final a in changeAllocations) {
+        final d = await (select(eventDotDenominations)..where((t) => t.id.equals(a.dotDenominationId))).getSingleOrNull();
+        if (d != null) {
+          await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
+            EventDotDenominationsCompanion(stockQty: Value(d.stockQty + a.qty)),
+          );
+        }
+      }
+      await (delete(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).go();
+      await (delete(saleLines)..where((t) => t.saleId.equals(saleId))).go();
+
+      // 3. Validar novos itens e calcular novo total
+      var totalCents = 0;
+      for (final l in lines) {
+        if (l.qty <= 0 && l.kind != SaleLineKind.valorLivre) {
+          throw ArgumentError('Quantidade inválida');
+        }
+        totalCents += l.resolveLineTotalCents();
+      }
+      if (amountReceivedCents < totalCents) {
+        throw ArgumentError('Valor recebido menor que o total');
+      }
+
+      for (final l in lines) {
+        switch (l.kind) {
+          case SaleLineKind.product:
+            final pid = l.productId;
+            if (pid == null) throw ArgumentError('Produto inválido');
+            final p = await (select(products)
+                  ..where((t) => t.id.equals(pid))
+                  ..where((t) => t.eventId.equals(eventId)))
+                .getSingleOrNull();
+            if (p == null) throw StateError('Produto não encontrado neste evento');
+            if (!p.active) throw StateError('Produto inativo: ${p.name}');
+            if (p.trackStock && p.stockQty < l.qty) {
+              throw StateError('Estoque insuficiente para ${p.name}');
+            }
+            if (l.unitPriceCents != p.priceCents) {
+              throw StateError('Preço do produto alterado; atualize o carrinho');
+            }
+            break;
+          case SaleLineKind.valorLivre:
+            if ((l.freeLabel ?? '').trim().isEmpty) {
+              throw ArgumentError('Descrição do valor avulso obrigatória');
+            }
+            if ((l.lineTotalCents ?? 0) <= 0) {
+              throw ArgumentError('Valor avulso inválido');
+            }
+            break;
+          case SaleLineKind.ficha:
+            final did = l.dotDenominationId;
+            if (did == null) throw ArgumentError('Ficha inválida');
+            final d = await (select(eventDotDenominations)..where((t) => t.id.equals(did))).getSingleOrNull();
+            if (d == null) throw StateError('Denominação não encontrada');
+            if (d.eventId != eventId) {
+              throw StateError('Ficha não pertence a este evento');
+            }
+            if (d.stockQty < l.qty) {
+              throw StateError('Estoque de fichas insuficiente (${d.label})');
+            }
+            if (l.unitPriceCents != d.valueCents) {
+              throw StateError('Valor da ficha alterado; atualize o carrinho');
+            }
+            break;
+          default:
+            throw ArgumentError('Tipo de linha desconhecido');
+        }
+      }
+
+      // 4. Atualizar os dados da venda original
+      await updateSaleDetails(
+        saleId: saleId,
+        paymentMethod: paymentMethod,
+        amountReceivedCents: amountReceivedCents,
+        notes: notes,
+        changePending: changePending,
+        customerName: customerName,
+      );
+      await (update(sales)..where((s) => s.id.equals(saleId))).write(
+        SalesCompanion(totalCents: Value(totalCents)),
+      );
+
+      // 5. Inserir novas linhas e abater novos estoques
+      for (final l in lines) {
+        final lineTotal = l.resolveLineTotalCents();
+        final unit = l.resolveUnitPriceCents();
+
+        await into(saleLines).insert(
+          SaleLinesCompanion.insert(
+            saleId: saleId,
+            lineKind: Value(l.kind),
+            productId: Value(l.productId),
+            dotDenominationId: Value(l.dotDenominationId),
+            freeLabel: Value(l.freeLabel),
+            qty: l.kind == SaleLineKind.valorLivre ? 1 : l.qty,
+            unitPriceCents: unit,
+            lineTotalCents: lineTotal,
+          ),
+        );
+
+        switch (l.kind) {
+          case SaleLineKind.product:
+            final pid = l.productId!;
+            final p = await (select(products)
+                  ..where((t) => t.id.equals(pid))
+                  ..where((t) => t.eventId.equals(eventId)))
+                .getSingle();
+            if (p.trackStock) {
+              await (update(products)..where((t) => t.id.equals(pid))).write(
+                ProductsCompanion(stockQty: Value(p.stockQty - l.qty)),
+              );
+            }
+            break;
+          case SaleLineKind.ficha:
+            final did = l.dotDenominationId!;
+            final d = await (select(eventDotDenominations)..where((t) => t.id.equals(did))).getSingle();
+            await (update(eventDotDenominations)..where((t) => t.id.equals(did))).write(
+              EventDotDenominationsCompanion(stockQty: Value(d.stockQty - l.qty)),
+            );
+            break;
+          case SaleLineKind.valorLivre:
+            break;
+        }
+      }
     });
   }
 
@@ -773,6 +957,74 @@ PRAGMA foreign_keys = ON;
             ..where((d) => d.eventId.equals(eventId)))
           .go();
       await (delete(events)..where((e) => e.id.equals(eventId))).go();
+    });
+  }
+
+  /// Atualiza dados básicos de uma venda.
+  Future<void> updateSaleDetails({
+    required int saleId,
+    required String paymentMethod,
+    required int amountReceivedCents,
+    String? notes,
+    bool? changePending,
+    String? customerName,
+  }) async {
+    await (update(sales)..where((s) => s.id.equals(saleId))).write(
+      SalesCompanion(
+        paymentMethod: Value(paymentMethod),
+        amountReceivedCents: Value(amountReceivedCents),
+        notes: Value(notes),
+        changePending: changePending != null ? Value(changePending) : const Value.absent(),
+        customerName: customerName != null ? Value(customerName) : const Value.absent(),
+      ),
+    );
+  }
+
+  /// Exclui a venda e devolve produtos e fichas ao estoque.
+  Future<void> deleteSale(int saleId) async {
+    await transaction(() async {
+      final sale = await (select(sales)..where((s) => s.id.equals(saleId)))
+          .getSingleOrNull();
+      if (sale == null) return;
+
+      final lines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
+
+      for (final l in lines) {
+        if (l.lineKind == SaleLineKind.product && l.productId != null) {
+          final p = await (select(products)
+                ..where((t) => t.id.equals(l.productId!)))
+              .getSingleOrNull();
+          if (p != null && p.trackStock) {
+            await (update(products)..where((t) => t.id.equals(p.id))).write(
+              ProductsCompanion(stockQty: Value(p.stockQty + l.qty)),
+            );
+          }
+        } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
+          final d = await (select(eventDotDenominations)
+                ..where((t) => t.id.equals(l.dotDenominationId!)))
+              .getSingleOrNull();
+          if (d != null) {
+            await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
+              EventDotDenominationsCompanion(stockQty: Value(d.stockQty + l.qty)),
+            );
+          }
+        }
+      }
+
+      // Deletar as alocações de troco em fichas (caso existam) e reverter estoques dessas fichas de troco
+      final changeAllocations = await (select(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).get();
+      for (final a in changeAllocations) {
+        final d = await (select(eventDotDenominations)..where((t) => t.id.equals(a.dotDenominationId))).getSingleOrNull();
+        if (d != null) {
+          await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
+            EventDotDenominationsCompanion(stockQty: Value(d.stockQty + a.qty)),
+          );
+        }
+      }
+      await (delete(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).go();
+      
+      await (delete(saleLines)..where((t) => t.saleId.equals(saleId))).go();
+      await (delete(sales)..where((t) => t.id.equals(saleId))).go();
     });
   }
 }

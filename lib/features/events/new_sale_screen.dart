@@ -7,6 +7,7 @@ import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../data/sale_line_draft.dart';
 import '../../domain/payment_method.dart';
+import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/money_format.dart';
 
@@ -17,9 +18,10 @@ class _FreeLine {
 }
 
 class NewSaleScreen extends ConsumerStatefulWidget {
-  const NewSaleScreen({super.key, required this.eventId});
+  const NewSaleScreen({super.key, required this.eventId, this.editSaleId});
 
   final int eventId;
+  final int? editSaleId;
 
   @override
   ConsumerState<NewSaleScreen> createState() => _NewSaleScreenState();
@@ -29,6 +31,41 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   final Map<int, int> _productQty = {};
   final Map<int, int> _fichaQty = {};
   final List<_FreeLine> _freeLines = [];
+  PosSale? _originalSale;
+  bool _isLoadingEdit = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editSaleId != null) {
+      _loadEditSale();
+    }
+  }
+
+  Future<void> _loadEditSale() async {
+    setState(() => _isLoadingEdit = true);
+    try {
+      final db = ref.read(appDatabaseProvider);
+      final sale = await (db.select(db.sales)..where((s) => s.id.equals(widget.editSaleId!))).getSingleOrNull();
+      if (sale != null) {
+        _originalSale = sale;
+        final lines = await (db.select(db.saleLines)..where((l) => l.saleId.equals(sale.id))).get();
+        for (final l in lines) {
+          if (l.lineKind == SaleLineKind.product && l.productId != null) {
+            _productQty[l.productId!] = (_productQty[l.productId!] ?? 0) + l.qty;
+          } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
+            _fichaQty[l.dotDenominationId!] = (_fichaQty[l.dotDenominationId!] ?? 0) + l.qty;
+          } else if (l.lineKind == SaleLineKind.valorLivre) {
+            _freeLines.add(_FreeLine(label: l.freeLabel ?? 'Valor', cents: l.lineTotalCents));
+          }
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingEdit = false);
+      }
+    }
+  }
 
   int _totalCents(
     List<ChurchProduct> products,
@@ -205,28 +242,73 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final result = await showDialog<_CheckoutResult>(
       context: context,
-      builder: (ctx) => _SaleCheckoutDialog(totalCents: total),
+      builder: (ctx) => _SaleCheckoutDialog(
+        totalCents: total,
+        denominations: denoms,
+        originalSale: _originalSale,
+      ),
     );
     if (result == null || !context.mounted) return;
     final db = ref.read(appDatabaseProvider);
     try {
-      final saleId = await db.completeSale(
-        eventId: widget.eventId,
-        paymentMethod: result.paymentMethod,
-        amountReceivedCents: result.amountReceivedCents,
-        lines: drafts,
-      );
-      if (!context.mounted) return;
-      final change = result.amountReceivedCents - total;
-      if (result.paymentMethod == PaymentMethod.dinheiro && change > 0) {
-        await router.push(
-          '/event/${widget.eventId}/sale/$saleId/troco?change=$change',
+      if (widget.editSaleId != null) {
+        await db.updateSaleWithLines(
+          saleId: widget.editSaleId!,
+          eventId: widget.eventId,
+          paymentMethod: result.paymentMethod,
+          amountReceivedCents: result.amountReceivedCents,
+          notes: result.notes,
+          changePending: result.changePending,
+          customerName: result.customerName,
+          lines: drafts,
+        );
+      } else {
+        await db.completeSale(
+          eventId: widget.eventId,
+          paymentMethod: result.paymentMethod,
+          amountReceivedCents: result.amountReceivedCents,
+          notes: result.notes,
+          changePending: result.changePending,
+          customerName: result.customerName,
+          lines: drafts,
         );
       }
       if (!context.mounted) return;
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Venda registrada')),
-      );
+      
+      final change = result.amountReceivedCents - total;
+
+      if (!mounted) return;
+      
+      if (change > 0 && result.paymentMethod == PaymentMethod.dinheiro) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(result.changePending ? 'Venda Finalizada (Troco Pendente)' : 'Venda Finalizada'),
+            content: Text(
+              result.changePending 
+                  ? 'Devendo troco de:\n\n${formatCents(change)}\n\nPara: ${result.customerName ?? 'Não informado'}'
+                  : 'Troco a devolver:\n\n${formatCents(change)}',
+              style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                fontSize: result.changePending ? 20 : null,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('Venda registrada')),
+        );
+      }
+
       if (!context.mounted) return;
       router.pop();
     } catch (e) {
@@ -245,9 +327,11 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
-        title: const Text('Nova venda'),
+        title: Text(widget.editSaleId != null ? 'Editar venda #${widget.editSaleId}' : 'Nova venda'),
       ),
-      body: StreamBuilder<List<ChurchProduct>>(
+      body: _isLoadingEdit 
+        ? const Center(child: CircularProgressIndicator())
+        : StreamBuilder<List<ChurchProduct>>(
         stream: db.watchActiveProductsForEvent(widget.eventId),
         builder: (context, prodSnap) {
           if (prodSnap.hasError) {
@@ -395,33 +479,46 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                               final disabled =
                                   p.trackStock && p.stockQty == 0;
                               final inCart = _productQty[p.id] ?? 0;
-                              return Card(
-                                child: InkWell(
-                                  onTap: disabled ? null : () => _addProduct(p),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          p.name,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
+                              
+                              Widget cardContent = Padding(
+                                padding: const EdgeInsets.all(8),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
+                                    ),
+                                    const Spacer(),
+                                    Text(formatCents(p.priceCents)),
+                                    if (inCart > 0)
+                                      Text('x$inCart',
                                           style: Theme.of(context)
                                               .textTheme
-                                              .titleSmall,
-                                        ),
-                                        const Spacer(),
-                                        Text(formatCents(p.priceCents)),
-                                        if (inCart > 0)
-                                          Text('x$inCart',
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .labelSmall),
-                                      ],
-                                    ),
-                                  ),
+                                              .labelSmall),
+                                  ],
+                                ),
+                              );
+
+                              if (disabled) {
+                                cardContent = Opacity(
+                                  opacity: 0.5,
+                                  child: cardContent,
+                                );
+                              }
+
+                              return Card(
+                                color: disabled
+                                    ? Colors.red.withValues(alpha: 0.2)
+                                    : null,
+                                child: InkWell(
+                                  onTap: disabled ? null : () => _addProduct(p),
+                                  child: cardContent,
                                 ),
                               );
                             },
@@ -545,15 +642,27 @@ class _CheckoutResult {
   _CheckoutResult({
     required this.paymentMethod,
     required this.amountReceivedCents,
+    this.notes,
+    this.changePending = false,
+    this.customerName,
   });
   final String paymentMethod;
   final int amountReceivedCents;
+  final String? notes;
+  final bool changePending;
+  final String? customerName;
 }
 
 class _SaleCheckoutDialog extends StatefulWidget {
-  const _SaleCheckoutDialog({required this.totalCents});
+  const _SaleCheckoutDialog({
+    required this.totalCents,
+    required this.denominations,
+    this.originalSale,
+  });
 
   final int totalCents;
+  final List<EventDotDenom> denominations;
+  final PosSale? originalSale;
 
   @override
   State<_SaleCheckoutDialog> createState() => _SaleCheckoutDialogState();
@@ -562,11 +671,23 @@ class _SaleCheckoutDialog extends StatefulWidget {
 class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
   String _payment = PaymentMethod.dinheiro;
   final _controller = TextEditingController();
+  final _notesController = TextEditingController();
+  bool _changePending = false;
+  final _customerNameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _syncReceivedField();
+    if (widget.originalSale != null) {
+      final s = widget.originalSale!;
+      _payment = s.paymentMethod;
+      _notesController.text = s.notes ?? '';
+      _changePending = s.changePending;
+      _customerNameController.text = s.customerName ?? '';
+      _controller.text = (s.amountReceivedCents / 100).toStringAsFixed(2).replaceAll('.', ',');
+    } else {
+      _syncReceivedField();
+    }
   }
 
   void _syncReceivedField() {
@@ -578,10 +699,31 @@ class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
   @override
   void dispose() {
     _controller.dispose();
+    _notesController.dispose();
+    _customerNameController.dispose();
     super.dispose();
   }
 
   int? get _received => parseMoneyToCents(_controller.text);
+
+  String _buildFichasSuggestion(int totalCents) {
+    if (widget.denominations.isEmpty || totalCents <= 0) return '';
+    final sorted = List<EventDotDenom>.from(widget.denominations)
+      ..sort((a, b) => b.valueCents.compareTo(a.valueCents));
+    var remaining = totalCents;
+    final Map<int, int> toGive = {};
+    for (final d in sorted) {
+      if (d.valueCents <= 0) continue;
+      final qty = remaining ~/ d.valueCents;
+      if (qty > 0) {
+        toGive[d.valueCents] = qty;
+        remaining -= (qty * d.valueCents);
+      }
+    }
+    if (toGive.isEmpty) return '';
+    final parts = toGive.entries.map((e) => '${e.value}x ${formatCents(e.key)}');
+    return 'Sugestão de Fichas (Dots):\n${parts.join('  |  ')}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -598,6 +740,22 @@ class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
           children: [
             Text('Total: ${formatCents(widget.totalCents)}'),
             const SizedBox(height: 12),
+            if (widget.denominations.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _buildFichasSuggestion(widget.totalCents),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             InputDecorator(
               decoration: const InputDecoration(
                 labelText: 'Forma de pagamento',
@@ -627,6 +785,15 @@ class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _notesController,
+              decoration: const InputDecoration(
+                labelText: 'Observação (Opcional)',
+                border: OutlineInputBorder(),
+              ),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: _controller,
               decoration: InputDecoration(
                 labelText: isCash
@@ -646,6 +813,28 @@ class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
                     : 'Troco: ${formatCents(change.clamp(0, 1 << 30))}',
                 style: Theme.of(context).textTheme.titleSmall,
               ),
+              if (_received != null && change > 0) ...[
+                const SizedBox(height: 12),
+                CheckboxListTile(
+                  title: const Text('Troco pendente'),
+                  subtitle: const Text('Marque se ficar devendo o troco'),
+                  value: _changePending,
+                  onChanged: (v) => setState(() => _changePending = v ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                if (_changePending) ...[
+                  TextField(
+                    controller: _customerNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome do cliente',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ],
               Wrap(
                 spacing: 8,
                 children: [10, 20, 50, 100, 200].map((reais) {
@@ -674,11 +863,22 @@ class _SaleCheckoutDialogState extends State<_SaleCheckoutDialog> {
           onPressed: () {
             final r = _received;
             if (r == null || r < widget.totalCents) return;
+            
+            if (_changePending && _customerNameController.text.trim().isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Informe o nome do cliente para o troco pendente')),
+              );
+              return;
+            }
+            
             Navigator.pop(
               context,
               _CheckoutResult(
                 paymentMethod: _payment,
                 amountReceivedCents: r,
+                notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+                changePending: _changePending,
+                customerName: _customerNameController.text.trim().isEmpty ? null : _customerNameController.text.trim(),
               ),
             );
           },
