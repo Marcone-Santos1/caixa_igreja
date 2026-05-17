@@ -39,6 +39,16 @@ class Products extends Table {
   BoolColumn get trackStock => boolean().withDefault(const Constant(false))();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
+  BoolColumn get isCombo => boolean().withDefault(const Constant(false))();
+}
+
+class ProductComboItems extends Table {
+  IntColumn get comboProductId => integer().references(Products, #id)();
+  IntColumn get childProductId => integer().references(Products, #id)();
+  IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {comboProductId, childProductId};
 }
 
 @DataClassName('PosSale')
@@ -214,6 +224,7 @@ class EventLowStockCounts {
     Events,
     EventDotDenominations,
     Products,
+    ProductComboItems,
     Sales,
     SaleLines,
     SaleChangeDotAllocations,
@@ -223,7 +234,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -305,6 +316,10 @@ PRAGMA foreign_keys = ON;
             await m.addColumn(sales, sales.changePending);
             await m.addColumn(sales, sales.customerName);
           }
+          if (from < 5) {
+            await m.addColumn(products, products.isCombo);
+            await m.createTable(productComboItems);
+          }
         },
       );
 
@@ -324,19 +339,49 @@ PRAGMA foreign_keys = ON;
         .watch();
   }
 
+  Future<List<ChurchProduct>> _mapProductsWithEffectiveStock(List<ChurchProduct> prods) async {
+    final List<ChurchProduct> mapped = [];
+    for (final p in prods) {
+      if (p.isCombo) {
+        final items = await (select(productComboItems)..where((t) => t.comboProductId.equals(p.id))).get();
+        int? effectiveStock;
+        bool tracksStock = false;
+        for (final item in items) {
+          final child = await (select(products)..where((t) => t.id.equals(item.childProductId))).getSingleOrNull();
+          if (child != null && child.trackStock) {
+            tracksStock = true;
+            final possible = child.stockQty ~/ item.qty;
+            if (effectiveStock == null || possible < effectiveStock) {
+              effectiveStock = possible;
+            }
+          }
+        }
+        mapped.add(p.copyWith(
+          trackStock: tracksStock,
+          stockQty: effectiveStock ?? 0,
+        ));
+      } else {
+        mapped.add(p);
+      }
+    }
+    return mapped;
+  }
+
   Stream<List<ChurchProduct>> watchActiveProductsForEvent(int eventId) {
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
           ..where((p) => p.active.equals(true))
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
-        .watch();
+        .watch()
+        .asyncMap(_mapProductsWithEffectiveStock);
   }
 
   Stream<List<ChurchProduct>> watchAllProductsForEvent(int eventId) {
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
-        .watch();
+        .watch()
+        .asyncMap(_mapProductsWithEffectiveStock);
   }
 
   Stream<List<ChurchEvent>> watchAllEvents() {
@@ -392,6 +437,7 @@ PRAGMA foreign_keys = ON;
       onListen: () {
         sub1 = (select(products)..where((p) => p.eventId.equals(eventId)))
             .watch()
+            .asyncMap(_mapProductsWithEffectiveStock)
             .listen((list) {
           latestP = list;
           emit();
@@ -413,7 +459,7 @@ PRAGMA foreign_keys = ON;
     return controller.stream;
   }
 
-  Future<List<EventSaleLineRow>> saleLinesForSale(int saleId) {
+  Future<List<EventSaleLineRow>> saleLinesForSale(int saleId) async {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
       leftOuterJoin(
@@ -429,27 +475,105 @@ PRAGMA foreign_keys = ON;
       ..where(saleLines.saleId.equals(saleId))
       ..orderBy([OrderingTerm.asc(saleLines.id)]);
 
-    return q.map((row) {
+    final rows = await q.get();
+    final result = <EventSaleLineRow>[];
+
+    for (final row in rows) {
       final sl = row.readTable(saleLines);
       final p = row.readTableOrNull(products);
       final d = row.readTableOrNull(eventDotDenominations);
-      final item = switch (sl.lineKind) {
-        SaleLineKind.valorLivre => 'Valor: ${sl.freeLabel ?? ''}',
-        SaleLineKind.ficha => 'Ficha: ${d?.label ?? '#${sl.dotDenominationId}'}',
-        _ => p?.name ?? 'Produto #${sl.productId}',
-      };
-      return EventSaleLineRow(
-        itemLabel: item,
+      
+      String itemLabel;
+      if (sl.lineKind == SaleLineKind.valorLivre) {
+        itemLabel = 'Valor: ${sl.freeLabel ?? ''}';
+      } else if (sl.lineKind == SaleLineKind.ficha) {
+        itemLabel = 'Ficha: ${d?.label ?? '#${sl.dotDenominationId}'}';
+      } else {
+        if (p != null && p.isCombo) {
+          final comboItems = await getComboItems(p.id);
+          final parts = <String>[];
+          for (final item in comboItems) {
+            final child = await (select(products)..where((t) => t.id.equals(item.childProductId))).getSingleOrNull();
+            if (child != null) {
+              parts.add('${item.qty}x ${child.name}');
+            }
+          }
+          if (parts.isNotEmpty) {
+            itemLabel = '📦 ${p.name} (${parts.join(', ')})';
+          } else {
+            itemLabel = '📦 ${p.name}';
+          }
+        } else {
+          itemLabel = p?.name ?? 'Produto #${sl.productId}';
+        }
+      }
+
+      result.add(EventSaleLineRow(
+        itemLabel: itemLabel,
         qty: sl.qty,
         unitPriceCents: sl.unitPriceCents,
         lineTotalCents: sl.lineTotalCents,
-      );
-    }).get();
+      ));
+    }
+
+    return result;
   }
 
   Future<List<ChurchEvent>> eventsForDayMs(int dayStartMs) {
     return (select(events)..where((e) => e.dateEpochMs.equals(dayStartMs)))
         .get();
+  }
+
+  Future<void> _validateProductStock(int productId, int qtyMultiplier) async {
+    final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
+    if (p == null) return;
+    if (p.isCombo) {
+      final children = await (select(productComboItems)..where((t) => t.comboProductId.equals(productId))).get();
+      for (final child in children) {
+        await _validateProductStock(child.childProductId, child.qty * qtyMultiplier);
+      }
+    } else {
+      if (p.trackStock && p.stockQty < qtyMultiplier) {
+        throw StateError('Estoque insuficiente para ${p.name}');
+      }
+    }
+  }
+
+  Future<void> _abateProductStock(int productId, int qtyMultiplier) async {
+    final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
+    if (p == null) return;
+    if (p.isCombo) {
+      final children = await (select(productComboItems)..where((t) => t.comboProductId.equals(productId))).get();
+      for (final child in children) {
+        await _abateProductStock(child.childProductId, child.qty * qtyMultiplier);
+      }
+    } else {
+      if (p.trackStock) {
+        if (p.stockQty < qtyMultiplier) {
+          throw StateError('Estoque insuficiente para ${p.name}');
+        }
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(stockQty: Value(p.stockQty - qtyMultiplier)),
+        );
+      }
+    }
+  }
+
+  Future<void> _revertProductStock(int productId, int qtyMultiplier) async {
+    final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
+    if (p == null) return;
+    if (p.isCombo) {
+      final children = await (select(productComboItems)..where((t) => t.comboProductId.equals(productId))).get();
+      for (final child in children) {
+        await _revertProductStock(child.childProductId, child.qty * qtyMultiplier);
+      }
+    } else {
+      if (p.trackStock) {
+        await (update(products)..where((t) => t.id.equals(productId))).write(
+          ProductsCompanion(stockQty: Value(p.stockQty + qtyMultiplier)),
+        );
+      }
+    }
   }
 
   /// Venda completa: linhas (produto, valor livre ou ficha), pagamento e estoques.
@@ -489,9 +613,7 @@ PRAGMA foreign_keys = ON;
                 .getSingleOrNull();
             if (p == null) throw StateError('Produto não encontrado neste evento');
             if (!p.active) throw StateError('Produto inativo: ${p.name}');
-            if (p.trackStock && p.stockQty < l.qty) {
-              throw StateError('Estoque insuficiente para ${p.name}');
-            }
+            await _validateProductStock(pid, l.qty);
             if (l.unitPriceCents != p.priceCents) {
               throw StateError('Preço do produto alterado; atualize o carrinho');
             }
@@ -560,15 +682,7 @@ PRAGMA foreign_keys = ON;
         switch (l.kind) {
           case SaleLineKind.product:
             final pid = l.productId!;
-            final p = await (select(products)
-                  ..where((t) => t.id.equals(pid))
-                  ..where((t) => t.eventId.equals(eventId)))
-                .getSingle();
-            if (p.trackStock) {
-              await (update(products)..where((t) => t.id.equals(pid))).write(
-                ProductsCompanion(stockQty: Value(p.stockQty - l.qty)),
-              );
-            }
+            await _abateProductStock(pid, l.qty);
             break;
           case SaleLineKind.ficha:
             final did = l.dotDenominationId!;
@@ -617,12 +731,7 @@ PRAGMA foreign_keys = ON;
       final oldLines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
       for (final l in oldLines) {
         if (l.lineKind == SaleLineKind.product && l.productId != null) {
-          final p = await (select(products)..where((t) => t.id.equals(l.productId!))).getSingleOrNull();
-          if (p != null && p.trackStock) {
-            await (update(products)..where((t) => t.id.equals(p.id))).write(
-              ProductsCompanion(stockQty: Value(p.stockQty + l.qty)),
-            );
-          }
+          await _revertProductStock(l.productId!, l.qty);
         } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
           final d = await (select(eventDotDenominations)..where((t) => t.id.equals(l.dotDenominationId!))).getSingleOrNull();
           if (d != null) {
@@ -668,9 +777,7 @@ PRAGMA foreign_keys = ON;
                 .getSingleOrNull();
             if (p == null) throw StateError('Produto não encontrado neste evento');
             if (!p.active) throw StateError('Produto inativo: ${p.name}');
-            if (p.trackStock && p.stockQty < l.qty) {
-              throw StateError('Estoque insuficiente para ${p.name}');
-            }
+            await _validateProductStock(pid, l.qty);
             if (l.unitPriceCents != p.priceCents) {
               throw StateError('Preço do produto alterado; atualize o carrinho');
             }
@@ -737,15 +844,7 @@ PRAGMA foreign_keys = ON;
         switch (l.kind) {
           case SaleLineKind.product:
             final pid = l.productId!;
-            final p = await (select(products)
-                  ..where((t) => t.id.equals(pid))
-                  ..where((t) => t.eventId.equals(eventId)))
-                .getSingle();
-            if (p.trackStock) {
-              await (update(products)..where((t) => t.id.equals(pid))).write(
-                ProductsCompanion(stockQty: Value(p.stockQty - l.qty)),
-              );
-            }
+            await _abateProductStock(pid, l.qty);
             break;
           case SaleLineKind.ficha:
             final did = l.dotDenominationId!;
@@ -886,6 +985,75 @@ PRAGMA foreign_keys = ON;
     }).get();
   }
 
+  Future<int> createCombo({
+    required int eventId,
+    required String name,
+    required int priceCents,
+    String description = '',
+    bool active = true,
+    required List<({int childProductId, int qty})> items,
+  }) {
+    return transaction(() async {
+      final comboId = await into(products).insert(
+        ProductsCompanion.insert(
+          eventId: eventId,
+          name: name,
+          priceCents: priceCents,
+          description: Value(description),
+          trackStock: const Value(false),
+          isCombo: const Value(true),
+          active: Value(active),
+        ),
+      );
+      for (final item in items) {
+        if (item.qty <= 0) continue;
+        await into(productComboItems).insert(
+          ProductComboItemsCompanion.insert(
+            comboProductId: comboId,
+            childProductId: item.childProductId,
+            qty: item.qty,
+          ),
+        );
+      }
+      return comboId;
+    });
+  }
+
+  Future<void> updateCombo({
+    required int comboProductId,
+    required String name,
+    required int priceCents,
+    String description = '',
+    bool active = true,
+    required List<({int childProductId, int qty})> items,
+  }) {
+    return transaction(() async {
+      await (update(products)..where((t) => t.id.equals(comboProductId))).write(
+        ProductsCompanion(
+          name: Value(name),
+          priceCents: Value(priceCents),
+          description: Value(description),
+          active: Value(active),
+        ),
+      );
+      await (delete(productComboItems)..where((t) => t.comboProductId.equals(comboProductId))).go();
+      for (final item in items) {
+        if (item.qty <= 0) continue;
+        await into(productComboItems).insert(
+          ProductComboItemsCompanion.insert(
+            comboProductId: comboProductId,
+            childProductId: item.childProductId,
+            qty: item.qty,
+          ),
+        );
+      }
+    });
+  }
+
+  Future<List<ProductComboItem>> getComboItems(int comboId) {
+    return (select(productComboItems)..where((t) => t.comboProductId.equals(comboId))).get();
+  }
+
   /// Remove o produto se não existir linha de venda referenciando-o.
   /// Retorna `null` em caso de sucesso, ou mensagem para o utilizador.
   Future<String?> deleteProduct({
@@ -903,6 +1071,16 @@ PRAGMA foreign_keys = ON;
     if (used.isNotEmpty) {
       return 'Este produto já entrou em vendas. Inative-o em vez de excluir.';
     }
+    final inCombos = await (select(productComboItems)..where((t) => t.childProductId.equals(productId))).get();
+    if (inCombos.isNotEmpty) {
+      return 'Este produto faz parte de um combo. Remova-o do combo antes de excluir.';
+    }
+    
+    // Deleta os itens se for um combo (ON DELETE cascade não configurado explicitamente)
+    if (p.isCombo) {
+      await (delete(productComboItems)..where((t) => t.comboProductId.equals(productId))).go();
+    }
+
     await (delete(products)
           ..where((t) => t.id.equals(productId))
           ..where((t) => t.eventId.equals(eventId)))
@@ -991,14 +1169,7 @@ PRAGMA foreign_keys = ON;
 
       for (final l in lines) {
         if (l.lineKind == SaleLineKind.product && l.productId != null) {
-          final p = await (select(products)
-                ..where((t) => t.id.equals(l.productId!)))
-              .getSingleOrNull();
-          if (p != null && p.trackStock) {
-            await (update(products)..where((t) => t.id.equals(p.id))).write(
-              ProductsCompanion(stockQty: Value(p.stockQty + l.qty)),
-            );
-          }
+          await _revertProductStock(l.productId!, l.qty);
         } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
           final d = await (select(eventDotDenominations)
                 ..where((t) => t.id.equals(l.dotDenominationId!)))

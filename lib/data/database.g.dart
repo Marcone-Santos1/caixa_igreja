@@ -759,6 +759,21 @@ class $ProductsTable extends Products
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _isComboMeta = const VerificationMeta(
+    'isCombo',
+  );
+  @override
+  late final GeneratedColumn<bool> isCombo = GeneratedColumn<bool>(
+    'is_combo',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_combo" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -769,6 +784,7 @@ class $ProductsTable extends Products
     trackStock,
     stockQty,
     active,
+    isCombo,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -836,6 +852,12 @@ class $ProductsTable extends Products
         active.isAcceptableOrUnknown(data['active']!, _activeMeta),
       );
     }
+    if (data.containsKey('is_combo')) {
+      context.handle(
+        _isComboMeta,
+        isCombo.isAcceptableOrUnknown(data['is_combo']!, _isComboMeta),
+      );
+    }
     return context;
   }
 
@@ -877,6 +899,10 @@ class $ProductsTable extends Products
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
       )!,
+      isCombo: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_combo'],
+      )!,
     );
   }
 
@@ -895,6 +921,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   final bool trackStock;
   final int stockQty;
   final bool active;
+  final bool isCombo;
   const ChurchProduct({
     required this.id,
     required this.eventId,
@@ -904,6 +931,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     required this.trackStock,
     required this.stockQty,
     required this.active,
+    required this.isCombo,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -916,6 +944,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     map['track_stock'] = Variable<bool>(trackStock);
     map['stock_qty'] = Variable<int>(stockQty);
     map['active'] = Variable<bool>(active);
+    map['is_combo'] = Variable<bool>(isCombo);
     return map;
   }
 
@@ -929,6 +958,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
       trackStock: Value(trackStock),
       stockQty: Value(stockQty),
       active: Value(active),
+      isCombo: Value(isCombo),
     );
   }
 
@@ -946,6 +976,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
       trackStock: serializer.fromJson<bool>(json['trackStock']),
       stockQty: serializer.fromJson<int>(json['stockQty']),
       active: serializer.fromJson<bool>(json['active']),
+      isCombo: serializer.fromJson<bool>(json['isCombo']),
     );
   }
   @override
@@ -960,6 +991,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
       'trackStock': serializer.toJson<bool>(trackStock),
       'stockQty': serializer.toJson<int>(stockQty),
       'active': serializer.toJson<bool>(active),
+      'isCombo': serializer.toJson<bool>(isCombo),
     };
   }
 
@@ -972,6 +1004,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     bool? trackStock,
     int? stockQty,
     bool? active,
+    bool? isCombo,
   }) => ChurchProduct(
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
@@ -981,6 +1014,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     trackStock: trackStock ?? this.trackStock,
     stockQty: stockQty ?? this.stockQty,
     active: active ?? this.active,
+    isCombo: isCombo ?? this.isCombo,
   );
   ChurchProduct copyWithCompanion(ProductsCompanion data) {
     return ChurchProduct(
@@ -998,6 +1032,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
           : this.trackStock,
       stockQty: data.stockQty.present ? data.stockQty.value : this.stockQty,
       active: data.active.present ? data.active.value : this.active,
+      isCombo: data.isCombo.present ? data.isCombo.value : this.isCombo,
     );
   }
 
@@ -1011,7 +1046,8 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
           ..write('priceCents: $priceCents, ')
           ..write('trackStock: $trackStock, ')
           ..write('stockQty: $stockQty, ')
-          ..write('active: $active')
+          ..write('active: $active, ')
+          ..write('isCombo: $isCombo')
           ..write(')'))
         .toString();
   }
@@ -1026,6 +1062,7 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     trackStock,
     stockQty,
     active,
+    isCombo,
   );
   @override
   bool operator ==(Object other) =>
@@ -1038,7 +1075,8 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
           other.priceCents == this.priceCents &&
           other.trackStock == this.trackStock &&
           other.stockQty == this.stockQty &&
-          other.active == this.active);
+          other.active == this.active &&
+          other.isCombo == this.isCombo);
 }
 
 class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
@@ -1050,6 +1088,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   final Value<bool> trackStock;
   final Value<int> stockQty;
   final Value<bool> active;
+  final Value<bool> isCombo;
   const ProductsCompanion({
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
@@ -1059,6 +1098,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     this.trackStock = const Value.absent(),
     this.stockQty = const Value.absent(),
     this.active = const Value.absent(),
+    this.isCombo = const Value.absent(),
   });
   ProductsCompanion.insert({
     this.id = const Value.absent(),
@@ -1069,6 +1109,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     this.trackStock = const Value.absent(),
     this.stockQty = const Value.absent(),
     this.active = const Value.absent(),
+    this.isCombo = const Value.absent(),
   }) : eventId = Value(eventId),
        name = Value(name),
        priceCents = Value(priceCents);
@@ -1081,6 +1122,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     Expression<bool>? trackStock,
     Expression<int>? stockQty,
     Expression<bool>? active,
+    Expression<bool>? isCombo,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1091,6 +1133,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
       if (trackStock != null) 'track_stock': trackStock,
       if (stockQty != null) 'stock_qty': stockQty,
       if (active != null) 'active': active,
+      if (isCombo != null) 'is_combo': isCombo,
     });
   }
 
@@ -1103,6 +1146,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     Value<bool>? trackStock,
     Value<int>? stockQty,
     Value<bool>? active,
+    Value<bool>? isCombo,
   }) {
     return ProductsCompanion(
       id: id ?? this.id,
@@ -1113,6 +1157,7 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
       trackStock: trackStock ?? this.trackStock,
       stockQty: stockQty ?? this.stockQty,
       active: active ?? this.active,
+      isCombo: isCombo ?? this.isCombo,
     );
   }
 
@@ -1143,6 +1188,9 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
+    if (isCombo.present) {
+      map['is_combo'] = Variable<bool>(isCombo.value);
+    }
     return map;
   }
 
@@ -1156,7 +1204,292 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
           ..write('priceCents: $priceCents, ')
           ..write('trackStock: $trackStock, ')
           ..write('stockQty: $stockQty, ')
-          ..write('active: $active')
+          ..write('active: $active, ')
+          ..write('isCombo: $isCombo')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProductComboItemsTable extends ProductComboItems
+    with TableInfo<$ProductComboItemsTable, ProductComboItem> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProductComboItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _comboProductIdMeta = const VerificationMeta(
+    'comboProductId',
+  );
+  @override
+  late final GeneratedColumn<int> comboProductId = GeneratedColumn<int>(
+    'combo_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES products (id)',
+    ),
+  );
+  static const VerificationMeta _childProductIdMeta = const VerificationMeta(
+    'childProductId',
+  );
+  @override
+  late final GeneratedColumn<int> childProductId = GeneratedColumn<int>(
+    'child_product_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES products (id)',
+    ),
+  );
+  static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
+  @override
+  late final GeneratedColumn<int> qty = GeneratedColumn<int>(
+    'qty',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [comboProductId, childProductId, qty];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'product_combo_items';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProductComboItem> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('combo_product_id')) {
+      context.handle(
+        _comboProductIdMeta,
+        comboProductId.isAcceptableOrUnknown(
+          data['combo_product_id']!,
+          _comboProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_comboProductIdMeta);
+    }
+    if (data.containsKey('child_product_id')) {
+      context.handle(
+        _childProductIdMeta,
+        childProductId.isAcceptableOrUnknown(
+          data['child_product_id']!,
+          _childProductIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_childProductIdMeta);
+    }
+    if (data.containsKey('qty')) {
+      context.handle(
+        _qtyMeta,
+        qty.isAcceptableOrUnknown(data['qty']!, _qtyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_qtyMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {comboProductId, childProductId};
+  @override
+  ProductComboItem map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProductComboItem(
+      comboProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}combo_product_id'],
+      )!,
+      childProductId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}child_product_id'],
+      )!,
+      qty: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}qty'],
+      )!,
+    );
+  }
+
+  @override
+  $ProductComboItemsTable createAlias(String alias) {
+    return $ProductComboItemsTable(attachedDatabase, alias);
+  }
+}
+
+class ProductComboItem extends DataClass
+    implements Insertable<ProductComboItem> {
+  final int comboProductId;
+  final int childProductId;
+  final int qty;
+  const ProductComboItem({
+    required this.comboProductId,
+    required this.childProductId,
+    required this.qty,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['combo_product_id'] = Variable<int>(comboProductId);
+    map['child_product_id'] = Variable<int>(childProductId);
+    map['qty'] = Variable<int>(qty);
+    return map;
+  }
+
+  ProductComboItemsCompanion toCompanion(bool nullToAbsent) {
+    return ProductComboItemsCompanion(
+      comboProductId: Value(comboProductId),
+      childProductId: Value(childProductId),
+      qty: Value(qty),
+    );
+  }
+
+  factory ProductComboItem.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProductComboItem(
+      comboProductId: serializer.fromJson<int>(json['comboProductId']),
+      childProductId: serializer.fromJson<int>(json['childProductId']),
+      qty: serializer.fromJson<int>(json['qty']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'comboProductId': serializer.toJson<int>(comboProductId),
+      'childProductId': serializer.toJson<int>(childProductId),
+      'qty': serializer.toJson<int>(qty),
+    };
+  }
+
+  ProductComboItem copyWith({
+    int? comboProductId,
+    int? childProductId,
+    int? qty,
+  }) => ProductComboItem(
+    comboProductId: comboProductId ?? this.comboProductId,
+    childProductId: childProductId ?? this.childProductId,
+    qty: qty ?? this.qty,
+  );
+  ProductComboItem copyWithCompanion(ProductComboItemsCompanion data) {
+    return ProductComboItem(
+      comboProductId: data.comboProductId.present
+          ? data.comboProductId.value
+          : this.comboProductId,
+      childProductId: data.childProductId.present
+          ? data.childProductId.value
+          : this.childProductId,
+      qty: data.qty.present ? data.qty.value : this.qty,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductComboItem(')
+          ..write('comboProductId: $comboProductId, ')
+          ..write('childProductId: $childProductId, ')
+          ..write('qty: $qty')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(comboProductId, childProductId, qty);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProductComboItem &&
+          other.comboProductId == this.comboProductId &&
+          other.childProductId == this.childProductId &&
+          other.qty == this.qty);
+}
+
+class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
+  final Value<int> comboProductId;
+  final Value<int> childProductId;
+  final Value<int> qty;
+  final Value<int> rowid;
+  const ProductComboItemsCompanion({
+    this.comboProductId = const Value.absent(),
+    this.childProductId = const Value.absent(),
+    this.qty = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProductComboItemsCompanion.insert({
+    required int comboProductId,
+    required int childProductId,
+    required int qty,
+    this.rowid = const Value.absent(),
+  }) : comboProductId = Value(comboProductId),
+       childProductId = Value(childProductId),
+       qty = Value(qty);
+  static Insertable<ProductComboItem> custom({
+    Expression<int>? comboProductId,
+    Expression<int>? childProductId,
+    Expression<int>? qty,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (comboProductId != null) 'combo_product_id': comboProductId,
+      if (childProductId != null) 'child_product_id': childProductId,
+      if (qty != null) 'qty': qty,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProductComboItemsCompanion copyWith({
+    Value<int>? comboProductId,
+    Value<int>? childProductId,
+    Value<int>? qty,
+    Value<int>? rowid,
+  }) {
+    return ProductComboItemsCompanion(
+      comboProductId: comboProductId ?? this.comboProductId,
+      childProductId: childProductId ?? this.childProductId,
+      qty: qty ?? this.qty,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (comboProductId.present) {
+      map['combo_product_id'] = Variable<int>(comboProductId.value);
+    }
+    if (childProductId.present) {
+      map['child_product_id'] = Variable<int>(childProductId.value);
+    }
+    if (qty.present) {
+      map['qty'] = Variable<int>(qty.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProductComboItemsCompanion(')
+          ..write('comboProductId: $comboProductId, ')
+          ..write('childProductId: $childProductId, ')
+          ..write('qty: $qty, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -2624,6 +2957,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $EventDotDenominationsTable eventDotDenominations =
       $EventDotDenominationsTable(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $ProductComboItemsTable productComboItems =
+      $ProductComboItemsTable(this);
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $SaleChangeDotAllocationsTable saleChangeDotAllocations =
@@ -2636,6 +2971,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     events,
     eventDotDenominations,
     products,
+    productComboItems,
     sales,
     saleLines,
     saleChangeDotAllocations,
@@ -3679,6 +4015,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<bool> trackStock,
       Value<int> stockQty,
       Value<bool> active,
+      Value<bool> isCombo,
     });
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
@@ -3690,6 +4027,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<bool> trackStock,
       Value<int> stockQty,
       Value<bool> active,
+      Value<bool> isCombo,
     });
 
 final class $$ProductsTableReferences
@@ -3774,6 +4112,11 @@ class $$ProductsTableFilterComposer
 
   ColumnFilters<bool> get active => $composableBuilder(
     column: $table.active,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isCombo => $composableBuilder(
+    column: $table.isCombo,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3870,6 +4213,11 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isCombo => $composableBuilder(
+    column: $table.isCombo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$EventsTableOrderingComposer get eventId {
     final $$EventsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3929,6 +4277,9 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<bool> get active =>
       $composableBuilder(column: $table.active, builder: (column) => column);
+
+  GeneratedColumn<bool> get isCombo =>
+      $composableBuilder(column: $table.isCombo, builder: (column) => column);
 
   $$EventsTableAnnotationComposer get eventId {
     final $$EventsTableAnnotationComposer composer = $composerBuilder(
@@ -4015,6 +4366,7 @@ class $$ProductsTableTableManager
                 Value<bool> trackStock = const Value.absent(),
                 Value<int> stockQty = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<bool> isCombo = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
                 eventId: eventId,
@@ -4024,6 +4376,7 @@ class $$ProductsTableTableManager
                 trackStock: trackStock,
                 stockQty: stockQty,
                 active: active,
+                isCombo: isCombo,
               ),
           createCompanionCallback:
               ({
@@ -4035,6 +4388,7 @@ class $$ProductsTableTableManager
                 Value<bool> trackStock = const Value.absent(),
                 Value<int> stockQty = const Value.absent(),
                 Value<bool> active = const Value.absent(),
+                Value<bool> isCombo = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
                 eventId: eventId,
@@ -4044,6 +4398,7 @@ class $$ProductsTableTableManager
                 trackStock: trackStock,
                 stockQty: stockQty,
                 active: active,
+                isCombo: isCombo,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -4130,6 +4485,400 @@ typedef $$ProductsTableProcessedTableManager =
       (ChurchProduct, $$ProductsTableReferences),
       ChurchProduct,
       PrefetchHooks Function({bool eventId, bool saleLinesRefs})
+    >;
+typedef $$ProductComboItemsTableCreateCompanionBuilder =
+    ProductComboItemsCompanion Function({
+      required int comboProductId,
+      required int childProductId,
+      required int qty,
+      Value<int> rowid,
+    });
+typedef $$ProductComboItemsTableUpdateCompanionBuilder =
+    ProductComboItemsCompanion Function({
+      Value<int> comboProductId,
+      Value<int> childProductId,
+      Value<int> qty,
+      Value<int> rowid,
+    });
+
+final class $$ProductComboItemsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ProductComboItemsTable,
+          ProductComboItem
+        > {
+  $$ProductComboItemsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ProductsTable _comboProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.productComboItems.comboProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get comboProductId {
+    final $_column = $_itemColumn<int>('combo_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_comboProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ProductsTable _childProductIdTable(_$AppDatabase db) =>
+      db.products.createAlias(
+        $_aliasNameGenerator(
+          db.productComboItems.childProductId,
+          db.products.id,
+        ),
+      );
+
+  $$ProductsTableProcessedTableManager get childProductId {
+    final $_column = $_itemColumn<int>('child_product_id')!;
+
+    final manager = $$ProductsTableTableManager(
+      $_db,
+      $_db.products,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_childProductIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ProductComboItemsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProductComboItemsTable> {
+  $$ProductComboItemsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ProductsTableFilterComposer get comboProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.comboProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableFilterComposer get childProductId {
+    final $$ProductsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.childProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableFilterComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductComboItemsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProductComboItemsTable> {
+  $$ProductComboItemsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get qty => $composableBuilder(
+    column: $table.qty,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ProductsTableOrderingComposer get comboProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.comboProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableOrderingComposer get childProductId {
+    final $$ProductsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.childProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableOrderingComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductComboItemsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProductComboItemsTable> {
+  $$ProductComboItemsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get qty =>
+      $composableBuilder(column: $table.qty, builder: (column) => column);
+
+  $$ProductsTableAnnotationComposer get comboProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.comboProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ProductsTableAnnotationComposer get childProductId {
+    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.childProductId,
+      referencedTable: $db.products,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ProductsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.products,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ProductComboItemsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProductComboItemsTable,
+          ProductComboItem,
+          $$ProductComboItemsTableFilterComposer,
+          $$ProductComboItemsTableOrderingComposer,
+          $$ProductComboItemsTableAnnotationComposer,
+          $$ProductComboItemsTableCreateCompanionBuilder,
+          $$ProductComboItemsTableUpdateCompanionBuilder,
+          (ProductComboItem, $$ProductComboItemsTableReferences),
+          ProductComboItem,
+          PrefetchHooks Function({bool comboProductId, bool childProductId})
+        > {
+  $$ProductComboItemsTableTableManager(
+    _$AppDatabase db,
+    $ProductComboItemsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProductComboItemsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProductComboItemsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProductComboItemsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> comboProductId = const Value.absent(),
+                Value<int> childProductId = const Value.absent(),
+                Value<int> qty = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProductComboItemsCompanion(
+                comboProductId: comboProductId,
+                childProductId: childProductId,
+                qty: qty,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required int comboProductId,
+                required int childProductId,
+                required int qty,
+                Value<int> rowid = const Value.absent(),
+              }) => ProductComboItemsCompanion.insert(
+                comboProductId: comboProductId,
+                childProductId: childProductId,
+                qty: qty,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ProductComboItemsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({comboProductId = false, childProductId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (comboProductId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.comboProductId,
+                                    referencedTable:
+                                        $$ProductComboItemsTableReferences
+                                            ._comboProductIdTable(db),
+                                    referencedColumn:
+                                        $$ProductComboItemsTableReferences
+                                            ._comboProductIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (childProductId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.childProductId,
+                                    referencedTable:
+                                        $$ProductComboItemsTableReferences
+                                            ._childProductIdTable(db),
+                                    referencedColumn:
+                                        $$ProductComboItemsTableReferences
+                                            ._childProductIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$ProductComboItemsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProductComboItemsTable,
+      ProductComboItem,
+      $$ProductComboItemsTableFilterComposer,
+      $$ProductComboItemsTableOrderingComposer,
+      $$ProductComboItemsTableAnnotationComposer,
+      $$ProductComboItemsTableCreateCompanionBuilder,
+      $$ProductComboItemsTableUpdateCompanionBuilder,
+      (ProductComboItem, $$ProductComboItemsTableReferences),
+      ProductComboItem,
+      PrefetchHooks Function({bool comboProductId, bool childProductId})
     >;
 typedef $$SalesTableCreateCompanionBuilder =
     SalesCompanion Function({
@@ -5739,6 +6488,8 @@ class $AppDatabaseManager {
       $$EventDotDenominationsTableTableManager(_db, _db.eventDotDenominations);
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$ProductComboItemsTableTableManager get productComboItems =>
+      $$ProductComboItemsTableTableManager(_db, _db.productComboItems);
   $$SalesTableTableManager get sales =>
       $$SalesTableTableManager(_db, _db.sales);
   $$SaleLinesTableTableManager get saleLines =>
