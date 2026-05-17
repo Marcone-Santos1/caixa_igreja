@@ -494,6 +494,16 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                           .textTheme
                                           .titleSmall,
                                     ),
+                                    if (p.isCombo)
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.green,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: const Text('COMBO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                      ),
                                     const Spacer(),
                                     Text(formatCents(p.priceCents)),
                                     if (inCart > 0)
