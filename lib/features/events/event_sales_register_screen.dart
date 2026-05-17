@@ -179,7 +179,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
       }
     }
 
-    Share.share(buffer.toString());
+    await SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
 
   @override
