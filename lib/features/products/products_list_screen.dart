@@ -5,6 +5,7 @@ import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/money_format.dart';
+import 'combo_form_screen.dart';
 import 'product_form_screen.dart';
 
 class ProductsListScreen extends ConsumerWidget {
@@ -46,19 +47,31 @@ class ProductsListScreen extends ConsumerWidget {
             itemBuilder: (context, i) {
               final p = list[i];
               final stock = p.trackStock ? '${p.stockQty} un.' : 'Sem controle';
+              final title = p.isCombo ? '📦 ${p.name} (COMBO)' : p.name;
               return CaixaListRow(
-                title: p.name,
+                title: title,
                 subtitle:
                     '${formatCents(p.priceCents)} · $stock${p.active ? '' : ' · Inativo'}',
                 onTap: () async {
-                  await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (_) => ProductFormScreen(
-                        eventId: eventId,
-                        productId: p.id,
+                  if (p.isCombo) {
+                    await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => ComboFormScreen(
+                          eventId: eventId,
+                          comboProductId: p.id,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  } else {
+                    await Navigator.of(context).push<bool>(
+                      MaterialPageRoute(
+                        builder: (_) => ProductFormScreen(
+                          eventId: eventId,
+                          productId: p.id,
+                        ),
+                      ),
+                    );
+                  }
                 },
                 trailing: IconButton(
                   tooltip: 'Excluir',
@@ -107,16 +120,38 @@ class ProductsListScreen extends ConsumerWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'fab_products_list',
-        onPressed: () async {
-          await Navigator.of(context).push<bool>(
-            MaterialPageRoute(
-              builder: (_) => ProductFormScreen(eventId: eventId),
-            ),
-          );
+      floatingActionButton: PopupMenuButton<int>(
+        tooltip: 'Adicionar',
+        onSelected: (val) async {
+          if (val == 0) {
+            await Navigator.of(context).push<bool>(
+              MaterialPageRoute(builder: (_) => ProductFormScreen(eventId: eventId)),
+            );
+          } else {
+            await Navigator.of(context).push<bool>(
+              MaterialPageRoute(builder: (_) => ComboFormScreen(eventId: eventId)),
+            );
+          }
         },
-        child: const Icon(Icons.add_rounded),
+        itemBuilder: (context) => [
+          const PopupMenuItem(
+            value: 0,
+            child: Row(children: [Icon(Icons.fastfood, size: 20), SizedBox(width: 12), Text('Novo Produto')]),
+          ),
+          const PopupMenuItem(
+            value: 1,
+            child: Row(children: [Icon(Icons.layers, size: 20), SizedBox(width: 12), Text('Novo Combo')]),
+          ),
+        ],
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            shape: BoxShape.circle,
+            boxShadow: kElevationToShadow[3],
+          ),
+          child: Icon(Icons.add_rounded, color: Theme.of(context).colorScheme.onPrimary),
+        ),
       ),
     );
   }
