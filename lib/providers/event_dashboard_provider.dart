@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 import '../domain/sale_line_kind.dart';
 import 'database_provider.dart';
+import 'sync_provider.dart';
 
 class ProductSaleStat {
   final int productId;
@@ -442,26 +443,46 @@ class EventDashboardData {
 }
 
 final eventSalesStreamProvider = StreamProvider.autoDispose.family<List<PosSale>, int>((ref, eventId) {
+  final syncState = ref.watch(syncProvider);
+  if (syncState.mode == SyncMode.client && syncState.isConnected) {
+    return ref.watch(syncClientStreamProvider((eventId, 'sales'))).map((list) => list.cast<PosSale>());
+  }
   final db = ref.watch(appDatabaseProvider);
   return db.watchSalesForEvent(eventId);
 });
 
 final eventSaleLinesStreamProvider = StreamProvider.autoDispose.family<List<PosSaleLine>, int>((ref, eventId) {
+  final syncState = ref.watch(syncProvider);
+  if (syncState.mode == SyncMode.client && syncState.isConnected) {
+    return ref.watch(syncClientStreamProvider((eventId, 'lines'))).map((list) => list.cast<PosSaleLine>());
+  }
   final db = ref.watch(appDatabaseProvider);
   return db.watchSaleLinesForEvent(eventId);
 });
 
 final eventProductsStreamProvider = StreamProvider.autoDispose.family<List<ChurchProduct>, int>((ref, eventId) {
+  final syncState = ref.watch(syncProvider);
+  if (syncState.mode == SyncMode.client && syncState.isConnected) {
+    return ref.watch(syncClientStreamProvider((eventId, 'products'))).map((list) => list.cast<ChurchProduct>());
+  }
   final db = ref.watch(appDatabaseProvider);
   return db.watchAllProductsForEvent(eventId);
 });
 
 final eventDenomsStreamProvider = StreamProvider.autoDispose.family<List<EventDotDenom>, int>((ref, eventId) {
+  final syncState = ref.watch(syncProvider);
+  if (syncState.mode == SyncMode.client && syncState.isConnected) {
+    return ref.watch(syncClientStreamProvider((eventId, 'denoms'))).map((list) => list.cast<EventDotDenom>());
+  }
   final db = ref.watch(appDatabaseProvider);
   return db.watchDotDenominations(eventId);
 });
 
 final eventChangeDotAllocationsStreamProvider = StreamProvider.autoDispose.family<List<ChangeDotRow>, int>((ref, eventId) {
+  final syncState = ref.watch(syncProvider);
+  if (syncState.mode == SyncMode.client && syncState.isConnected) {
+    return ref.watch(syncClientStreamProvider((eventId, 'changeDotAllocations'))).map((list) => list.cast<ChangeDotRow>());
+  }
   final db = ref.watch(appDatabaseProvider);
   return db.watchChangeDotAllocationsForEvent(eventId);
 });

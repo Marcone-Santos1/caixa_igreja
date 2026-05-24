@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../providers/sync_provider.dart';
 
 import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
@@ -42,6 +43,11 @@ class EventHubScreen extends ConsumerWidget {
           ),
           title: const Text('Evento'),
           actions: [
+            IconButton(
+              tooltip: 'Sincronização',
+              icon: const Icon(Icons.sync),
+              onPressed: () => context.push('/event/$eventId/sync'),
+            ),
             IconButton(
               tooltip: 'Editar',
               icon: const Icon(Icons.edit_outlined),
@@ -92,9 +98,98 @@ class EventHubScreen extends ConsumerWidget {
             }
             final day = DateTime.fromMillisecondsSinceEpoch(e.dateEpochMs);
             final scheme = Theme.of(context).colorScheme;
+            final syncState = ref.watch(syncProvider);
+            Widget syncStatusWidget = const SizedBox.shrink();
+            if (syncState.mode == SyncMode.server) {
+              syncStatusWidget = Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.dns, color: scheme.primary, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Servidor Ativo (${syncState.connectedClients.length} terminal/ais)',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            } else if (syncState.mode == SyncMode.client && syncState.isConnected) {
+              syncStatusWidget = Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.cloud_done, color: Colors.green, size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Conectado ao Caixa Central',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            } else if (syncState.mode == SyncMode.client && !syncState.isConnected) {
+              syncStatusWidget = Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off, color: Colors.red, size: 18),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Desconectado do Caixa Central',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                      if (syncState.serverIp != null)
+                        TextButton(
+                          onPressed: () {
+                            ref.read(syncProvider.notifier).connectToHost(
+                              syncState.serverIp!,
+                              syncState.serverPort,
+                              eventId,
+                            );
+                          },
+                          style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero),
+                          child: const Text('Reconectar', style: TextStyle(fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
             return ListView(
               padding: kCaixaScreenPadding.copyWith(top: 16, bottom: 28),
               children: [
+                syncStatusWidget,
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
@@ -116,7 +211,7 @@ class EventHubScreen extends ConsumerWidget {
                               size: 16,
                               color: scheme.onSurfaceVariant,
                             ),
-                            const SizedBox(width: 8),
+                           SizedBox(width: 8),
                             Text(
                               _dateFmt.format(day),
                               style: Theme.of(context).textTheme.titleSmall?.copyWith(

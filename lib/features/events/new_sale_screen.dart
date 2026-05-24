@@ -10,6 +10,7 @@ import '../../domain/payment_method.dart';
 import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sales_draft_provider.dart';
+import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
 
 class NewSaleScreen extends ConsumerStatefulWidget {
@@ -326,27 +327,42 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     if (result == null || !context.mounted) return;
     final db = ref.read(appDatabaseProvider);
     try {
-      if (_isEditing) {
-        await db.updateSaleWithLines(
-          saleId: widget.editSaleId!,
-          eventId: widget.eventId,
-          paymentMethod: result.paymentMethod,
-          amountReceivedCents: result.amountReceivedCents,
-          notes: result.notes,
-          changePending: result.changePending,
-          customerName: result.customerName,
-          lines: drafts,
+      final syncState = ref.read(syncProvider);
+      final isSyncClient = syncState.mode == SyncMode.client && syncState.isConnected;
+
+      if (isSyncClient) {
+        await ref.read(syncProvider.notifier).submitSaleToHost(
+          widget.eventId,
+          result.paymentMethod,
+          result.amountReceivedCents,
+          result.notes,
+          result.changePending,
+          result.customerName,
+          drafts,
         );
       } else {
-        await db.completeSale(
-          eventId: widget.eventId,
-          paymentMethod: result.paymentMethod,
-          amountReceivedCents: result.amountReceivedCents,
-          notes: result.notes,
-          changePending: result.changePending,
-          customerName: result.customerName,
-          lines: drafts,
-        );
+        if (_isEditing) {
+          await db.updateSaleWithLines(
+            saleId: widget.editSaleId!,
+            eventId: widget.eventId,
+            paymentMethod: result.paymentMethod,
+            amountReceivedCents: result.amountReceivedCents,
+            notes: result.notes,
+            changePending: result.changePending,
+            customerName: result.customerName,
+            lines: drafts,
+          );
+        } else {
+          await db.completeSale(
+            eventId: widget.eventId,
+            paymentMethod: result.paymentMethod,
+            amountReceivedCents: result.amountReceivedCents,
+            notes: result.notes,
+            changePending: result.changePending,
+            customerName: result.customerName,
+            lines: drafts,
+          );
+        }
       }
       if (!context.mounted) return;
       

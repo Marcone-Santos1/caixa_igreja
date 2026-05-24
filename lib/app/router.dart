@@ -11,6 +11,7 @@ import '../features/events/events_list_screen.dart';
 import '../features/events/new_sale_screen.dart';
 import '../features/export/export_screen.dart';
 import '../features/products/products_list_screen.dart';
+import '../features/events/sync_settings_screen.dart';
 import '../features/settings/appearance_screen.dart';
 import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -136,6 +137,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             saleId: sid,
             changeCents: change,
           );
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/event/:eventId/sync',
+        builder: (context, state) {
+          final id = int.parse(state.pathParameters['eventId']!);
+          return SyncSettingsScreen(eventId: id);
         },
       ),
     ],
