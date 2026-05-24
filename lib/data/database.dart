@@ -175,15 +175,20 @@ class EventFinanceSummary {
     var total = 0;
     var cashChange = 0;
     for (final s in sales) {
-      total += s.totalCents;
-      final cur = map[s.paymentMethod];
+      final sDyn = s as dynamic;
+      final sTotalCents = sDyn.totalCents as int? ?? 0;
+      final sAmountReceivedCents = sDyn.amountReceivedCents as int? ?? sTotalCents;
+      final sPaymentMethod = sDyn.paymentMethod as String? ?? PaymentMethod.dinheiro;
+
+      total += sTotalCents;
+      final cur = map[sPaymentMethod];
       if (cur == null) {
-        map[s.paymentMethod] = (n: 1, cents: s.totalCents);
+        map[sPaymentMethod] = (n: 1, cents: sTotalCents);
       } else {
-        map[s.paymentMethod] = (n: cur.n + 1, cents: cur.cents + s.totalCents);
+        map[sPaymentMethod] = (n: cur.n + 1, cents: cur.cents + sTotalCents);
       }
-      if (s.paymentMethod == PaymentMethod.dinheiro) {
-        final ch = s.amountReceivedCents - s.totalCents;
+      if (sPaymentMethod == PaymentMethod.dinheiro) {
+        final ch = sAmountReceivedCents - sTotalCents;
         if (ch > 0) cashChange += ch;
       }
     }
@@ -342,17 +347,32 @@ PRAGMA foreign_keys = ON;
   Future<List<ChurchProduct>> _mapProductsWithEffectiveStock(List<ChurchProduct> prods) async {
     final List<ChurchProduct> mapped = [];
     for (final p in prods) {
-      if (p.isCombo) {
-        final items = await (select(productComboItems)..where((t) => t.comboProductId.equals(p.id))).get();
+      final pDyn = p as dynamic;
+      final pIsCombo = pDyn.isCombo as bool? ?? false;
+      final pId = pDyn.id as int? ?? 0;
+
+      if (pIsCombo) {
+        final items = await (select(productComboItems)..where((t) => t.comboProductId.equals(pId))).get();
         int? effectiveStock;
         bool tracksStock = false;
         for (final item in items) {
-          final child = await (select(products)..where((t) => t.id.equals(item.childProductId))).getSingleOrNull();
-          if (child != null && child.trackStock) {
-            tracksStock = true;
-            final possible = child.stockQty ~/ item.qty;
-            if (effectiveStock == null || possible < effectiveStock) {
-              effectiveStock = possible;
+          final itemDyn = item as dynamic;
+          final childId = itemDyn.childProductId as int? ?? 0;
+          final itemQty = itemDyn.qty as int? ?? 1;
+
+          final child = await (select(products)..where((t) => t.id.equals(childId))).getSingleOrNull();
+          if (child != null) {
+            final childDyn = child as dynamic;
+            final childTrackStock = childDyn.trackStock as bool? ?? false;
+            final childStockQty = childDyn.stockQty as int? ?? 0;
+
+            if (childTrackStock) {
+              tracksStock = true;
+              final qtyDiv = itemQty > 0 ? itemQty : 1;
+              final possible = childStockQty ~/ qtyDiv;
+              if (effectiveStock == null || possible < effectiveStock) {
+                effectiveStock = possible;
+              }
             }
           }
         }
@@ -397,6 +417,20 @@ PRAGMA foreign_keys = ON;
         .watch();
   }
 
+  Stream<List<PosSaleLine>> watchSaleLinesForEvent(int eventId) {
+    final q = select(saleLines).join([
+      innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
+    ])..where(sales.eventId.equals(eventId));
+    return q.watch().map((rows) => rows.map((r) => r.readTable(saleLines)).toList());
+  }
+
+  Stream<List<ChangeDotRow>> watchChangeDotAllocationsForEvent(int eventId) {
+    final q = select(saleChangeDotAllocations).join([
+      innerJoin(sales, sales.id.equalsExp(saleChangeDotAllocations.saleId)),
+    ])..where(sales.eventId.equals(eventId));
+    return q.watch().map((rows) => rows.map((r) => r.readTable(saleChangeDotAllocations)).toList());
+  }
+
   Stream<EventFinanceSummary> watchEventFinanceSummary(int eventId) {
     return (select(sales)..where((s) => s.eventId.equals(eventId)))
         .watch()
@@ -409,7 +443,6 @@ PRAGMA foreign_keys = ON;
         .then(EventFinanceSummary.fromSales);
   }
 
-  /// Emite contagens sempre que produtos ou fichas do evento mudam.
   Stream<EventLowStockCounts> watchEventLowStockCounts(int eventId) {
     final threshold = kLowStockThreshold;
     late StreamSubscription<List<ChurchProduct>> sub1;
@@ -423,13 +456,20 @@ PRAGMA foreign_keys = ON;
       if (controller.isClosed) return;
       final lowP = latestP
           .where(
-            (p) =>
-                p.active &&
-                p.trackStock &&
-                p.stockQty <= threshold,
+            (p) {
+              final pDyn = p as dynamic;
+              final active = pDyn.active as bool? ?? true;
+              final trackStock = pDyn.trackStock as bool? ?? false;
+              final stockQty = pDyn.stockQty as int? ?? 0;
+              return active && trackStock && stockQty <= threshold;
+            },
           )
           .length;
-      final lowD = latestD.where((d) => d.stockQty <= threshold).length;
+      final lowD = latestD.where((d) {
+        final dDyn = d as dynamic;
+        final stockQty = dDyn.stockQty as int? ?? 0;
+        return stockQty <= threshold;
+      }).length;
       controller.add(EventLowStockCounts(lowProductCount: lowP, lowDotCount: lowD));
     }
 
@@ -484,35 +524,54 @@ PRAGMA foreign_keys = ON;
       final d = row.readTableOrNull(eventDotDenominations);
       
       String itemLabel;
-      if (sl.lineKind == SaleLineKind.valorLivre) {
-        itemLabel = 'Valor: ${sl.freeLabel ?? ''}';
-      } else if (sl.lineKind == SaleLineKind.ficha) {
-        itemLabel = 'Ficha: ${d?.label ?? '#${sl.dotDenominationId}'}';
+      final slDyn = sl as dynamic;
+      final slLineKind = slDyn.lineKind as int? ?? 0;
+      final slQty = slDyn.qty as int? ?? 0;
+      final slUnitPriceCents = slDyn.unitPriceCents as int? ?? 0;
+      final slLineTotalCents = slDyn.lineTotalCents as int? ?? (slQty * slUnitPriceCents);
+
+      if (slLineKind == SaleLineKind.valorLivre) {
+        itemLabel = 'Valor: ${slDyn.freeLabel ?? ''}';
+      } else if (slLineKind == SaleLineKind.ficha) {
+        final dLabel = d != null ? (d as dynamic).label as String? : null;
+        final dId = slDyn.dotDenominationId;
+        itemLabel = 'Ficha: ${dLabel ?? '#$dId'}';
       } else {
-        if (p != null && p.isCombo) {
-          final comboItems = await getComboItems(p.id);
-          final parts = <String>[];
-          for (final item in comboItems) {
-            final child = await (select(products)..where((t) => t.id.equals(item.childProductId))).getSingleOrNull();
-            if (child != null) {
-              parts.add('${item.qty}x ${child.name}');
+        if (p != null) {
+          final pDyn = p as dynamic;
+          final pIsCombo = pDyn.isCombo as bool? ?? false;
+          final pName = pDyn.name as String? ?? 'Produto';
+          final pId = pDyn.id as int? ?? 0;
+          if (pIsCombo) {
+            final comboItems = await getComboItems(pId);
+            final parts = <String>[];
+            for (final item in comboItems) {
+              final itemDyn = item as dynamic;
+              final childId = itemDyn.childProductId as int? ?? 0;
+              final child = await (select(products)..where((t) => t.id.equals(childId))).getSingleOrNull();
+              if (child != null) {
+                final childName = (child as dynamic).name as String? ?? 'Produto';
+                parts.add('${itemDyn.qty}x $childName');
+              }
             }
-          }
-          if (parts.isNotEmpty) {
-            itemLabel = '📦 ${p.name} (${parts.join(', ')})';
+            if (parts.isNotEmpty) {
+              itemLabel = '📦 $pName (${parts.join(', ')})';
+            } else {
+              itemLabel = '📦 $pName';
+            }
           } else {
-            itemLabel = '📦 ${p.name}';
+            itemLabel = pName;
           }
         } else {
-          itemLabel = p?.name ?? 'Produto #${sl.productId}';
+          itemLabel = 'Produto #${slDyn.productId}';
         }
       }
 
       result.add(EventSaleLineRow(
         itemLabel: itemLabel,
-        qty: sl.qty,
-        unitPriceCents: sl.unitPriceCents,
-        lineTotalCents: sl.lineTotalCents,
+        qty: slQty,
+        unitPriceCents: slUnitPriceCents,
+        lineTotalCents: slLineTotalCents,
       ));
     }
 

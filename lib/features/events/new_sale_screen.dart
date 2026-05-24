@@ -9,13 +9,8 @@ import '../../data/sale_line_draft.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/sales_draft_provider.dart';
 import '../../utils/money_format.dart';
-
-class _FreeLine {
-  _FreeLine({required this.label, required this.cents});
-  final String label;
-  final int cents;
-}
 
 class NewSaleScreen extends ConsumerStatefulWidget {
   const NewSaleScreen({super.key, required this.eventId, this.editSaleId});
@@ -30,9 +25,11 @@ class NewSaleScreen extends ConsumerStatefulWidget {
 class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   final Map<int, int> _productQty = {};
   final Map<int, int> _fichaQty = {};
-  final List<_FreeLine> _freeLines = [];
+  final List<FreeLineDraft> _freeLines = [];
   PosSale? _originalSale;
   bool _isLoadingEdit = false;
+
+  bool get _isEditing => widget.editSaleId != null;
 
   @override
   void initState() {
@@ -56,7 +53,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
             _fichaQty[l.dotDenominationId!] = (_fichaQty[l.dotDenominationId!] ?? 0) + l.qty;
           } else if (l.lineKind == SaleLineKind.valorLivre) {
-            _freeLines.add(_FreeLine(label: l.freeLabel ?? 'Valor', cents: l.lineTotalCents));
+            _freeLines.add(FreeLineDraft(label: l.freeLabel ?? 'Valor', cents: l.lineTotalCents));
           }
         }
       }
@@ -71,56 +68,94 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     List<ChurchProduct> products,
     List<EventDotDenom> denoms,
   ) {
-    var t = 0;
-    for (final p in products) {
-      final q = _productQty[p.id] ?? 0;
-      if (q > 0) t += q * p.priceCents;
+    if (_isEditing) {
+      var t = 0;
+      for (final p in products) {
+        final q = _productQty[p.id] ?? 0;
+        if (q > 0) t += q * p.priceCents;
+      }
+      for (final d in denoms) {
+        final q = _fichaQty[d.id] ?? 0;
+        if (q > 0) t += q * d.valueCents;
+      }
+      for (final f in _freeLines) {
+        t += f.cents;
+      }
+      return t;
+    } else {
+      final draft = ref.watch(vendaDraftsProvider(widget.eventId)).activeDraft;
+      return draft.totalCents(products, denoms);
     }
-    for (final d in denoms) {
-      final q = _fichaQty[d.id] ?? 0;
-      if (q > 0) t += q * d.valueCents;
-    }
-    for (final f in _freeLines) {
-      t += f.cents;
-    }
-    return t;
   }
 
   void _addProduct(ChurchProduct p) {
-    setState(() {
-      final q = _productQty[p.id] ?? 0;
+    if (_isEditing) {
+      setState(() {
+        final q = _productQty[p.id] ?? 0;
+        if (p.trackStock && q >= p.stockQty) return;
+        _productQty[p.id] = q + 1;
+      });
+    } else {
+      final draft = ref.read(vendaDraftsProvider(widget.eventId)).activeDraft;
+      final q = draft.productQty[p.id] ?? 0;
       if (p.trackStock && q >= p.stockQty) return;
-      _productQty[p.id] = q + 1;
-    });
+      ref.read(vendaDraftsProvider(widget.eventId).notifier).updateProductQty(p.id, q + 1);
+    }
   }
 
   void _setProductQty(ChurchProduct p, int q) {
-    setState(() {
+    if (_isEditing) {
+      setState(() {
+        if (q <= 0) {
+          _productQty.remove(p.id);
+        } else {
+          final cap = p.trackStock ? p.stockQty : q;
+          _productQty[p.id] = q > cap ? cap : q;
+        }
+      });
+    } else {
       if (q <= 0) {
-        _productQty.remove(p.id);
+        ref.read(vendaDraftsProvider(widget.eventId).notifier).updateProductQty(p.id, 0);
       } else {
         final cap = p.trackStock ? p.stockQty : q;
-        _productQty[p.id] = q > cap ? cap : q;
+        final targetQty = q > cap ? cap : q;
+        ref.read(vendaDraftsProvider(widget.eventId).notifier).updateProductQty(p.id, targetQty);
       }
-    });
+    }
   }
 
   void _addFicha(EventDotDenom d) {
-    setState(() {
-      final q = _fichaQty[d.id] ?? 0;
+    if (_isEditing) {
+      setState(() {
+        final q = _fichaQty[d.id] ?? 0;
+        if (q >= d.stockQty) return;
+        _fichaQty[d.id] = q + 1;
+      });
+    } else {
+      final draft = ref.read(vendaDraftsProvider(widget.eventId)).activeDraft;
+      final q = draft.fichaQty[d.id] ?? 0;
       if (q >= d.stockQty) return;
-      _fichaQty[d.id] = q + 1;
-    });
+      ref.read(vendaDraftsProvider(widget.eventId).notifier).updateFichaQty(d.id, q + 1);
+    }
   }
 
   void _setFichaQty(EventDotDenom d, int q) {
-    setState(() {
+    if (_isEditing) {
+      setState(() {
+        if (q <= 0) {
+          _fichaQty.remove(d.id);
+        } else {
+          _fichaQty[d.id] = q > d.stockQty ? d.stockQty : q;
+        }
+      });
+    } else {
       if (q <= 0) {
-        _fichaQty.remove(d.id);
+        ref.read(vendaDraftsProvider(widget.eventId).notifier).updateFichaQty(d.id, 0);
       } else {
-        _fichaQty[d.id] = q > d.stockQty ? d.stockQty : q;
+        final targetQty = q > d.stockQty ? d.stockQty : q;
+        ref.read(vendaDraftsProvider(widget.eventId).notifier).updateFichaQty(d.id, targetQty);
       }
-    });
+    }
   }
 
   Future<void> _addFreeLine() async {
@@ -181,9 +216,13 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       );
       return;
     }
-    setState(() {
-      _freeLines.add(_FreeLine(label: labelCtrl.text.trim(), cents: cents));
-    });
+    if (_isEditing) {
+      setState(() {
+        _freeLines.add(FreeLineDraft(label: labelCtrl.text.trim(), cents: cents));
+      });
+    } else {
+      ref.read(vendaDraftsProvider(widget.eventId).notifier).addFreeLine(labelCtrl.text.trim(), cents);
+    }
   }
 
   List<SaleLineDraft> _buildDrafts(
@@ -191,37 +230,73 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     List<EventDotDenom> denoms,
   ) {
     final out = <SaleLineDraft>[];
-    for (final p in products) {
-      final q = _productQty[p.id] ?? 0;
-      if (q > 0) {
+    if (_isEditing) {
+      for (final p in products) {
+        final q = _productQty[p.id] ?? 0;
+        if (q > 0) {
+          out.add(
+            SaleLineDraft.product(
+              productId: p.id,
+              qty: q,
+              unitPriceCents: p.priceCents,
+            ),
+          );
+        }
+      }
+      for (final d in denoms) {
+        final q = _fichaQty[d.id] ?? 0;
+        if (q > 0) {
+          out.add(
+            SaleLineDraft.ficha(
+              dotDenominationId: d.id,
+              qty: q,
+              unitPriceCents: d.valueCents,
+            ),
+          );
+        }
+      }
+      for (final f in _freeLines) {
         out.add(
-          SaleLineDraft.product(
-            productId: p.id,
-            qty: q,
-            unitPriceCents: p.priceCents,
+          SaleLineDraft.valorLivre(
+            freeLabel: f.label,
+            lineTotalCents: f.cents,
           ),
         );
       }
-    }
-    for (final d in denoms) {
-      final q = _fichaQty[d.id] ?? 0;
-      if (q > 0) {
+    } else {
+      final draft = ref.read(vendaDraftsProvider(widget.eventId)).activeDraft;
+      for (final p in products) {
+        final q = draft.productQty[p.id] ?? 0;
+        if (q > 0) {
+          out.add(
+            SaleLineDraft.product(
+              productId: p.id,
+              qty: q,
+              unitPriceCents: p.priceCents,
+            ),
+          );
+        }
+      }
+      for (final d in denoms) {
+        final q = draft.fichaQty[d.id] ?? 0;
+        if (q > 0) {
+          out.add(
+            SaleLineDraft.ficha(
+              dotDenominationId: d.id,
+              qty: q,
+              unitPriceCents: d.valueCents,
+            ),
+          );
+        }
+      }
+      for (final f in draft.freeLines) {
         out.add(
-          SaleLineDraft.ficha(
-            dotDenominationId: d.id,
-            qty: q,
-            unitPriceCents: d.valueCents,
+          SaleLineDraft.valorLivre(
+            freeLabel: f.label,
+            lineTotalCents: f.cents,
           ),
         );
       }
-    }
-    for (final f in _freeLines) {
-      out.add(
-        SaleLineDraft.valorLivre(
-          freeLabel: f.label,
-          lineTotalCents: f.cents,
-        ),
-      );
     }
     return out;
   }
@@ -251,7 +326,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     if (result == null || !context.mounted) return;
     final db = ref.read(appDatabaseProvider);
     try {
-      if (widget.editSaleId != null) {
+      if (_isEditing) {
         await db.updateSaleWithLines(
           saleId: widget.editSaleId!,
           eventId: widget.eventId,
@@ -310,7 +385,20 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       }
 
       if (!context.mounted) return;
-      router.pop();
+
+      if (_isEditing) {
+        router.pop();
+      } else {
+        final draftsState = ref.read(vendaDraftsProvider(widget.eventId));
+        final activeDraftId = draftsState.activeDraftId;
+        final otherDraftsNotEmpty = draftsState.drafts.any((d) => d.id != activeDraftId && !d.isEmpty);
+
+        ref.read(vendaDraftsProvider(widget.eventId).notifier).removeDraft(activeDraftId);
+
+        if (!otherDraftsNotEmpty) {
+          router.pop();
+        }
+      }
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text('$e')),
@@ -318,9 +406,135 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     }
   }
 
+  Widget _buildDraftTabs(
+    BuildContext context,
+    WidgetRef ref,
+    EventSalesDraftState draftsState,
+    List<ChurchProduct> products,
+    List<EventDotDenom> denoms,
+  ) {
+    final notifier = ref.read(vendaDraftsProvider(widget.eventId).notifier);
+    final activeId = draftsState.activeDraftId;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      height: 54,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: draftsState.drafts.length + 1,
+        itemBuilder: (context, index) {
+          if (index == draftsState.drafts.length) {
+            return Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: IconButton.filledTonal(
+                icon: const Icon(Icons.add, size: 20),
+                onPressed: () => notifier.addDraft(),
+                tooltip: 'Nova aba de venda',
+              ),
+            );
+          }
+
+          final d = draftsState.drafts[index];
+          final isActive = d.id == activeId;
+          final total = d.totalCents(products, denoms);
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Material(
+              color: isActive
+                  ? colorScheme.primary
+                  : colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(20),
+              elevation: isActive ? 2 : 0,
+              child: InkWell(
+                onTap: () => notifier.selectDraft(d.id),
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (total > 0) ...[
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: isActive ? colorScheme.onPrimary : Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        total > 0 ? '${d.name} (${formatCents(total)})' : d.name,
+                        style: TextStyle(
+                          color: isActive
+                              ? colorScheme.onPrimary
+                              : colorScheme.onSurfaceVariant,
+                          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (draftsState.drafts.length > 1) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () {
+                            if (d.isEmpty) {
+                              notifier.removeDraft(d.id);
+                            } else {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Descartar venda?'),
+                                  content: Text('Deseja realmente descartar a aba "${d.name}"?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx),
+                                      child: const Text('Cancelar'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        notifier.removeDraft(d.id);
+                                      },
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Colors.red,
+                                      ),
+                                      child: const Text('Descartar'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                          },
+                          child: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: isActive
+                                ? colorScheme.onPrimary.withValues(alpha: 0.8)
+                                : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final db = ref.watch(appDatabaseProvider);
+    final draftsState = _isEditing ? null : ref.watch(vendaDraftsProvider(widget.eventId));
+    final draft = draftsState?.activeDraft;
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -357,6 +571,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (!_isEditing && draftsState != null)
+                    _buildDraftTabs(context, ref, draftsState, products, denoms),
                   if (hasCart)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -371,7 +587,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                           ),
                           children: [
                           for (final p in products)
-                            if ((_productQty[p.id] ?? 0) > 0)
+                            if (((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) > 0)
                               ListTile(
                                 dense: true,
                                 title: Text(p.name),
@@ -385,10 +601,10 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                       ),
                                       onPressed: () => _setProductQty(
                                         p,
-                                        (_productQty[p.id] ?? 0) - 1,
+                                        ((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) - 1,
                                       ),
                                     ),
-                                    Text('${_productQty[p.id]}'),
+                                    Text('${_isEditing ? _productQty[p.id] : draft?.productQty[p.id]}'),
                                     IconButton(
                                       icon: const Icon(Icons.add_circle_outline),
                                       onPressed: () => _addProduct(p),
@@ -397,7 +613,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                 ),
                               ),
                           for (final d in denoms)
-                            if ((_fichaQty[d.id] ?? 0) > 0)
+                            if (((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) > 0)
                               ListTile(
                                 dense: true,
                                 title: Text('${d.label} (ficha)'),
@@ -411,10 +627,10 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                       ),
                                       onPressed: () => _setFichaQty(
                                         d,
-                                        (_fichaQty[d.id] ?? 0) - 1,
+                                        ((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) - 1,
                                       ),
                                     ),
-                                    Text('${_fichaQty[d.id]}'),
+                                    Text('${_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]}'),
                                     IconButton(
                                       icon: const Icon(Icons.add_circle_outline),
                                       onPressed: () => _addFicha(d),
@@ -422,7 +638,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                                   ],
                                 ),
                               ),
-                          for (final f in _freeLines)
+                          for (final f in (_isEditing ? _freeLines : draft?.freeLines ?? const []))
                             ListTile(
                               dense: true,
                               title: Text(f.label),
@@ -430,7 +646,11 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                               trailing: IconButton(
                                 icon: const Icon(Icons.close),
                                 onPressed: () {
-                                  setState(() => _freeLines.remove(f));
+                                  if (_isEditing) {
+                                    setState(() => _freeLines.remove(f));
+                                  } else {
+                                    ref.read(vendaDraftsProvider(widget.eventId).notifier).removeFreeLine(f);
+                                  }
                                 },
                               ),
                             ),
@@ -478,7 +698,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                               final p = products[i];
                               final disabled =
                                   p.trackStock && p.stockQty == 0;
-                              final inCart = _productQty[p.id] ?? 0;
+                              final inCart = _isEditing ? (_productQty[p.id] ?? 0) : (draft?.productQty[p.id] ?? 0);
                               
                               Widget cardContent = Padding(
                                 padding: const EdgeInsets.all(8),
@@ -554,7 +774,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                             itemBuilder: (context, i) {
                               final d = denoms[i];
                               final disabled = d.stockQty == 0;
-                              final inCart = _fichaQty[d.id] ?? 0;
+                              final inCart = _isEditing ? (_fichaQty[d.id] ?? 0) : (draft?.fichaQty[d.id] ?? 0);
                               return Card(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -613,11 +833,17 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                             child: OutlinedButton(
                               onPressed: !hasCart
                                   ? null
-                                  : () => setState(() {
-                                        _productQty.clear();
-                                        _fichaQty.clear();
-                                        _freeLines.clear();
-                                      }),
+                                  : () {
+                                      if (_isEditing) {
+                                        setState(() {
+                                          _productQty.clear();
+                                          _fichaQty.clear();
+                                          _freeLines.clear();
+                                        });
+                                      } else {
+                                        ref.read(vendaDraftsProvider(widget.eventId).notifier).clearDraft(draft!.id);
+                                      }
+                                    },
                               child: const Text('Limpar'),
                             ),
                           ),

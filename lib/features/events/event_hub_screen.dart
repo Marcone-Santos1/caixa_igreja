@@ -173,6 +173,15 @@ class EventHubScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
+                  onPressed: () => context.push('/event/$eventId/dashboard'),
+                  icon: const Icon(Icons.analytics_outlined),
+                  label: const Text('Dashboard do evento'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(50),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
                   onPressed: () => context.push('/event/$eventId/vendas'),
                   icon: const Icon(Icons.receipt_long_outlined),
                   label: const Text('Registro de vendas'),
@@ -386,6 +395,17 @@ class _FinanceSummaryCard extends ConsumerWidget {
                         ),
                       ),
                   ],
+                  const Divider(height: 20),
+                  TextButton.icon(
+                    onPressed: () => context.push('/event/$eventId/dashboard'),
+                    icon: const Icon(Icons.bar_chart_outlined, size: 18),
+                    label: const Text('Ver dashboard detalhado'),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 36),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
                 ],
               ],
             ),
