@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../providers/event_detail_provider.dart';
 import '../../providers/sync_provider.dart';
@@ -8,7 +11,7 @@ import '../../providers/sync_provider.dart';
 class SyncSettingsScreen extends ConsumerStatefulWidget {
   const SyncSettingsScreen({super.key, required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   ConsumerState<SyncSettingsScreen> createState() => _SyncSettingsScreenState();
@@ -39,6 +42,20 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
     final syncState = ref.watch(syncProvider);
     final eventAsync = ref.watch(eventDetailProvider(widget.eventId));
     final scheme = Theme.of(context).colorScheme;
+
+    final event = eventAsync.valueOrNull;
+    String? connectionToken;
+    if (event != null && syncState.serverIp != null) {
+      final payload = {
+        'ip': syncState.serverIp,
+        'port': syncState.serverPort,
+        'eventId': event.id,
+        'eventTitle': event.title,
+        'eventDate': event.dateEpochMs,
+        'eventNotes': event.notes,
+      };
+      connectionToken = base64Encode(utf8.encode(jsonEncode(payload)));
+    }
 
     final eventTitle = eventAsync.maybeWhen(
       data: (e) => e?.title ?? 'Evento #${widget.eventId}',
@@ -156,6 +173,45 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                                   child: Text('• $clientIp', style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11)),
                                 )),
                           ],
+                          if (connectionToken != null) ...[
+                            const Divider(),
+                            const Text(
+                              'Conectar novos caixas',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Peça para o outro aparelho ler o QR code abaixo ou colar o token de conexão.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey),
+                            ),
+                            Center(
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: QrImageView(
+                                  data: 'caixa://connect/$connectionToken',
+                                  version: QrVersions.auto,
+                                  size: 160.0,
+                                ),
+                              ),
+                            ),
+                            Center(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: 'caixa://connect/$connectionToken'));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Token de conexão copiado!')),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy_rounded, size: 16),
+                                label: const Text('Copiar token de conexão', style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -234,7 +290,7 @@ class _SyncSettingsScreenState extends ConsumerState<SyncSettingsScreen> {
                             final sIp = server['ip'] as String;
                             final sPort = server['port'] as int;
                             final sTitle = server['eventTitle'] as String;
-                            final sEventId = server['eventId'] as int;
+                            final sEventId = server['eventId'] as String;
                             final isCurrent = syncState.isConnected && syncState.serverIp == sIp;
 
                             return Card(

@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Esta permissão é necessária para conectar e sincronizar dados de vendas entre caixas na mesma rede Wi-Fi.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Precisamos de acesso à câmera para ler o QR Code de conexão do Caixa Central.</string>
 </dict>
 </plist>

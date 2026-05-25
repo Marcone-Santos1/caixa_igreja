@@ -9,6 +9,7 @@ import '../../data/sale_line_draft.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/event_dashboard_provider.dart';
 import '../../providers/sales_draft_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
@@ -16,16 +17,16 @@ import '../../utils/money_format.dart';
 class NewSaleScreen extends ConsumerStatefulWidget {
   const NewSaleScreen({super.key, required this.eventId, this.editSaleId});
 
-  final int eventId;
-  final int? editSaleId;
+  final String eventId;
+  final String? editSaleId;
 
   @override
   ConsumerState<NewSaleScreen> createState() => _NewSaleScreenState();
 }
 
 class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
-  final Map<int, int> _productQty = {};
-  final Map<int, int> _fichaQty = {};
+  final Map<String, int> _productQty = {};
+  final Map<String, int> _fichaQty = {};
   final List<FreeLineDraft> _freeLines = [];
   PosSale? _originalSale;
   bool _isLoadingEdit = false;
@@ -547,9 +548,10 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final db = ref.watch(appDatabaseProvider);
     final draftsState = _isEditing ? null : ref.watch(vendaDraftsProvider(widget.eventId));
     final draft = draftsState?.activeDraft;
+    final activeProductsAsync = ref.watch(eventActiveProductsStreamProvider(widget.eventId));
+    final denomsAsync = ref.watch(eventDenomsStreamProvider(widget.eventId));
 
     return Scaffold(
       appBar: AppBar(
@@ -559,333 +561,319 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
         ),
         title: Text(widget.editSaleId != null ? 'Editar venda #${widget.editSaleId}' : 'Nova venda'),
       ),
-      body: _isLoadingEdit 
+      body: _isLoadingEdit
         ? const Center(child: CircularProgressIndicator())
-        : StreamBuilder<List<ChurchProduct>>(
-        stream: db.watchActiveProductsForEvent(widget.eventId),
-        builder: (context, prodSnap) {
-          if (prodSnap.hasError) {
-            return Center(child: Text('Erro: ${prodSnap.error}'));
-          }
-          final products = prodSnap.data;
-          if (products == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          return StreamBuilder<List<EventDotDenom>>(
-            stream: db.watchDotDenominations(widget.eventId),
-            builder: (context, dotSnap) {
-              if (dotSnap.hasError) {
-                return Center(child: Text('Erro: ${dotSnap.error}'));
-              }
-              final denoms = dotSnap.data;
-              if (denoms == null) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final total = _totalCents(products, denoms);
-              final hasCart = total > 0;
+        : activeProductsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (err, _) => Center(child: Text('Erro: $err')),
+            data: (products) => denomsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Erro: $err')),
+              data: (denoms) {
+                final total = _totalCents(products, denoms);
+                final hasCart = total > 0;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!_isEditing && draftsState != null)
-                    _buildDraftTabs(context, ref, draftsState, products, denoms),
-                  if (hasCart)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                      child: Card(
-                        child: ExpansionTile(
-                          initiallyExpanded: true,
-                          title: Text(
-                            'Resumo · ${formatCents(total)}',
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          children: [
-                          for (final p in products)
-                            if (((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) > 0)
-                              ListTile(
-                                dense: true,
-                                title: Text(p.name),
-                                subtitle: Text(formatCents(p.priceCents)),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                      ),
-                                      onPressed: () => _setProductQty(
-                                        p,
-                                        ((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) - 1,
-                                      ),
-                                    ),
-                                    Text('${_isEditing ? _productQty[p.id] : draft?.productQty[p.id]}'),
-                                    IconButton(
-                                      icon: const Icon(Icons.add_circle_outline),
-                                      onPressed: () => _addProduct(p),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          for (final d in denoms)
-                            if (((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) > 0)
-                              ListTile(
-                                dense: true,
-                                title: Text('${d.label} (ficha)'),
-                                subtitle: Text(formatCents(d.valueCents)),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                      ),
-                                      onPressed: () => _setFichaQty(
-                                        d,
-                                        ((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) - 1,
-                                      ),
-                                    ),
-                                    Text('${_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]}'),
-                                    IconButton(
-                                      icon: const Icon(Icons.add_circle_outline),
-                                      onPressed: () => _addFicha(d),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          for (final f in (_isEditing ? _freeLines : draft?.freeLines ?? const []))
-                            ListTile(
-                              dense: true,
-                              title: Text(f.label),
-                              subtitle: Text(formatCents(f.cents)),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.close),
-                                onPressed: () {
-                                  if (_isEditing) {
-                                    setState(() => _freeLines.remove(f));
-                                  } else {
-                                    ref.read(vendaDraftsProvider(widget.eventId).notifier).removeFreeLine(f);
-                                  }
-                                },
-                              ),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!_isEditing && draftsState != null)
+                      _buildDraftTabs(context, ref, draftsState, products, denoms),
+                    if (hasCart)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                        child: Card(
+                          child: ExpansionTile(
+                            initiallyExpanded: true,
+                            title: Text(
+                              'Resumo · ${formatCents(total)}',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: ListView(
-                      padding: kCaixaScreenPadding.copyWith(
-                        top: 4,
-                        bottom: 8,
-                      ),
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Produtos',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: _addFreeLine,
-                              icon: const Icon(Icons.attach_money),
-                              label: const Text('Valor avulso'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        if (products.isEmpty)
-                          const Text('Nenhum produto ativo.')
-                        else
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              childAspectRatio: 1.2,
-                            ),
-                            itemCount: products.length,
-                            itemBuilder: (context, i) {
-                              final p = products[i];
-                              final disabled =
-                                  p.trackStock && p.stockQty == 0;
-                              final inCart = _isEditing ? (_productQty[p.id] ?? 0) : (draft?.productQty[p.id] ?? 0);
-                              
-                              Widget cardContent = Padding(
-                                padding: const EdgeInsets.all(8),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      p.name,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .titleSmall,
-                                    ),
-                                    if (p.isCombo)
-                                      Container(
-                                        margin: const EdgeInsets.only(top: 4),
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          borderRadius: BorderRadius.circular(4),
+                            children: [
+                            for (final p in products)
+                              if (((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) > 0)
+                                ListTile(
+                                  dense: true,
+                                  title: Text(p.name),
+                                  subtitle: Text(formatCents(p.priceCents)),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
                                         ),
-                                        child: const Text('COMBO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        onPressed: () => _setProductQty(
+                                          p,
+                                          ((_isEditing ? _productQty[p.id] : draft?.productQty[p.id]) ?? 0) - 1,
+                                        ),
                                       ),
-                                    const Spacer(),
-                                    Text(formatCents(p.priceCents)),
-                                    if (inCart > 0)
-                                      Text('x$inCart',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall),
-                                  ],
+                                      Text('${_isEditing ? _productQty[p.id] : draft?.productQty[p.id]}'),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline),
+                                        onPressed: () => _addProduct(p),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-
-                              if (disabled) {
-                                cardContent = Opacity(
-                                  opacity: 0.5,
-                                  child: cardContent,
-                                );
-                              }
-
-                              return Card(
-                                color: disabled
-                                    ? Colors.red.withValues(alpha: 0.2)
-                                    : null,
-                                child: InkWell(
-                                  onTap: disabled ? null : () => _addProduct(p),
-                                  child: cardContent,
+                            for (final d in denoms)
+                              if (((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) > 0)
+                                ListTile(
+                                  dense: true,
+                                  title: Text('${d.label} (ficha)'),
+                                  subtitle: Text(formatCents(d.valueCents)),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.remove_circle_outline,
+                                        ),
+                                        onPressed: () => _setFichaQty(
+                                          d,
+                                          ((_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]) ?? 0) - 1,
+                                        ),
+                                      ),
+                                      Text('${_isEditing ? _fichaQty[d.id] : draft?.fichaQty[d.id]}'),
+                                      IconButton(
+                                        icon: const Icon(Icons.add_circle_outline),
+                                        onPressed: () => _addFicha(d),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
+                            for (final f in (_isEditing ? _freeLines : draft?.freeLines ?? const []))
+                              ListTile(
+                                dense: true,
+                                title: Text(f.label),
+                                subtitle: Text(formatCents(f.cents)),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () {
+                                    if (_isEditing) {
+                                      setState(() => _freeLines.remove(f));
+                                    } else {
+                                      ref.read(vendaDraftsProvider(widget.eventId).notifier).removeFreeLine(f);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ],
                           ),
-                        if (denoms.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Text(
-                            'Fichas (dots)',
-                            style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                      ),
+                    Expanded(
+                      child: ListView(
+                        padding: kCaixaScreenPadding.copyWith(
+                          top: 4,
+                          bottom: 8,
+                        ),
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Produtos',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: _addFreeLine,
+                                icon: const Icon(Icons.attach_money),
+                                label: const Text('Valor avulso'),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 8),
-                          GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              mainAxisSpacing: 8,
-                              crossAxisSpacing: 8,
-                              childAspectRatio: 1.2,
+                          if (products.isEmpty)
+                            const Text('Nenhum produto ativo.')
+                          else
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                childAspectRatio: 1.2,
+                              ),
+                              itemCount: products.length,
+                              itemBuilder: (context, i) {
+                                final p = products[i];
+                                final disabled =
+                                    p.trackStock && p.stockQty == 0;
+                                final inCart = _isEditing ? (_productQty[p.id] ?? 0) : (draft?.productQty[p.id] ?? 0);
+                                
+                                Widget cardContent = Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        p.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall,
+                                      ),
+                                      if (p.isCombo)
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text('COMBO', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      const Spacer(),
+                                      Text(formatCents(p.priceCents)),
+                                      if (inCart > 0)
+                                        Text('x$inCart',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelSmall),
+                                    ],
+                                  ),
+                                );
+
+                                if (disabled) {
+                                  cardContent = Opacity(
+                                    opacity: 0.5,
+                                    child: cardContent,
+                                  );
+                                }
+
+                                return Card(
+                                  color: disabled
+                                      ? Colors.red.withValues(alpha: 0.2)
+                                      : null,
+                                  child: InkWell(
+                                    onTap: disabled ? null : () => _addProduct(p),
+                                    child: cardContent,
+                                  ),
+                                );
+                              },
                             ),
-                            itemCount: denoms.length,
-                            itemBuilder: (context, i) {
-                              final d = denoms[i];
-                              final disabled = d.stockQty == 0;
-                              final inCart = _isEditing ? (_fichaQty[d.id] ?? 0) : (draft?.fichaQty[d.id] ?? 0);
-                              return Card(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .secondaryContainer,
-                                child: InkWell(
-                                  onTap: disabled ? null : () => _addFicha(d),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          d.label,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall,
-                                        ),
-                                        const Spacer(),
-                                        Text(formatCents(d.valueCents)),
-                                        Text(
-                                          'Estoque: ${d.stockQty}',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .labelSmall,
-                                        ),
-                                        if (inCart > 0)
+                          if (denoms.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Text(
+                              'Fichas (dots)',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                childAspectRatio: 1.2,
+                              ),
+                              itemCount: denoms.length,
+                              itemBuilder: (context, i) {
+                                final d = denoms[i];
+                                final disabled = d.stockQty == 0;
+                                final inCart = _isEditing ? (_fichaQty[d.id] ?? 0) : (draft?.fichaQty[d.id] ?? 0);
+                                return Card(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .secondaryContainer,
+                                  child: InkWell(
+                                    onTap: disabled ? null : () => _addFicha(d),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                           Text(
-                                            'x$inCart',
+                                            d.label,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleSmall,
+                                          ),
+                                          const Spacer(),
+                                          Text(formatCents(d.valueCents)),
+                                          Text(
+                                            'Estoque: ${d.stockQty}',
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .labelSmall,
                                           ),
-                                      ],
+                                          if (inCart > 0)
+                                            Text(
+                                              'x$inCart',
+                                              style: Theme.of(context)
+                                                  .textTheme
+                                                  .labelSmall,
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  SafeArea(
-                    child: Padding(
-                      padding: kCaixaScreenPadding.copyWith(
-                        top: 8,
-                        bottom: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: !hasCart
-                                  ? null
-                                  : () {
-                                      if (_isEditing) {
-                                        setState(() {
-                                          _productQty.clear();
-                                          _fichaQty.clear();
-                                          _freeLines.clear();
-                                        });
-                                      } else {
-                                        ref.read(vendaDraftsProvider(widget.eventId).notifier).clearDraft(draft!.id);
-                                      }
-                                    },
-                              child: const Text('Limpar'),
+                                );
+                              },
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FilledButton(
-                              onPressed: !hasCart
-                                  ? null
-                                  : () => _checkout(total, products, denoms),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
+                          ],
+                        ],
+                      ),
+                    ),
+                    SafeArea(
+                      child: Padding(
+                        padding: kCaixaScreenPadding.copyWith(
+                          top: 8,
+                          bottom: 12,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: !hasCart
+                                    ? null
+                                    : () {
+                                        if (_isEditing) {
+                                          setState(() {
+                                            _productQty.clear();
+                                            _fichaQty.clear();
+                                            _freeLines.clear();
+                                          });
+                                        } else {
+                                          ref.read(vendaDraftsProvider(widget.eventId).notifier).clearDraft(draft!.id);
+                                        }
+                                      },
+                                child: const Text('Limpar'),
                               ),
-                              child: Text('Pagar ${formatCents(total)}'),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: FilledButton(
+                                onPressed: !hasCart
+                                    ? null
+                                    : () => _checkout(total, products, denoms),
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(48),
+                                ),
+                                child: Text('Pagar ${formatCents(total)}'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      ),
+                  ],
+                );
+              },
+            ),
+          ),
     );
   }
 }

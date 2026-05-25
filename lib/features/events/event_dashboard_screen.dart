@@ -13,7 +13,7 @@ enum DashboardTab { geral, produtos, outros }
 class EventDashboardScreen extends ConsumerStatefulWidget {
   const EventDashboardScreen({super.key, required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   ConsumerState<EventDashboardScreen> createState() => _EventDashboardScreenState();

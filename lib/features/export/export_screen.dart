@@ -24,7 +24,7 @@ class ExportScreen extends ConsumerStatefulWidget {
 }
 
 class _ExportScreenState extends ConsumerState<ExportScreen> {
-  int? _eventId;
+  String? _eventId;
   bool _busy = false;
 
   String _safeFileSlug(String title) {
@@ -163,7 +163,7 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 8),
-                      DropdownButton<int>(
+                      DropdownButton<String>(
                         isExpanded: true,
                         value: selectedId,
                         items: [

@@ -1,14 +1,14 @@
 import '../data/database.dart';
 
 /// Alocação sugerida: quantas fichas de cada denominação (troco exato, greedy maior valor primeiro).
-List<({int dotDenominationId, int qty})> suggestChangeAllocation({
+List<({String dotDenominationId, int qty})> suggestChangeAllocation({
   required int changeCents,
   required List<EventDotDenom> denoms,
 }) {
   if (changeCents <= 0) return [];
   final sorted = [...denoms]..sort((a, b) => b.valueCents.compareTo(a.valueCents));
   var remaining = changeCents;
-  final out = <({int dotDenominationId, int qty})>[];
+  final out = <({String dotDenominationId, int qty})>[];
   for (final d in sorted) {
     if (remaining <= 0 || d.valueCents <= 0) continue;
     final maxByChange = remaining ~/ d.valueCents;
@@ -22,7 +22,7 @@ List<({int dotDenominationId, int qty})> suggestChangeAllocation({
 }
 
 int allocationTotalCents(
-  List<({int dotDenominationId, int qty})> alloc,
+  List<({String dotDenominationId, int qty})> alloc,
   List<EventDotDenom> denoms,
 ) {
   final byId = {for (final d in denoms) d.id: d};

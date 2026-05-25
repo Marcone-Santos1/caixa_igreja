@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
 import 'package:drift/drift.dart' hide Column;
 
 class ComboFormScreen extends ConsumerStatefulWidget {
-  final int eventId;
-  final int? comboProductId;
+  final String eventId;
+  final String? comboProductId;
 
   const ComboFormScreen({super.key, required this.eventId, this.comboProductId});
 
@@ -23,15 +24,24 @@ class _ComboFormScreenState extends ConsumerState<ComboFormScreen> {
   final _priceCtrl = TextEditingController();
   bool _active = true;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   // Map of productId -> quantity in combo
-  final Map<int, int> _comboItems = {};
+  final Map<String, int> _comboItems = {};
   List<ChurchProduct> _availableProducts = [];
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
+    _priceCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -67,7 +77,7 @@ class _ComboFormScreenState extends ConsumerState<ComboFormScreen> {
     }
   }
 
-  void _save() async {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     
     if (_comboItems.isEmpty || _comboItems.values.every((q) => q <= 0)) {
@@ -77,36 +87,141 @@ class _ComboFormScreenState extends ConsumerState<ComboFormScreen> {
       return;
     }
 
-    final valStr = _priceCtrl.text.replaceAll(RegExp(r'[^\d]'), '');
-    final priceCents = int.tryParse(valStr) ?? 0;
+    final priceCents = parseMoneyToCents(_priceCtrl.text);
+    if (priceCents == null || priceCents <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preço inválido')),
+      );
+      return;
+    }
 
-    final db = ref.read(appDatabaseProvider);
+    setState(() => _isSaving = true);
+
+    final syncNotifier = ref.read(syncProvider.notifier);
+    final syncState = ref.read(syncProvider);
+    final isClient = syncState.mode == SyncMode.client && syncState.isConnected;
+    final isServer = syncState.mode == SyncMode.server;
+
     final itemsList = _comboItems.entries
         .where((e) => e.value > 0)
         .map((e) => (childProductId: e.key, qty: e.value))
         .toList();
 
-    if (widget.comboProductId == null) {
-      await db.createCombo(
-        eventId: widget.eventId,
-        name: _nameCtrl.text.trim(),
-        priceCents: priceCents,
-        description: _descCtrl.text.trim(),
-        active: _active,
-        items: itemsList,
-      );
-    } else {
-      await db.updateCombo(
-        comboProductId: widget.comboProductId!,
-        name: _nameCtrl.text.trim(),
-        priceCents: priceCents,
-        description: _descCtrl.text.trim(),
-        active: _active,
-        items: itemsList,
-      );
-    }
+    try {
+      if (isClient) {
+        // Delega ao host via HTTP
+        final comboId = widget.comboProductId;
+        await syncNotifier.submitProductToHost(
+          eventId: widget.eventId,
+          productId: comboId,
+          name: _nameCtrl.text.trim(),
+          priceCents: priceCents,
+          description: _descCtrl.text.trim(),
+          trackStock: false,
+          stockQty: 0,
+          active: _active,
+          isCombo: true,
+          items: itemsList
+              .map((i) => {'childProductId': i.childProductId, 'qty': i.qty})
+              .toList(),
+        );
+        // Re-sync: puxa os dados atualizados do host imediatamente
+        await syncNotifier.refreshAllClientCaches(widget.eventId);
+      } else {
+        // Salva localmente (host ou standalone)
+        final db = ref.read(appDatabaseProvider);
+        if (widget.comboProductId == null) {
+          await db.createCombo(
+            eventId: widget.eventId,
+            name: _nameCtrl.text.trim(),
+            priceCents: priceCents,
+            description: _descCtrl.text.trim(),
+            active: _active,
+            items: itemsList,
+          );
+        } else {
+          await db.updateCombo(
+            comboProductId: widget.comboProductId!,
+            name: _nameCtrl.text.trim(),
+            priceCents: priceCents,
+            description: _descCtrl.text.trim(),
+            active: _active,
+            items: itemsList,
+          );
+        }
+        // Se for o host, avisa os clientes conectados
+        if (isServer) syncNotifier.broadcastRefresh();
+      }
 
-    if (mounted) Navigator.pop(context, true);
+      if (mounted) Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar combo: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final id = widget.comboProductId;
+    if (id == null) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir combo?'),
+        content: const Text(
+          'O combo será removido do catálogo. '
+          'Não é possível excluir se já tiver sido vendido.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _isSaving = true);
+
+    final syncNotifier = ref.read(syncProvider.notifier);
+    final syncState = ref.read(syncProvider);
+    final isClient = syncState.mode == SyncMode.client && syncState.isConnected;
+    final isServer = syncState.mode == SyncMode.server;
+
+    try {
+      if (isClient) {
+        await syncNotifier.deleteProductOnHost(widget.eventId, id);
+        // Re-sync: puxa os dados atualizados do host imediatamente
+        await syncNotifier.refreshAllClientCaches(widget.eventId);
+      } else {
+        final db = ref.read(appDatabaseProvider);
+        final err = await db.deleteProduct(eventId: widget.eventId, productId: id);
+        if (err != null) throw StateError(err);
+        if (isServer) syncNotifier.broadcastRefresh();
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao excluir combo: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -115,13 +230,27 @@ class _ComboFormScreenState extends ConsumerState<ComboFormScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final isEdit = widget.comboProductId != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.comboProductId == null ? 'Novo Combo' : 'Editar Combo'),
+        title: Text(isEdit ? 'Editar Combo' : 'Novo Combo'),
         actions: [
+          if (isEdit)
+            IconButton(
+              tooltip: 'Excluir combo',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: _isSaving ? null : _confirmDelete,
+            ),
           IconButton(
-            icon: const Icon(Icons.check_rounded),
-            onPressed: _save,
+            icon: _isSaving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.check_rounded),
+            onPressed: _isSaving ? null : _save,
           ),
         ],
       ),
@@ -139,8 +268,8 @@ class _ComboFormScreenState extends ConsumerState<ComboFormScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _priceCtrl,
-              decoration: const InputDecoration(labelText: 'Preço Fixo do Combo (R\$) *', border: OutlineInputBorder()),
-              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Preço Fixo do Combo (ex: 5,00) *', border: OutlineInputBorder()),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               validator: (v) => v == null || v.trim().isEmpty ? 'Obrigatório' : null,
             ),
             const SizedBox(height: 16),

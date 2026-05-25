@@ -2,37 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/ui_kit.dart';
-import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/money_format.dart';
+import '../../providers/event_dashboard_provider.dart';
+import '../../providers/sync_provider.dart';
 import 'combo_form_screen.dart';
 import 'product_form_screen.dart';
 
 class ProductsListScreen extends ConsumerWidget {
   const ProductsListScreen({super.key, required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final db = ref.watch(appDatabaseProvider);
+    final syncState = ref.watch(syncProvider);
+    final isClient = syncState.mode == SyncMode.client && syncState.isConnected;
+    final productsAsync = ref.watch(eventProductsStreamProvider(eventId));
+
     return Scaffold(
       appBar: AppBar(title: const Text('Produtos do evento')),
-      body: StreamBuilder<List<ChurchProduct>>(
-        stream: db.watchAllProductsForEvent(eventId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Erro: ${snapshot.error}',
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            );
-          }
-          final list = snapshot.data;
-          if (list == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: productsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, _) => Center(child: Text('Erro: $err')),
+        data: (list) {
           if (list.isEmpty) {
             return const CaixaEmptyHint(
               icon: Icons.inventory_2_outlined,
@@ -104,14 +97,33 @@ class ProductsListScreen extends ConsumerWidget {
                       ),
                     );
                     if (ok != true || !context.mounted) return;
-                    final err = await ref
-                        .read(appDatabaseProvider)
-                        .deleteProduct(eventId: eventId, productId: p.id);
-                    if (!context.mounted) return;
-                    if (err != null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(err)),
-                      );
+                    
+                    try {
+                      if (isClient) {
+                        await ref.read(syncProvider.notifier).deleteProductOnHost(eventId, p.id);
+                        // Re-sync: puxa os dados atualizados do host imediatamente
+                        await ref.read(syncProvider.notifier).refreshAllClientCaches(eventId);
+                      } else {
+                        final err = await ref
+                            .read(appDatabaseProvider)
+                            .deleteProduct(eventId: eventId, productId: p.id);
+                        if (err != null) throw StateError(err);
+                        // Se for o host, avisa os clientes conectados
+                        if (ref.read(syncProvider).mode == SyncMode.server) {
+                          ref.read(syncProvider.notifier).broadcastRefresh();
+                        }
+                      }
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Produto excluído com sucesso')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Erro ao excluir: $e')),
+                        );
+                      }
                     }
                   },
                 ),

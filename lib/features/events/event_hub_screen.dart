@@ -21,7 +21,7 @@ final _dateFmt = DateFormat.yMMMEd('pt_BR');
 class EventHubScreen extends ConsumerWidget {
   const EventHubScreen({super.key, required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -296,7 +296,7 @@ class EventHubScreen extends ConsumerWidget {
 class _LowStockBanner extends ConsumerWidget {
   const _LowStockBanner({required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -372,7 +372,7 @@ class _LowStockBanner extends ConsumerWidget {
 class _FinanceSummaryCard extends ConsumerWidget {
   const _FinanceSummaryCard({required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

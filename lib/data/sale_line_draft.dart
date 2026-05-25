@@ -13,7 +13,7 @@ class SaleLineDraft {
   });
 
   factory SaleLineDraft.product({
-    required int productId,
+    required String productId,
     required int qty,
     required int unitPriceCents,
   }) {
@@ -39,7 +39,7 @@ class SaleLineDraft {
   }
 
   factory SaleLineDraft.ficha({
-    required int dotDenominationId,
+    required String dotDenominationId,
     required int qty,
     required int unitPriceCents,
   }) {
@@ -52,8 +52,8 @@ class SaleLineDraft {
   }
 
   final int kind;
-  final int? productId;
-  final int? dotDenominationId;
+  final String? productId;
+  final String? dotDenominationId;
   final String? freeLabel;
   final int qty;
   final int? unitPriceCents;

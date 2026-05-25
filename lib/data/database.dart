@@ -7,32 +7,41 @@ import '../domain/payment_method.dart';
 import '../domain/stock_constants.dart';
 import 'drift_database_paths.dart';
 import '../domain/sale_line_kind.dart';
+import 'package:uuid/uuid.dart';
 import 'sale_line_draft.dart';
 
 part 'database.g.dart';
 
+const _uuid = Uuid();
+
 @DataClassName('ChurchEvent')
 class Events extends Table {
-  IntColumn get id => integer().autoIncrement()();
+  TextColumn get id => text()();
   TextColumn get title => text()();
   TextColumn get notes => text().withDefault(const Constant(''))();
   IntColumn get dateEpochMs => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// “Fichas” / pontos do evento (valor unitário + estoque).
 @DataClassName('EventDotDenom')
 class EventDotDenominations extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get eventId => integer().references(Events, #id)();
+  TextColumn get id => text()();
+  TextColumn get eventId => text().references(Events, #id)();
   TextColumn get label => text()();
   IntColumn get valueCents => integer()();
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 @DataClassName('ChurchProduct')
 class Products extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get eventId => integer().references(Events, #id)();
+  TextColumn get id => text()();
+  TextColumn get eventId => text().references(Events, #id)();
   TextColumn get name => text()();
   TextColumn get description => text().withDefault(const Constant(''))();
   IntColumn get priceCents => integer()();
@@ -40,11 +49,14 @@ class Products extends Table {
   IntColumn get stockQty => integer().withDefault(const Constant(0))();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   BoolColumn get isCombo => boolean().withDefault(const Constant(false))();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 class ProductComboItems extends Table {
-  IntColumn get comboProductId => integer().references(Products, #id)();
-  IntColumn get childProductId => integer().references(Products, #id)();
+  TextColumn get comboProductId => text().references(Products, #id)();
+  TextColumn get childProductId => text().references(Products, #id)();
   IntColumn get qty => integer()();
 
   @override
@@ -53,8 +65,8 @@ class ProductComboItems extends Table {
 
 @DataClassName('PosSale')
 class Sales extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get eventId => integer().references(Events, #id)();
+  TextColumn get id => text()();
+  TextColumn get eventId => text().references(Events, #id)();
   IntColumn get soldAtMs => integer()();
   IntColumn get totalCents => integer()();
   IntColumn get amountReceivedCents => integer()();
@@ -63,30 +75,39 @@ class Sales extends Table {
   TextColumn get notes => text().nullable()();
   BoolColumn get changePending => boolean().withDefault(const Constant(false))();
   TextColumn get customerName => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 @DataClassName('PosSaleLine')
 class SaleLines extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get saleId => integer().references(Sales, #id)();
+  TextColumn get id => text()();
+  TextColumn get saleId => text().references(Sales, #id)();
   IntColumn get lineKind => integer().withDefault(const Constant(0))();
-  IntColumn get productId => integer().nullable().references(Products, #id)();
-  IntColumn get dotDenominationId =>
-      integer().nullable().references(EventDotDenominations, #id)();
+  TextColumn get productId => text().nullable().references(Products, #id)();
+  TextColumn get dotDenominationId =>
+      text().nullable().references(EventDotDenominations, #id)();
   TextColumn get freeLabel => text().nullable()();
   IntColumn get qty => integer()();
   IntColumn get unitPriceCents => integer()();
   IntColumn get lineTotalCents => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// Fichas entregues como troco (auditoria + baixa de estoque).
 @DataClassName('ChangeDotRow')
 class SaleChangeDotAllocations extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get saleId => integer().references(Sales, #id)();
-  IntColumn get dotDenominationId =>
-      integer().references(EventDotDenominations, #id)();
+  TextColumn get id => text()();
+  TextColumn get saleId => text().references(Sales, #id)();
+  TextColumn get dotDenominationId =>
+      text().references(EventDotDenominations, #id)();
   IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
 }
 
 /// Linha de venda para exibição no registro do evento (sem dados do evento).
@@ -239,7 +260,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -325,6 +346,25 @@ PRAGMA foreign_keys = ON;
             await m.addColumn(products, products.isCombo);
             await m.createTable(productComboItems);
           }
+          if (from < 6) {
+            // Migração de quebra de esquema estrutural (int para UUID String).
+            // Dropamos as tabelas na ordem inversa de dependência e recriamos do zero.
+            await customStatement('PRAGMA foreign_keys = OFF;');
+            final tablesToDrop = [
+              'sale_change_dot_allocations',
+              'sale_lines',
+              'sales',
+              'product_combo_items',
+              'products',
+              'event_dot_denominations',
+              'events'
+            ];
+            for (final table in tablesToDrop) {
+              await customStatement('DROP TABLE IF EXISTS $table;');
+            }
+            await customStatement('PRAGMA foreign_keys = ON;');
+            await m.createAll();
+          }
         },
       );
 
@@ -332,12 +372,14 @@ PRAGMA foreign_keys = ON;
     return driftDatabase(name: kCaixaIgrejaDriftDbName);
   }
 
-  Stream<ChurchEvent?> watchEvent(int id) {
+  String generateUuid() => _uuid.v7();
+
+  Stream<ChurchEvent?> watchEvent(String id) {
     return (select(events)..where((e) => e.id.equals(id)))
         .watchSingleOrNull();
   }
 
-  Stream<List<EventDotDenom>> watchDotDenominations(int eventId) {
+  Stream<List<EventDotDenom>> watchDotDenominations(String eventId) {
     return (select(eventDotDenominations)
           ..where((t) => t.eventId.equals(eventId))
           ..orderBy([(t) => OrderingTerm.desc(t.valueCents)]))
@@ -349,7 +391,7 @@ PRAGMA foreign_keys = ON;
     for (final p in prods) {
       final pDyn = p as dynamic;
       final pIsCombo = pDyn.isCombo as bool? ?? false;
-      final pId = pDyn.id as int? ?? 0;
+      final pId = pDyn.id as String? ?? '';
 
       if (pIsCombo) {
         final items = await (select(productComboItems)..where((t) => t.comboProductId.equals(pId))).get();
@@ -357,7 +399,7 @@ PRAGMA foreign_keys = ON;
         bool tracksStock = false;
         for (final item in items) {
           final itemDyn = item as dynamic;
-          final childId = itemDyn.childProductId as int? ?? 0;
+          final childId = itemDyn.childProductId as String? ?? '';
           final itemQty = itemDyn.qty as int? ?? 1;
 
           final child = await (select(products)..where((t) => t.id.equals(childId))).getSingleOrNull();
@@ -387,7 +429,7 @@ PRAGMA foreign_keys = ON;
     return mapped;
   }
 
-  Stream<List<ChurchProduct>> watchActiveProductsForEvent(int eventId) {
+  Stream<List<ChurchProduct>> watchActiveProductsForEvent(String eventId) {
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
           ..where((p) => p.active.equals(true))
@@ -396,7 +438,7 @@ PRAGMA foreign_keys = ON;
         .asyncMap(_mapProductsWithEffectiveStock);
   }
 
-  Stream<List<ChurchProduct>> watchAllProductsForEvent(int eventId) {
+  Stream<List<ChurchProduct>> watchAllProductsForEvent(String eventId) {
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
@@ -410,40 +452,40 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Vendas do evento, mais recentes primeiro (registro / livro-caixa).
-  Stream<List<PosSale>> watchSalesForEvent(int eventId) {
+  Stream<List<PosSale>> watchSalesForEvent(String eventId) {
     return (select(sales)
           ..where((s) => s.eventId.equals(eventId))
           ..orderBy([(s) => OrderingTerm.desc(s.soldAtMs)]))
         .watch();
   }
 
-  Stream<List<PosSaleLine>> watchSaleLinesForEvent(int eventId) {
+  Stream<List<PosSaleLine>> watchSaleLinesForEvent(String eventId) {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
     ])..where(sales.eventId.equals(eventId));
     return q.watch().map((rows) => rows.map((r) => r.readTable(saleLines)).toList());
   }
 
-  Stream<List<ChangeDotRow>> watchChangeDotAllocationsForEvent(int eventId) {
+  Stream<List<ChangeDotRow>> watchChangeDotAllocationsForEvent(String eventId) {
     final q = select(saleChangeDotAllocations).join([
       innerJoin(sales, sales.id.equalsExp(saleChangeDotAllocations.saleId)),
     ])..where(sales.eventId.equals(eventId));
     return q.watch().map((rows) => rows.map((r) => r.readTable(saleChangeDotAllocations)).toList());
   }
 
-  Stream<EventFinanceSummary> watchEventFinanceSummary(int eventId) {
+  Stream<EventFinanceSummary> watchEventFinanceSummary(String eventId) {
     return (select(sales)..where((s) => s.eventId.equals(eventId)))
         .watch()
         .map(EventFinanceSummary.fromSales);
   }
 
-  Future<EventFinanceSummary> eventFinanceSummary(int eventId) {
+  Future<EventFinanceSummary> eventFinanceSummary(String eventId) {
     return (select(sales)..where((s) => s.eventId.equals(eventId)))
         .get()
         .then(EventFinanceSummary.fromSales);
   }
 
-  Stream<EventLowStockCounts> watchEventLowStockCounts(int eventId) {
+  Stream<EventLowStockCounts> watchEventLowStockCounts(String eventId) {
     final threshold = kLowStockThreshold;
     late StreamSubscription<List<ChurchProduct>> sub1;
     late StreamSubscription<List<EventDotDenom>> sub2;
@@ -499,7 +541,7 @@ PRAGMA foreign_keys = ON;
     return controller.stream;
   }
 
-  Future<List<EventSaleLineRow>> saleLinesForSale(int saleId) async {
+  Future<List<EventSaleLineRow>> saleLinesForSale(String saleId) async {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
       leftOuterJoin(
@@ -541,13 +583,13 @@ PRAGMA foreign_keys = ON;
           final pDyn = p as dynamic;
           final pIsCombo = pDyn.isCombo as bool? ?? false;
           final pName = pDyn.name as String? ?? 'Produto';
-          final pId = pDyn.id as int? ?? 0;
+          final pId = pDyn.id as String? ?? '';
           if (pIsCombo) {
             final comboItems = await getComboItems(pId);
             final parts = <String>[];
             for (final item in comboItems) {
               final itemDyn = item as dynamic;
-              final childId = itemDyn.childProductId as int? ?? 0;
+              final childId = itemDyn.childProductId as String? ?? '';
               final child = await (select(products)..where((t) => t.id.equals(childId))).getSingleOrNull();
               if (child != null) {
                 final childName = (child as dynamic).name as String? ?? 'Produto';
@@ -583,7 +625,7 @@ PRAGMA foreign_keys = ON;
         .get();
   }
 
-  Future<void> _validateProductStock(int productId, int qtyMultiplier) async {
+  Future<void> _validateProductStock(String productId, int qtyMultiplier) async {
     final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
     if (p == null) return;
     if (p.isCombo) {
@@ -598,7 +640,7 @@ PRAGMA foreign_keys = ON;
     }
   }
 
-  Future<void> _abateProductStock(int productId, int qtyMultiplier) async {
+  Future<void> _abateProductStock(String productId, int qtyMultiplier) async {
     final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
     if (p == null) return;
     if (p.isCombo) {
@@ -618,7 +660,7 @@ PRAGMA foreign_keys = ON;
     }
   }
 
-  Future<void> _revertProductStock(int productId, int qtyMultiplier) async {
+  Future<void> _revertProductStock(String productId, int qtyMultiplier) async {
     final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
     if (p == null) return;
     if (p.isCombo) {
@@ -636,8 +678,8 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Venda completa: linhas (produto, valor livre ou ficha), pagamento e estoques.
-  Future<int> completeSale({
-    required int eventId,
+  Future<String> completeSale({
+    required String eventId,
     required String paymentMethod,
     required int amountReceivedCents,
     String? notes,
@@ -708,8 +750,10 @@ PRAGMA foreign_keys = ON;
       }
 
       final soldAt = DateTime.now().millisecondsSinceEpoch;
-      final saleId = await into(sales).insert(
+      final saleId = _uuid.v7();
+      await into(sales).insert(
         SalesCompanion.insert(
+          id: saleId,
           eventId: eventId,
           soldAtMs: soldAt,
           totalCents: totalCents,
@@ -724,9 +768,11 @@ PRAGMA foreign_keys = ON;
       for (final l in lines) {
         final lineTotal = l.resolveLineTotalCents();
         final unit = l.resolveUnitPriceCents();
+        final lineId = _uuid.v7();
 
         await into(saleLines).insert(
           SaleLinesCompanion.insert(
+            id: lineId,
             saleId: saleId,
             lineKind: Value(l.kind),
             productId: Value(l.productId),
@@ -767,8 +813,8 @@ PRAGMA foreign_keys = ON;
   /// Atualiza a venda revertendo as linhas antigas e inserindo novas,
   /// atualizando o valor recebido, método, etc, mas mantendo a mesma saleId.
   Future<void> updateSaleWithLines({
-    required int saleId,
-    required int eventId,
+    required String saleId,
+    required String eventId,
     required String paymentMethod,
     required int amountReceivedCents,
     String? notes,
@@ -886,9 +932,11 @@ PRAGMA foreign_keys = ON;
       for (final l in lines) {
         final lineTotal = l.resolveLineTotalCents();
         final unit = l.resolveUnitPriceCents();
+        final lineId = _uuid.v7();
 
         await into(saleLines).insert(
           SaleLinesCompanion.insert(
+            id: lineId,
             saleId: saleId,
             lineKind: Value(l.kind),
             productId: Value(l.productId),
@@ -921,10 +969,10 @@ PRAGMA foreign_keys = ON;
 
   /// Registra fichas dadas no troco (soma deve ser igual ao troco).
   Future<void> confirmChangeDots({
-    required int saleId,
-    required int eventId,
+    required String saleId,
+    required String eventId,
     required int changeCents,
-    required List<({int dotDenominationId, int qty})> allocation,
+    required List<({String dotDenominationId, int qty})> allocation,
   }) {
     return transaction(() async {
       if (changeCents <= 0) return;
@@ -959,7 +1007,7 @@ PRAGMA foreign_keys = ON;
         );
       }
 
-      final merged = <int, int>{};
+      final merged = <String, int>{};
       for (final a in allocation) {
         if (a.qty <= 0) continue;
         merged[a.dotDenominationId] =
@@ -977,8 +1025,10 @@ PRAGMA foreign_keys = ON;
         final fresh = await (select(eventDotDenominations)
               ..where((t) => t.id.equals(a.dotDenominationId)))
             .getSingle();
+        final allocId = _uuid.v7();
         await into(saleChangeDotAllocations).insert(
           SaleChangeDotAllocationsCompanion.insert(
+            id: allocId,
             saleId: saleId,
             dotDenominationId: a.dotDenominationId,
             qty: a.qty,
@@ -996,7 +1046,7 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Linhas de venda (itens) de um único evento, ordenadas por data da venda.
-  Future<List<SaleLineExportRow>> exportSaleLinesForEvent(int eventId) async {
+  Future<List<SaleLineExportRow>> exportSaleLinesForEvent(String eventId) async {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
       innerJoin(events, events.id.equalsExp(sales.eventId)),
@@ -1044,17 +1094,19 @@ PRAGMA foreign_keys = ON;
     }).get();
   }
 
-  Future<int> createCombo({
-    required int eventId,
+  Future<String> createCombo({
+    required String eventId,
     required String name,
     required int priceCents,
     String description = '',
     bool active = true,
-    required List<({int childProductId, int qty})> items,
+    required List<({String childProductId, int qty})> items,
   }) {
     return transaction(() async {
-      final comboId = await into(products).insert(
+      final comboId = _uuid.v7();
+      await into(products).insert(
         ProductsCompanion.insert(
+          id: comboId,
           eventId: eventId,
           name: name,
           priceCents: priceCents,
@@ -1079,12 +1131,12 @@ PRAGMA foreign_keys = ON;
   }
 
   Future<void> updateCombo({
-    required int comboProductId,
+    required String comboProductId,
     required String name,
     required int priceCents,
     String description = '',
     bool active = true,
-    required List<({int childProductId, int qty})> items,
+    required List<({String childProductId, int qty})> items,
   }) {
     return transaction(() async {
       await (update(products)..where((t) => t.id.equals(comboProductId))).write(
@@ -1109,15 +1161,105 @@ PRAGMA foreign_keys = ON;
     });
   }
 
-  Future<List<ProductComboItem>> getComboItems(int comboId) {
+  Future<List<ProductComboItem>> getComboItems(String comboId) {
     return (select(productComboItems)..where((t) => t.comboProductId.equals(comboId))).get();
+  }
+
+  Future<List<ProductComboItem>> getComboItemsForEvent(String eventId) async {
+    final query = select(productComboItems).join([
+      innerJoin(products, products.id.equalsExp(productComboItems.comboProductId)),
+    ])..where(products.eventId.equals(eventId));
+    final rows = await query.get();
+    return rows.map((row) => row.readTable(productComboItems)).toList();
+  }
+
+  /// Sincroniza todos os dados de um evento vindo do Host no banco de dados local do Cliente,
+  /// limpando dados antigos e inserindo os novos em uma transação atômica.
+  Future<void> syncEventData({
+    required String eventId,
+    required ChurchEvent event,
+    required List<EventDotDenom> denoms,
+    required List<ChurchProduct> productsList,
+    required List<ProductComboItem> comboItems,
+    required List<PosSale> salesList,
+    required List<PosSaleLine> saleLinesList,
+    required List<ChangeDotRow> changeAllocationsList,
+  }) async {
+    await transaction(() async {
+      // 1. Obter informações de produtos e denominações locais antes de limpar
+      final productRows = await (select(products)..where((p) => p.eventId.equals(eventId))).get();
+      final productIds = productRows.map((p) => p.id).toList();
+
+      final denomRows = await (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).get();
+      final denomIds = denomRows.map((d) => d.id).toList();
+
+      // 2. Limpar dados locais antigos associados a esse evento de forma ordenada (chaves estrangeiras)
+      final saleRows = await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
+      final saleIds = saleRows.map((s) => s.id).toList();
+      if (saleIds.isNotEmpty) {
+        await (delete(saleChangeDotAllocations)..where((t) => t.saleId.isIn(saleIds))).go();
+        await (delete(saleLines)..where((t) => t.saleId.isIn(saleIds))).go();
+      }
+
+      // Limpeza de contingência para linhas de venda e troco órfãs vinculadas a produtos/fichas do evento
+      if (productIds.isNotEmpty) {
+        await (delete(saleLines)..where((t) => t.productId.isIn(productIds))).go();
+      }
+      if (denomIds.isNotEmpty) {
+        await (delete(saleChangeDotAllocations)..where((t) => t.dotDenominationId.isIn(denomIds))).go();
+      }
+
+      await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
+
+      if (productIds.isNotEmpty) {
+        await (delete(productComboItems)
+              ..where((t) => t.comboProductId.isIn(productIds) | t.childProductId.isIn(productIds)))
+            .go();
+      }
+
+      await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
+      await (delete(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).go();
+
+      // 2. Atualizar ou inserir o evento
+      await into(events).insert(event, mode: InsertMode.insertOrReplace);
+
+      // 3. Inserir denominações
+      for (final d in denoms) {
+        await into(eventDotDenominations).insert(d, mode: InsertMode.insertOrReplace);
+      }
+
+      // 4. Inserir produtos
+      for (final p in productsList) {
+        await into(products).insert(p, mode: InsertMode.insertOrReplace);
+      }
+
+      // 5. Inserir itens de combo
+      for (final ci in comboItems) {
+        await into(productComboItems).insert(ci, mode: InsertMode.insertOrReplace);
+      }
+
+      // 6. Inserir vendas
+      for (final s in salesList) {
+        await into(sales).insert(s, mode: InsertMode.insertOrReplace);
+      }
+
+      // 7. Inserir linhas de vendas
+      for (final sl in saleLinesList) {
+        await into(saleLines).insert(sl, mode: InsertMode.insertOrReplace);
+      }
+
+      // 8. Inserir alocações de troco
+      for (final ca in changeAllocationsList) {
+        await into(saleChangeDotAllocations).insert(ca, mode: InsertMode.insertOrReplace);
+      }
+    });
   }
 
   /// Remove o produto se não existir linha de venda referenciando-o.
   /// Retorna `null` em caso de sucesso, ou mensagem para o utilizador.
   Future<String?> deleteProduct({
-    required int eventId,
-    required int productId,
+    required String eventId,
+    required String productId,
   }) async {
     final p = await (select(products)
           ..where((t) => t.id.equals(productId))
@@ -1149,8 +1291,8 @@ PRAGMA foreign_keys = ON;
 
   /// Remove a ficha se não existir venda ou troco referenciando-a.
   Future<String?> deleteDotDenomination({
-    required int eventId,
-    required int dotDenominationId,
+    required String eventId,
+    required String dotDenominationId,
   }) async {
     final d = await (select(eventDotDenominations)
           ..where((t) => t.id.equals(dotDenominationId))
@@ -1177,8 +1319,16 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Apaga o evento e todos os dados associados (vendas, linhas, produtos, fichas).
-  Future<void> deleteEventCascade(int eventId) async {
+  Future<void> deleteEventCascade(String eventId) async {
     await transaction(() async {
+      // 1. Obter informações de produtos e denominações locais antes de limpar
+      final productRows = await (select(products)..where((p) => p.eventId.equals(eventId))).get();
+      final productIds = productRows.map((p) => p.id).toList();
+
+      final denomRows = await (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).get();
+      final denomIds = denomRows.map((d) => d.id).toList();
+
+      // 2. Limpar dados de vendas associados a esse evento
       final saleRows =
           await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
       final saleIds = saleRows.map((s) => s.id).toList();
@@ -1188,7 +1338,24 @@ PRAGMA foreign_keys = ON;
             .go();
         await (delete(saleLines)..where((t) => t.saleId.isIn(saleIds))).go();
       }
+
+      // Limpeza de contingência para linhas de venda e troco órfãs vinculadas a produtos/fichas do evento
+      if (productIds.isNotEmpty) {
+        await (delete(saleLines)..where((t) => t.productId.isIn(productIds))).go();
+      }
+      if (denomIds.isNotEmpty) {
+        await (delete(saleChangeDotAllocations)..where((t) => t.dotDenominationId.isIn(denomIds))).go();
+      }
+
       await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
+
+      // Limpar combo items associados a produtos deste evento
+      if (productIds.isNotEmpty) {
+        await (delete(productComboItems)
+              ..where((t) => t.comboProductId.isIn(productIds) | t.childProductId.isIn(productIds)))
+            .go();
+      }
+
       await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
       await (delete(eventDotDenominations)
             ..where((d) => d.eventId.equals(eventId)))
@@ -1199,7 +1366,7 @@ PRAGMA foreign_keys = ON;
 
   /// Atualiza dados básicos de uma venda.
   Future<void> updateSaleDetails({
-    required int saleId,
+    required String saleId,
     required String paymentMethod,
     required int amountReceivedCents,
     String? notes,
@@ -1218,7 +1385,7 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Exclui a venda e devolve produtos e fichas ao estoque.
-  Future<void> deleteSale(int saleId) async {
+  Future<void> deleteSale(String saleId) async {
     await transaction(() async {
       final sale = await (select(sales)..where((s) => s.id.equals(saleId)))
           .getSingleOrNull();

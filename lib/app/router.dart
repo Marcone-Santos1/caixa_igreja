@@ -59,7 +59,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return EventHubScreen(eventId: id);
         },
       ),
@@ -67,7 +67,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/produtos',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return ProductsListScreen(eventId: id);
         },
       ),
@@ -75,7 +75,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/fichas',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return DotManagementScreen(eventId: id);
         },
       ),
@@ -83,7 +83,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/vendas',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return EventSalesRegisterScreen(eventId: id);
         },
       ),
@@ -91,7 +91,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/dashboard',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return EventDashboardScreen(eventId: id);
         },
       ),
@@ -99,7 +99,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/sale',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return NewSaleScreen(eventId: id);
         },
       ),
@@ -107,8 +107,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/edit_sale/:saleId',
         builder: (context, state) {
-          final eid = int.parse(state.pathParameters['eventId']!);
-          final sid = int.parse(state.pathParameters['saleId']!);
+          final eid = state.pathParameters['eventId']!;
+          final sid = state.pathParameters['saleId']!;
           return NewSaleScreen(eventId: eid, editSaleId: sid);
         },
       ),
@@ -126,8 +126,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/sale/:saleId/troco',
         builder: (context, state) {
-          final eid = int.parse(state.pathParameters['eventId']!);
-          final sid = int.parse(state.pathParameters['saleId']!);
+          final eid = state.pathParameters['eventId']!;
+          final sid = state.pathParameters['saleId']!;
           final change = int.tryParse(
                 state.uri.queryParameters['change'] ?? '',
               ) ??
@@ -143,7 +143,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/event/:eventId/sync',
         builder: (context, state) {
-          final id = int.parse(state.pathParameters['eventId']!);
+          final id = state.pathParameters['eventId']!;
           return SyncSettingsScreen(eventId: id);
         },
       ),

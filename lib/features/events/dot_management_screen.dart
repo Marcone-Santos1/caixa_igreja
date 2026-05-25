@@ -13,7 +13,7 @@ import '../../utils/money_format.dart';
 class DotManagementScreen extends ConsumerWidget {
   const DotManagementScreen({super.key, required this.eventId});
 
-  final int eventId;
+  final String eventId;
 
   Future<void> _openForm(
     BuildContext context,
@@ -108,8 +108,10 @@ class DotManagementScreen extends ConsumerWidget {
 
     final db = ref.read(appDatabaseProvider);
     if (existing == null) {
+      final idToUse = db.generateUuid();
       await db.into(db.eventDotDenominations).insert(
             EventDotDenominationsCompanion.insert(
+              id: idToUse,
               eventId: eventId,
               label: labelCtrl.text.trim(),
               valueCents: vc,

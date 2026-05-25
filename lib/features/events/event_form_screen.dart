@@ -12,7 +12,7 @@ import 'event_delete_dialog.dart';
 class EventFormScreen extends ConsumerStatefulWidget {
   const EventFormScreen({super.key, this.eventId});
 
-  final int? eventId;
+  final String? eventId;
 
   @override
   ConsumerState<EventFormScreen> createState() => _EventFormScreenState();
@@ -76,13 +76,15 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     final dayMs = startOfLocalDayMs(_day);
     final db = ref.read(appDatabaseProvider);
 
+    final id = widget.eventId;
+    final idToUse = id ?? db.generateUuid();
     final companion = EventsCompanion(
+      id: id == null ? Value(idToUse) : const Value.absent(),
       title: Value(_title.text.trim()),
       notes: Value(_notes.text.trim()),
       dateEpochMs: Value(dayMs),
     );
 
-    final id = widget.eventId;
     if (id == null) {
       await db.into(db.events).insert(companion);
     } else {

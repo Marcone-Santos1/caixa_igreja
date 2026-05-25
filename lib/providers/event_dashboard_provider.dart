@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 import '../domain/sale_line_kind.dart';
 import 'database_provider.dart';
-import 'sync_provider.dart';
 
 class ProductSaleStat {
-  final int productId;
+  final String productId;
   final String name;
   final int qtySold;
   final int totalCents;
@@ -28,7 +27,7 @@ class ProductSaleStat {
 }
 
 class FichaSaleStat {
-  final int denomId;
+  final String denomId;
   final String label;
   final int qtySold;
   final int totalCents;
@@ -68,7 +67,7 @@ class HourlySaleStat {
 }
 
 class PendingChangeSaleInfo {
-  final int saleId;
+  final String saleId;
   final String customerName;
   final int changeCents;
 
@@ -80,7 +79,7 @@ class PendingChangeSaleInfo {
 }
 
 class ChangeDotStat {
-  final int denomId;
+  final String denomId;
   final String label;
   final int valueCents;
   final int qtyGiven;
@@ -101,7 +100,8 @@ class EventDashboardData {
   final int averageTicketCents;
   final Map<String, int> revenueByPaymentMethod; // method -> cents
   final Map<String, int> salesCountByPaymentMethod; // method -> count
-  final Map<String, int> averageTicketByPaymentMethod; // method -> average cents
+  final Map<String, int>
+  averageTicketByPaymentMethod; // method -> average cents
   final int totalPendingChangeCents;
   final List<PendingChangeSaleInfo> pendingChangeSales;
   final List<ChangeDotStat> changeDotStats;
@@ -138,11 +138,12 @@ class EventDashboardData {
     // Diagnosticar e tratar possíveis valores nulos vindos do banco de dados (bypass de null safety)
     final cleanedSales = sales.map((sale) {
       final sDyn = sale as dynamic;
-      final id = sDyn.id as int? ?? 0;
-      final eventId = sDyn.eventId as int? ?? 0;
+      final id = sDyn.id as String? ?? '';
+      final eventId = sDyn.eventId as String? ?? '';
       final soldAtMs = sDyn.soldAtMs as int? ?? 0;
       final totalCents = sDyn.totalCents as int? ?? 0;
-      final amountReceivedCents = sDyn.amountReceivedCents as int? ?? totalCents;
+      final amountReceivedCents =
+          sDyn.amountReceivedCents as int? ?? totalCents;
       final paymentMethod = sDyn.paymentMethod as String? ?? 'dinheiro';
       final changePending = sDyn.changePending as bool? ?? false;
       final customerName = sDyn.customerName as String?;
@@ -155,7 +156,10 @@ class EventDashboardData {
           sDyn.amountReceivedCents == null ||
           sDyn.paymentMethod == null ||
           sDyn.changePending == null) {
-        developer.log('Venda #$id possui campos nulos no banco de dados. Tratando com fallbacks.', name: 'CaixaIgreja_Warning');
+        developer.log(
+          'Venda #$id possui campos nulos no banco de dados. Tratando com fallbacks.',
+          name: 'CaixaIgreja_Warning',
+        );
       }
 
       return PosSale(
@@ -173,15 +177,16 @@ class EventDashboardData {
 
     final cleanedLines = lines.map((line) {
       final lDyn = line as dynamic;
-      final id = lDyn.id as int? ?? 0;
-      final saleId = lDyn.saleId as int? ?? 0;
+      final id = lDyn.id as String? ?? '';
+      final saleId = lDyn.saleId as String? ?? '';
       final lineKind = lDyn.lineKind as int? ?? 0;
-      final productId = lDyn.productId as int?;
-      final dotDenominationId = lDyn.dotDenominationId as int?;
+      final productId = lDyn.productId as String?;
+      final dotDenominationId = lDyn.dotDenominationId as String?;
       final freeLabel = lDyn.freeLabel as String?;
       final qty = lDyn.qty as int? ?? 0;
       final unitPriceCents = lDyn.unitPriceCents as int? ?? 0;
-      final lineTotalCents = lDyn.lineTotalCents as int? ?? (qty * unitPriceCents);
+      final lineTotalCents =
+          lDyn.lineTotalCents as int? ?? (qty * unitPriceCents);
 
       if (lDyn.id == null ||
           lDyn.saleId == null ||
@@ -189,7 +194,10 @@ class EventDashboardData {
           lDyn.qty == null ||
           lDyn.unitPriceCents == null ||
           lDyn.lineTotalCents == null) {
-        developer.log('Linha de venda #$id possui campos nulos no banco de dados. Tratando com fallbacks.', name: 'CaixaIgreja_Warning');
+        developer.log(
+          'Linha de venda #$id possui campos nulos no banco de dados. Tratando com fallbacks.',
+          name: 'CaixaIgreja_Warning',
+        );
       }
 
       return PosSaleLine(
@@ -207,8 +215,8 @@ class EventDashboardData {
 
     final cleanedProducts = products.map((p) {
       final pDyn = p as dynamic;
-      final id = pDyn.id as int? ?? 0;
-      final eventId = pDyn.eventId as int? ?? 0;
+      final id = pDyn.id as String? ?? '';
+      final eventId = pDyn.eventId as String? ?? '';
       final name = pDyn.name as String? ?? '';
       final description = pDyn.description as String? ?? '';
       final priceCents = pDyn.priceCents as int? ?? 0;
@@ -232,8 +240,8 @@ class EventDashboardData {
 
     final cleanedDenoms = denoms.map((d) {
       final dDyn = d as dynamic;
-      final id = dDyn.id as int? ?? 0;
-      final eventId = dDyn.eventId as int? ?? 0;
+      final id = dDyn.id as String? ?? '';
+      final eventId = dDyn.eventId as String? ?? '';
       final label = dDyn.label as String? ?? '';
       final valueCents = dDyn.valueCents as int? ?? 0;
       final stockQty = dDyn.stockQty as int? ?? 0;
@@ -249,9 +257,9 @@ class EventDashboardData {
 
     final cleanedChangeDotAllocations = changeDotAllocations.map((c) {
       final cDyn = c as dynamic;
-      final id = cDyn.id as int? ?? 0;
-      final saleId = cDyn.saleId as int? ?? 0;
-      final dotDenominationId = cDyn.dotDenominationId as int? ?? 0;
+      final id = cDyn.id as String? ?? '';
+      final saleId = cDyn.saleId as String? ?? '';
+      final dotDenominationId = cDyn.dotDenominationId as String? ?? '';
       final qty = cDyn.qty as int? ?? 0;
 
       return ChangeDotRow(
@@ -281,8 +289,9 @@ class EventDashboardData {
       averageTicketByPaymentMethod[method] = count > 0 ? revenue ~/ count : 0;
     });
 
-    final averageTicketCents =
-        totalSalesCount > 0 ? totalRevenueCents ~/ totalSalesCount : 0;
+    final averageTicketCents = totalSalesCount > 0
+        ? totalRevenueCents ~/ totalSalesCount
+        : 0;
 
     // Calculate pending change
     var totalPendingChangeCents = 0;
@@ -292,17 +301,19 @@ class EventDashboardData {
         final change = sale.amountReceivedCents - sale.totalCents;
         if (change > 0) {
           totalPendingChangeCents += change;
-          pendingChangeSales.add(PendingChangeSaleInfo(
-            saleId: sale.id,
-            customerName: sale.customerName ?? 'Não informado',
-            changeCents: change,
-          ));
+          pendingChangeSales.add(
+            PendingChangeSaleInfo(
+              saleId: sale.id,
+              customerName: sale.customerName ?? 'Não informado',
+              changeCents: change,
+            ),
+          );
         }
       }
     }
 
     // Aggregate change dots stats
-    final Map<int, int> changeDotQtyAgg = {};
+    final Map<String, int> changeDotQtyAgg = {};
     for (final alloc in cleanedChangeDotAllocations) {
       changeDotQtyAgg[alloc.dotDenominationId] =
           (changeDotQtyAgg[alloc.dotDenominationId] ?? 0) + alloc.qty;
@@ -312,40 +323,48 @@ class EventDashboardData {
     for (final d in cleanedDenoms) {
       final qty = changeDotQtyAgg[d.id] ?? 0;
       if (qty > 0) {
-        changeDotStats.add(ChangeDotStat(
-          denomId: d.id,
-          label: d.label,
-          valueCents: d.valueCents,
-          qtyGiven: qty,
-          totalCents: qty * d.valueCents,
-        ));
+        changeDotStats.add(
+          ChangeDotStat(
+            denomId: d.id,
+            label: d.label,
+            valueCents: d.valueCents,
+            qtyGiven: qty,
+            totalCents: qty * d.valueCents,
+          ),
+        );
       }
     }
     // Sort change dot stats by total cents descending
     changeDotStats.sort((a, b) => b.totalCents.compareTo(a.totalCents));
 
     // Aggregate product stats
-    final Map<int, (int qty, int cents)> productAgg = {};
+    final Map<String, (int qty, int cents)> productAgg = {};
     // Aggregate denom stats
-    final Map<int, (int qty, int cents)> denomAgg = {};
+    final Map<String, (int qty, int cents)> denomAgg = {};
     // Aggregate free value stats
     final Map<String, (int qty, int cents)> freeValueAgg = {};
 
     for (final line in cleanedLines) {
       if (line.lineKind == SaleLineKind.product && line.productId != null) {
         final current = productAgg[line.productId!] ?? (0, 0);
-        productAgg[line.productId!] =
-            (current.$1 + line.qty, current.$2 + line.lineTotalCents);
+        productAgg[line.productId!] = (
+          current.$1 + line.qty,
+          current.$2 + line.lineTotalCents,
+        );
       } else if (line.lineKind == SaleLineKind.ficha &&
           line.dotDenominationId != null) {
         final current = denomAgg[line.dotDenominationId!] ?? (0, 0);
-        denomAgg[line.dotDenominationId!] =
-            (current.$1 + line.qty, current.$2 + line.lineTotalCents);
+        denomAgg[line.dotDenominationId!] = (
+          current.$1 + line.qty,
+          current.$2 + line.lineTotalCents,
+        );
       } else if (line.lineKind == SaleLineKind.valorLivre) {
         final label = line.freeLabel ?? 'Valor avulso';
         final current = freeValueAgg[label] ?? (0, 0);
-        freeValueAgg[label] =
-            (current.$1 + line.qty, current.$2 + line.lineTotalCents);
+        freeValueAgg[label] = (
+          current.$1 + line.qty,
+          current.$2 + line.lineTotalCents,
+        );
       }
     }
 
@@ -383,23 +402,23 @@ class EventDashboardData {
     final List<FichaSaleStat> fichaStats = [];
     for (final d in cleanedDenoms) {
       final agg = denomAgg[d.id] ?? (0, 0);
-      fichaStats.add(FichaSaleStat(
-        denomId: d.id,
-        label: d.label,
-        qtySold: agg.$1,
-        totalCents: agg.$2,
-        remainingStock: d.stockQty,
-      ));
+      fichaStats.add(
+        FichaSaleStat(
+          denomId: d.id,
+          label: d.label,
+          qtySold: agg.$1,
+          totalCents: agg.$2,
+          remainingStock: d.stockQty,
+        ),
+      );
     }
     fichaStats.sort((a, b) => b.qtySold.compareTo(a.qtySold));
 
     final List<FreeValueSaleStat> freeValueStats = [];
     freeValueAgg.forEach((label, agg) {
-      freeValueStats.add(FreeValueSaleStat(
-        label: label,
-        qtySold: agg.$1,
-        totalCents: agg.$2,
-      ));
+      freeValueStats.add(
+        FreeValueSaleStat(label: label, qtySold: agg.$1, totalCents: agg.$2),
+      );
     });
     freeValueStats.sort((a, b) => b.totalCents.compareTo(a.totalCents));
 
@@ -416,11 +435,13 @@ class EventDashboardData {
     final sortedHours = hourlyAgg.keys.toList()..sort();
     for (final hour in sortedHours) {
       final agg = hourlyAgg[hour]!;
-      hourlyStats.add(HourlySaleStat(
-        hourLabel: '${hour.toString().padLeft(2, '0')}h',
-        totalCents: agg.$1,
-        salesCount: agg.$2,
-      ));
+      hourlyStats.add(
+        HourlySaleStat(
+          hourLabel: '${hour.toString().padLeft(2, '0')}h',
+          totalCents: agg.$1,
+          salesCount: agg.$2,
+        ),
+      );
     }
 
     return EventDashboardData(
@@ -440,85 +461,93 @@ class EventDashboardData {
       hourlyStats: hourlyStats,
     );
   }
-}
+}final eventSalesStreamProvider = StreamProvider.autoDispose
+    .family<List<PosSale>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchSalesForEvent(eventId);
+    });
 
-final eventSalesStreamProvider = StreamProvider.autoDispose.family<List<PosSale>, int>((ref, eventId) {
-  final syncState = ref.watch(syncProvider);
-  if (syncState.mode == SyncMode.client && syncState.isConnected) {
-    return ref.watch(syncClientStreamProvider((eventId, 'sales'))).map((list) => list.cast<PosSale>());
-  }
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchSalesForEvent(eventId);
-});
+final eventSaleLinesStreamProvider = StreamProvider.autoDispose
+    .family<List<PosSaleLine>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchSaleLinesForEvent(eventId);
+    });
 
-final eventSaleLinesStreamProvider = StreamProvider.autoDispose.family<List<PosSaleLine>, int>((ref, eventId) {
-  final syncState = ref.watch(syncProvider);
-  if (syncState.mode == SyncMode.client && syncState.isConnected) {
-    return ref.watch(syncClientStreamProvider((eventId, 'lines'))).map((list) => list.cast<PosSaleLine>());
-  }
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchSaleLinesForEvent(eventId);
-});
+final eventProductsStreamProvider = StreamProvider.autoDispose
+    .family<List<ChurchProduct>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchAllProductsForEvent(eventId);
+    });
 
-final eventProductsStreamProvider = StreamProvider.autoDispose.family<List<ChurchProduct>, int>((ref, eventId) {
-  final syncState = ref.watch(syncProvider);
-  if (syncState.mode == SyncMode.client && syncState.isConnected) {
-    return ref.watch(syncClientStreamProvider((eventId, 'products'))).map((list) => list.cast<ChurchProduct>());
-  }
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchAllProductsForEvent(eventId);
-});
+final eventActiveProductsStreamProvider = StreamProvider.autoDispose
+    .family<List<ChurchProduct>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchActiveProductsForEvent(eventId);
+    });
 
-final eventDenomsStreamProvider = StreamProvider.autoDispose.family<List<EventDotDenom>, int>((ref, eventId) {
-  final syncState = ref.watch(syncProvider);
-  if (syncState.mode == SyncMode.client && syncState.isConnected) {
-    return ref.watch(syncClientStreamProvider((eventId, 'denoms'))).map((list) => list.cast<EventDotDenom>());
-  }
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchDotDenominations(eventId);
-});
+final eventDenomsStreamProvider = StreamProvider.autoDispose
+    .family<List<EventDotDenom>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchDotDenominations(eventId);
+    });
 
-final eventChangeDotAllocationsStreamProvider = StreamProvider.autoDispose.family<List<ChangeDotRow>, int>((ref, eventId) {
-  final syncState = ref.watch(syncProvider);
-  if (syncState.mode == SyncMode.client && syncState.isConnected) {
-    return ref.watch(syncClientStreamProvider((eventId, 'changeDotAllocations'))).map((list) => list.cast<ChangeDotRow>());
-  }
-  final db = ref.watch(appDatabaseProvider);
-  return db.watchChangeDotAllocationsForEvent(eventId);
-});
+final eventChangeDotAllocationsStreamProvider = StreamProvider.autoDispose
+    .family<List<ChangeDotRow>, String>((ref, eventId) {
+      final db = ref.watch(appDatabaseProvider);
+      return db.watchChangeDotAllocationsForEvent(eventId);
+    });
 
-final eventDashboardProvider = Provider.family<AsyncValue<EventDashboardData>, int>((ref, eventId) {
-  final salesAsync = ref.watch(eventSalesStreamProvider(eventId));
-  final linesAsync = ref.watch(eventSaleLinesStreamProvider(eventId));
-  final productsAsync = ref.watch(eventProductsStreamProvider(eventId));
-  final denomsAsync = ref.watch(eventDenomsStreamProvider(eventId));
-  final changeDotAllocAsync = ref.watch(eventChangeDotAllocationsStreamProvider(eventId));
+final eventDashboardProvider =
+    Provider.family<AsyncValue<EventDashboardData>, String>((ref, eventId) {
+      final salesAsync = ref.watch(eventSalesStreamProvider(eventId));
+      final linesAsync = ref.watch(eventSaleLinesStreamProvider(eventId));
+      final productsAsync = ref.watch(eventProductsStreamProvider(eventId));
+      final denomsAsync = ref.watch(eventDenomsStreamProvider(eventId));
+      final changeDotAllocAsync = ref.watch(
+        eventChangeDotAllocationsStreamProvider(eventId),
+      );
 
-  if (salesAsync.isLoading ||
-      linesAsync.isLoading ||
-      productsAsync.isLoading ||
-      denomsAsync.isLoading ||
-      changeDotAllocAsync.isLoading) {
-    return const AsyncValue.loading();
-  }
-  if (salesAsync.hasError) return AsyncValue.error(salesAsync.error!, salesAsync.stackTrace!);
-  if (linesAsync.hasError) return AsyncValue.error(linesAsync.error!, linesAsync.stackTrace!);
-  if (productsAsync.hasError) return AsyncValue.error(productsAsync.error!, productsAsync.stackTrace!);
-  if (denomsAsync.hasError) return AsyncValue.error(denomsAsync.error!, denomsAsync.stackTrace!);
-  if (changeDotAllocAsync.hasError) return AsyncValue.error(changeDotAllocAsync.error!, changeDotAllocAsync.stackTrace!);
+      if (salesAsync.isLoading ||
+          linesAsync.isLoading ||
+          productsAsync.isLoading ||
+          denomsAsync.isLoading ||
+          changeDotAllocAsync.isLoading) {
+        return const AsyncValue.loading();
+      }
+      if (salesAsync.hasError) {
+        return AsyncValue.error(salesAsync.error!, salesAsync.stackTrace!);
+      }
+      if (linesAsync.hasError) {
+        return AsyncValue.error(linesAsync.error!, linesAsync.stackTrace!);
+      }
+      if (productsAsync.hasError) {
+        return AsyncValue.error(
+          productsAsync.error!,
+          productsAsync.stackTrace!,
+        );
+      }
+      if (denomsAsync.hasError) {
+        return AsyncValue.error(denomsAsync.error!, denomsAsync.stackTrace!);
+      }
+      if (changeDotAllocAsync.hasError) {
+        return AsyncValue.error(
+          changeDotAllocAsync.error!,
+          changeDotAllocAsync.stackTrace!,
+        );
+      }
 
-  final sales = salesAsync.value!;
-  final lines = linesAsync.value!;
-  final products = productsAsync.value!;
-  final denoms = denomsAsync.value!;
-  final changeDotAllocations = changeDotAllocAsync.value!;
+      final sales = salesAsync.value!;
+      final lines = linesAsync.value!;
+      final products = productsAsync.value!;
+      final denoms = denomsAsync.value!;
+      final changeDotAllocations = changeDotAllocAsync.value!;
 
-  final data = EventDashboardData.compute(
-    sales: sales,
-    lines: lines,
-    products: products,
-    denoms: denoms,
-    changeDotAllocations: changeDotAllocations,
-  );
-  return AsyncValue.data(data);
-});
+      final data = EventDashboardData.compute(
+        sales: sales,
+        lines: lines,
+        products: products,
+        denoms: denoms,
+        changeDotAllocations: changeDotAllocations,
+      );
+      return AsyncValue.data(data);
+    });

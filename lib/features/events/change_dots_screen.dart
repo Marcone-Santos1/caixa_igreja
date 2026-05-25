@@ -16,8 +16,8 @@ class ChangeDotsScreen extends ConsumerStatefulWidget {
     required this.changeCents,
   });
 
-  final int eventId;
-  final int saleId;
+  final String eventId;
+  final String saleId;
   final int changeCents;
 
   @override
@@ -25,7 +25,7 @@ class ChangeDotsScreen extends ConsumerStatefulWidget {
 }
 
 class _ChangeDotsScreenState extends ConsumerState<ChangeDotsScreen> {
-  final Map<int, TextEditingController> _qtyCtrls = {};
+  final Map<String, TextEditingController> _qtyCtrls = {};
 
   @override
   void dispose() {
@@ -35,17 +35,17 @@ class _ChangeDotsScreenState extends ConsumerState<ChangeDotsScreen> {
     super.dispose();
   }
 
-  TextEditingController _ctrlFor(int denomId) {
+  TextEditingController _ctrlFor(String denomId) {
     return _qtyCtrls.putIfAbsent(
       denomId,
       () => TextEditingController(text: '0'),
     );
   }
 
-  List<({int dotDenominationId, int qty})> _readAllocation(
+  List<({String dotDenominationId, int qty})> _readAllocation(
     List<EventDotDenom> denoms,
   ) {
-    final out = <({int dotDenominationId, int qty})>[];
+    final out = <({String dotDenominationId, int qty})>[];
     for (final d in denoms) {
       final raw = _ctrlFor(d.id).text.trim();
       final q = int.tryParse(raw) ?? 0;
@@ -55,7 +55,7 @@ class _ChangeDotsScreenState extends ConsumerState<ChangeDotsScreen> {
   }
 
   int _sumCents(
-    List<({int dotDenominationId, int qty})> alloc,
+    List<({String dotDenominationId, int qty})> alloc,
     List<EventDotDenom> denoms,
   ) {
     return allocationTotalCents(alloc, denoms);

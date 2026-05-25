@@ -11,15 +11,15 @@ class FreeLineDraft {
 class SalesDraft {
   final String id;
   final String name;
-  final Map<int, int> productQty; // productId -> qty
-  final Map<int, int> fichaQty; // denomId -> qty
+  final Map<String, int> productQty; // productId -> qty
+  final Map<String, int> fichaQty; // denomId -> qty
   final List<FreeLineDraft> freeLines;
 
   SalesDraft({
     required this.id,
     required this.name,
-    Map<int, int>? productQty,
-    Map<int, int>? fichaQty,
+    Map<String, int>? productQty,
+    Map<String, int>? fichaQty,
     List<FreeLineDraft>? freeLines,
   })  : productQty = productQty ?? {},
         fichaQty = fichaQty ?? {},
@@ -46,8 +46,8 @@ class SalesDraft {
 
   SalesDraft copyWith({
     String? name,
-    Map<int, int>? productQty,
-    Map<int, int>? fichaQty,
+    Map<String, int>? productQty,
+    Map<String, int>? fichaQty,
     List<FreeLineDraft>? freeLines,
   }) {
     return SalesDraft(
@@ -86,7 +86,7 @@ class EventSalesDraftNotifier extends StateNotifier<EventSalesDraftState> {
     );
   }
 
-  final int eventId;
+  final String eventId;
 
   void addDraft() {
     final numbers = state.drafts.map((d) {
@@ -146,11 +146,11 @@ class EventSalesDraftNotifier extends StateNotifier<EventSalesDraftState> {
     );
   }
 
-  void updateProductQty(int productId, int qty) {
+  void updateProductQty(String productId, int qty) {
     state = EventSalesDraftState(
       drafts: state.drafts.map((d) {
         if (d.id == state.activeDraftId) {
-          final newProductQty = Map<int, int>.from(d.productQty);
+          final newProductQty = Map<String, int>.from(d.productQty);
           if (qty <= 0) {
             newProductQty.remove(productId);
           } else {
@@ -164,11 +164,11 @@ class EventSalesDraftNotifier extends StateNotifier<EventSalesDraftState> {
     );
   }
 
-  void updateFichaQty(int denomId, int qty) {
+  void updateFichaQty(String denomId, int qty) {
     state = EventSalesDraftState(
       drafts: state.drafts.map((d) {
         if (d.id == state.activeDraftId) {
-          final newFichaQty = Map<int, int>.from(d.fichaQty);
+          final newFichaQty = Map<String, int>.from(d.fichaQty);
           if (qty <= 0) {
             newFichaQty.remove(denomId);
           } else {
@@ -212,6 +212,6 @@ class EventSalesDraftNotifier extends StateNotifier<EventSalesDraftState> {
 }
 
 final vendaDraftsProvider = StateNotifierProvider.family<
-    EventSalesDraftNotifier, EventSalesDraftState, int>((ref, eventId) {
+    EventSalesDraftNotifier, EventSalesDraftState, String>((ref, eventId) {
   return EventSalesDraftNotifier(eventId);
 });

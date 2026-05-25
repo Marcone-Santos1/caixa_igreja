@@ -19,8 +19,8 @@ void main() {
   test('EventDashboardData.compute com dados populados simples', () {
     final sales = [
       const PosSale(
-        id: 1,
-        eventId: 1,
+        id: 'sale_1',
+        eventId: 'event_1',
         soldAtMs: 1716500000000, //algum timestamp
         totalCents: 1000,
         amountReceivedCents: 1000,
@@ -30,8 +30,8 @@ void main() {
     ];
     final products = [
       const ChurchProduct(
-        id: 1,
-        eventId: 1,
+        id: 'product_1',
+        eventId: 'event_1',
         name: 'Produto 1',
         description: '',
         priceCents: 1000,
@@ -43,10 +43,10 @@ void main() {
     ];
     final lines = [
       const PosSaleLine(
-        id: 1,
-        saleId: 1,
+        id: 'line_1',
+        saleId: 'sale_1',
         lineKind: SaleLineKind.product,
-        productId: 1,
+        productId: 'product_1',
         qty: 1,
         unitPriceCents: 1000,
         lineTotalCents: 1000,

@@ -1,0 +1,48 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "caixa_igreja",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "caixa_igreja (profile mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "caixa_igreja (release mode)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "Pixel 7",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554",
+            "flutterMode": "debug"
+        },
+        {
+            "name": "Pixel 9 Pro",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5556",
+            "flutterMode": "debug"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "All Devices",
+            "configurations": [
+                "Pixel 7",
+                "Pixel 9 Pro"
+            ]
+        }
+    ]
+}

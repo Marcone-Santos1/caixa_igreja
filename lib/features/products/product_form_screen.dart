@@ -6,13 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
+import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
 
 class ProductFormScreen extends ConsumerStatefulWidget {
   const ProductFormScreen({super.key, required this.eventId, this.productId});
 
-  final int eventId;
-  final int? productId;
+  final String eventId;
+  final String? productId;
 
   @override
   ConsumerState<ProductFormScreen> createState() => _ProductFormScreenState();
@@ -84,11 +85,37 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     var stock = int.tryParse(_stock.text.trim()) ?? 0;
     if (stock < 0) stock = 0;
 
-    final db = ref.read(appDatabaseProvider);
+    final syncNotifier = ref.read(syncProvider.notifier);
+    final syncState = ref.read(syncProvider);
+    final isClient = syncState.mode == SyncMode.client && syncState.isConnected;
+    final isServer = syncState.mode == SyncMode.server;
     final id = widget.productId;
-    if (id == null) {
-      await db.into(db.products).insert(
+
+    try {
+      if (isClient) {
+        // Delega ao host via HTTP
+        await syncNotifier.submitProductToHost(
+          eventId: widget.eventId,
+          productId: id,
+          name: _name.text.trim(),
+          priceCents: priceCents,
+          description: _description.text.trim(),
+          trackStock: _trackStock,
+          stockQty: _trackStock ? stock : 0,
+          active: _active,
+          isCombo: false,
+          items: [],
+        );
+        // Re-sync: puxa os dados atualizados do host imediatamente
+        await syncNotifier.refreshAllClientCaches(widget.eventId);
+      } else {
+        // Salva localmente (host ou standalone)
+        final db = ref.read(appDatabaseProvider);
+        if (id == null) {
+          final idToUse = db.generateUuid();
+          await db.into(db.products).insert(
             ProductsCompanion.insert(
+              id: idToUse,
               eventId: widget.eventId,
               name: _name.text.trim(),
               description: Value(_description.text.trim()),
@@ -98,22 +125,32 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               active: Value(_active),
             ),
           );
-    } else {
-      await (db.update(db.products)
-            ..where((t) => t.id.equals(id))
-            ..where((t) => t.eventId.equals(widget.eventId)))
-          .write(
-            ProductsCompanion(
-              name: Value(_name.text.trim()),
-              description: Value(_description.text.trim()),
-              priceCents: Value(priceCents),
-              trackStock: Value(_trackStock),
-              stockQty: Value(_trackStock ? stock : 0),
-              active: Value(_active),
-            ),
-          );
+        } else {
+          await (db.update(db.products)
+                ..where((t) => t.id.equals(id))
+                ..where((t) => t.eventId.equals(widget.eventId)))
+              .write(
+                ProductsCompanion(
+                  name: Value(_name.text.trim()),
+                  description: Value(_description.text.trim()),
+                  priceCents: Value(priceCents),
+                  trackStock: Value(_trackStock),
+                  stockQty: Value(_trackStock ? stock : 0),
+                  active: Value(_active),
+                ),
+              );
+        }
+        // Se for o host, avisa os clientes conectados
+        if (isServer) syncNotifier.broadcastRefresh();
+      }
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar: $e')),
+        );
+      }
     }
-    if (mounted) Navigator.of(context).pop(true);
   }
 
   Future<void> _confirmDelete() async {
@@ -144,14 +181,30 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    final db = ref.read(appDatabaseProvider);
-    final err = await db.deleteProduct(eventId: widget.eventId, productId: id);
-    if (!mounted) return;
-    if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-      return;
+
+    final syncNotifier = ref.read(syncProvider.notifier);
+    final syncState = ref.read(syncProvider);
+    final isClient = syncState.mode == SyncMode.client && syncState.isConnected;
+    final isServer = syncState.mode == SyncMode.server;
+
+    try {
+      if (isClient) {
+        await syncNotifier.deleteProductOnHost(widget.eventId, id);
+        // Re-sync: puxa os dados atualizados do host imediatamente
+        await syncNotifier.refreshAllClientCaches(widget.eventId);
+      } else {
+        final db = ref.read(appDatabaseProvider);
+        final err = await db.deleteProduct(eventId: widget.eventId, productId: id);
+        if (err != null) throw StateError(err);
+        if (isServer) syncNotifier.broadcastRefresh();
+      }
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao excluir: $e')));
+      }
     }
-    Navigator.of(context).pop(true);
   }
 
   @override
