@@ -1001,14 +1001,69 @@ class SyncNotifier extends StateNotifier<SyncState> {
         });
   }
 
+  /// Retorna o IP local Wi-Fi real, evitando IPs de VPN, tethering e CGNAT.
+  /// Estratégia em 3 passes:
+  ///  1. Interface cujo nome começa com "wlan" ou "en" E com IP de rede privada LAN
+  ///  2. Qualquer interface com IP de rede privada LAN (192.168.x / 10.x / 172.16-31.x)
+  ///  3. Qualquer IPv4 não-loopback (fallback)
   Future<String?> _getLocalIp() async {
     try {
-      final interfaces = await NetworkInterface.list();
-      developer.log('Interfaces de rede encontradas: ${interfaces.map((i) => "${i.name}: ${i.addresses.map((a) => a.address).toList()}").toList()}', name: 'SyncNotifier');
-      for (final interface in interfaces) {
-        for (final address in interface.addresses) {
-          if (address.type == InternetAddressType.IPv4 && !address.isLoopback) {
-            return address.address;
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
+
+      developer.log(
+        'Interfaces de rede: ${interfaces.map((i) => "${i.name}: ${i.addresses.map((a) => a.address).join(', ')}").join(' | ')}',
+        name: 'SyncNotifier',
+      );
+
+      bool isPrivateLan(String ip) {
+        // 192.168.x.x
+        if (ip.startsWith('192.168.')) return true;
+        // 10.x.x.x
+        if (ip.startsWith('10.')) return true;
+        // 172.16.x.x – 172.31.x.x
+        final parts = ip.split('.');
+        if (parts.length == 4 && parts[0] == '172') {
+          final second = int.tryParse(parts[1]) ?? 0;
+          if (second >= 16 && second <= 31) return true;
+        }
+        return false;
+      }
+
+      bool isWifiInterface(String name) {
+        final n = name.toLowerCase();
+        return n.startsWith('wlan') || n.startsWith('en') || n.startsWith('wifi');
+      }
+
+      // Passe 1: interface Wi-Fi com IP de LAN privada
+      for (final iface in interfaces) {
+        if (!isWifiInterface(iface.name)) continue;
+        for (final addr in iface.addresses) {
+          if (!addr.isLoopback && isPrivateLan(addr.address)) {
+            developer.log('IP Wi-Fi selecionado (passe 1): ${addr.address} (${iface.name})', name: 'SyncNotifier');
+            return addr.address;
+          }
+        }
+      }
+
+      // Passe 2: qualquer interface com IP de LAN privada
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          if (!addr.isLoopback && isPrivateLan(addr.address)) {
+            developer.log('IP LAN selecionado (passe 2): ${addr.address} (${iface.name})', name: 'SyncNotifier');
+            return addr.address;
+          }
+        }
+      }
+
+      // Passe 3: qualquer IPv4 não-loopback (último recurso)
+      for (final iface in interfaces) {
+        for (final addr in iface.addresses) {
+          if (!addr.isLoopback) {
+            developer.log('IP fallback selecionado (passe 3): ${addr.address} (${iface.name})', name: 'SyncNotifier');
+            return addr.address;
           }
         }
       }
