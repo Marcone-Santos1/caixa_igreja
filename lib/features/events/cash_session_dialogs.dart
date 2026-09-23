@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -179,18 +180,18 @@ class CloseCashSessionDialog extends ConsumerStatefulWidget {
   const CloseCashSessionDialog({
     super.key,
     required this.session,
-    required this.sales,
+    this.sales,
     required this.eventTitle,
   });
 
   final CashSession session;
-  final List<PosSale> sales;
+  final List<PosSale>? sales;
   final String eventTitle;
 
   static Future<bool?> show({
     required BuildContext context,
     required CashSession session,
-    required List<PosSale> sales,
+    List<PosSale>? sales,
     required String eventTitle,
   }) {
     return showDialog<bool>(
@@ -234,234 +235,253 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
   @override
   Widget build(BuildContext context) {
     final s = widget.session;
-    final sales = widget.sales;
+    final db = ref.watch(appDatabaseProvider);
 
-    // Cálculos Contábeis
-    var totalRevenueCents = 0;
-    var cashRevenueCents = 0;
-    var cashChangeGivenCents = 0;
-    final methodTotalsCents = <String, int>{};
-    final pendingChangesList = <Map<String, dynamic>>[];
+    return StreamBuilder<List<PosSale>>(
+      stream: (db.select(db.sales)..where((tbl) => tbl.eventId.equals(s.eventId))).watch(),
+      builder: (context, snapshot) {
+        final allSales = snapshot.data ?? widget.sales ?? [];
+        final sales = allSales.where((sale) {
+          if (sale.sessionId == s.id) return true;
+          if (sale.sessionId == null) {
+            final saleDate = DateTime.fromMillisecondsSinceEpoch(sale.soldAtMs);
+            final sessionDate = DateTime.fromMillisecondsSinceEpoch(s.openedAtMs);
+            return saleDate.year == sessionDate.year &&
+                saleDate.month == sessionDate.month &&
+                saleDate.day == sessionDate.day;
+          }
+          return false;
+        }).toList();
 
-    for (final sale in sales) {
-      totalRevenueCents += sale.totalCents;
-      final m = sale.paymentMethod;
-      methodTotalsCents[m] = (methodTotalsCents[m] ?? 0) + sale.totalCents;
+        // Cálculos Contábeis
+        var totalRevenueCents = 0;
+        var cashRevenueCents = 0;
+        var cashChangeGivenCents = 0;
+        final methodTotalsCents = <String, int>{};
+        final pendingChangesList = <Map<String, dynamic>>[];
 
-      if (m == PaymentMethod.dinheiro) {
-        cashRevenueCents += sale.totalCents;
-        final ch = sale.amountReceivedCents - sale.totalCents;
-        if (ch > 0 && !sale.changePending) {
-          cashChangeGivenCents += ch;
+        for (final sale in sales) {
+          totalRevenueCents += sale.totalCents;
+          final m = sale.paymentMethod;
+          methodTotalsCents[m] = (methodTotalsCents[m] ?? 0) + sale.totalCents;
+
+          if (m == PaymentMethod.dinheiro) {
+            cashRevenueCents += sale.totalCents;
+            final ch = sale.amountReceivedCents - sale.totalCents;
+            if (ch > 0 && !sale.changePending) {
+              cashChangeGivenCents += ch;
+            }
+          }
+
+          if (sale.changePending) {
+            pendingChangesList.add({
+              'customerName': sale.customerName ?? 'Cliente',
+              'change': (sale.amountReceivedCents - sale.totalCents) / 100.0,
+            });
+          }
         }
-      }
 
-      if (sale.changePending) {
-        pendingChangesList.add({
-          'customerName': sale.customerName ?? 'Cliente',
-          'change': (sale.amountReceivedCents - sale.totalCents) / 100.0,
-        });
-      }
-    }
+        final initialFloatCents = s.initialCashFloatCents;
+        final expectedDrawerCents = initialFloatCents + cashRevenueCents - cashChangeGivenCents;
+        final diffCents = _hasTypedCount ? _countedCents - expectedDrawerCents : null;
 
-    final initialFloatCents = s.initialCashFloatCents;
-    final expectedDrawerCents = initialFloatCents + cashRevenueCents - cashChangeGivenCents;
-    final diffCents = _hasTypedCount ? _countedCents - expectedDrawerCents : null;
+        final openDate = DateTime.fromMillisecondsSinceEpoch(s.openedAtMs);
+        final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
 
-    final openDate = DateTime.fromMillisecondsSinceEpoch(s.openedAtMs);
-    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
-
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.lock_clock_rounded, color: Colors.red),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Fechamento de Caixa',
-                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
-                ),
-                Text(
-                  s.title,
-                  style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
             children: [
-              Text(
-                'Aberto em: ${dateFmt.format(openDate)}',
-                style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 12),
-
-              // Quadro de Faturamento Total
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: CaixaAppTheme.marianBlue.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: CaixaAppTheme.marianBlue.withValues(alpha: 0.2)),
+                  color: Colors.red.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: const Icon(Icons.lock_clock_rounded, color: Colors.red),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Faturamento Total (${sales.length} vendas)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
-                    Text(formatCents(totalRevenueCents), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: CaixaAppTheme.marianBlue)),
+                    Text(
+                      'Fechamento de Caixa',
+                      style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    Text(
+                      s.title,
+                      style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+                    ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Meios de pagamento
-              ...methodTotalsCents.entries.map((e) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('• ${e.key}', style: GoogleFonts.inter(fontSize: 13)),
-                        Text(formatCents(e.value), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  )),
-              const Divider(height: 20),
-
-              // CONFERÊNCIA DE GAVETA (DINHEIRO)
-              Text('CONFERÊNCIA DE GAVETA (DINHEIRO)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12, color: CaixaAppTheme.marianBlue)),
-              const SizedBox(height: 8),
-              _drawerRow('(+) Fundo Inicial de Troco', formatCents(initialFloatCents)),
-              _drawerRow('(+) Vendas em Dinheiro', formatCents(cashRevenueCents)),
-              if (cashChangeGivenCents > 0)
-                _drawerRow('(-) Trocos Pagos em Dinheiro', formatCents(cashChangeGivenCents)),
-              const Divider(height: 16),
-              _drawerRow(
-                '(=) Esperado em Gaveta',
-                formatCents(expectedDrawerCents),
-                isBold: true,
-                color: CaixaAppTheme.marianBlue,
-              ),
-              const SizedBox(height: 12),
-
-              // Campo de contagem real
-              TextField(
-                controller: _countedController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Dinheiro Contado na Gaveta',
-                  prefixText: 'R\$ ',
-                  prefixIcon: Icon(Icons.money_rounded, size: 20),
-                  border: OutlineInputBorder(),
-                  hintText: '0,00',
-                ),
-                onChanged: (val) {
-                  final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
-                  final cents = int.tryParse(digits) ?? 0;
-                  setState(() {
-                    _hasTypedCount = true;
-                    _countedCents = cents;
-                  });
-                  final formatted = (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
-                  if (formatted != val) {
-                    _countedController.value = TextEditingValue(
-                      text: formatted,
-                      selection: TextSelection.collapsed(offset: formatted.length),
-                    );
-                  }
-                },
-              ),
-
-              // Feedback de Diferença
-              if (diffCents != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: diffCents == 0
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : (diffCents > 0 ? Colors.blue.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    diffCents == 0
-                        ? '✓ Caixa conferido exato (sem sobra ou falta)'
-                        : (diffCents > 0
-                            ? '▲ Sobra de caixa: +${formatCents(diffCents)}'
-                            : '▼ Falta de caixa: ${formatCents(diffCents)}'),
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: diffCents == 0 ? Colors.green.shade800 : (diffCents > 0 ? Colors.blue.shade900 : Colors.red.shade900),
-                    ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 12),
-              TextField(
-                controller: _closedByController,
-                decoration: const InputDecoration(
-                  labelText: 'Operador de Fechamento',
-                  prefixIcon: Icon(Icons.badge_outlined, size: 20),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Observações (Opcional)',
-                  prefixIcon: Icon(Icons.notes_rounded, size: 20),
-                  border: OutlineInputBorder(),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton.icon(
-          onPressed: _isSubmitting
-              ? null
-              : () => _finishAndPrint(
-                    totalRevenueCents: totalRevenueCents,
-                    cashRevenueCents: cashRevenueCents,
-                    cashChangeGivenCents: cashChangeGivenCents,
-                    expectedDrawerCents: expectedDrawerCents,
-                    methodTotalsCents: methodTotalsCents,
-                    pendingChangesList: pendingChangesList,
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Aberto em: ${dateFmt.format(openDate)}',
+                    style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
                   ),
-          icon: const Icon(Icons.print_outlined, size: 18),
-          label: _isSubmitting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Text('Fechar e Imprimir'),
-          style: FilledButton.styleFrom(
-            backgroundColor: CaixaAppTheme.marianBlue,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  const SizedBox(height: 12),
+
+                  // Quadro de Faturamento Total
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: CaixaAppTheme.marianBlue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: CaixaAppTheme.marianBlue.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Faturamento Total (${sales.length} vendas)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
+                        Text(formatCents(totalRevenueCents), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: CaixaAppTheme.marianBlue)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Meios de pagamento
+                  ...methodTotalsCents.entries.map((e) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('• ${e.key}', style: GoogleFonts.inter(fontSize: 13)),
+                            Text(formatCents(e.value), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      )),
+                  const Divider(height: 20),
+
+                  // CONFERÊNCIA DE GAVETA (DINHEIRO)
+                  Text('CONFERÊNCIA DE GAVETA (DINHEIRO)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12, color: CaixaAppTheme.marianBlue)),
+                  const SizedBox(height: 8),
+                  _drawerRow('(+) Fundo Inicial de Troco', formatCents(initialFloatCents)),
+                  _drawerRow('(+) Vendas em Dinheiro', formatCents(cashRevenueCents)),
+                  if (cashChangeGivenCents > 0)
+                    _drawerRow('(-) Trocos Pagos em Dinheiro', formatCents(cashChangeGivenCents)),
+                  const Divider(height: 16),
+                  _drawerRow(
+                    '(=) Esperado em Gaveta',
+                    formatCents(expectedDrawerCents),
+                    isBold: true,
+                    color: CaixaAppTheme.marianBlue,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Campo de contagem real
+                  TextField(
+                    controller: _countedController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Dinheiro Contado na Gaveta',
+                      prefixText: 'R\$ ',
+                      prefixIcon: Icon(Icons.money_rounded, size: 20),
+                      border: OutlineInputBorder(),
+                      hintText: '0,00',
+                    ),
+                    onChanged: (val) {
+                      final digits = val.replaceAll(RegExp(r'[^0-9]'), '');
+                      final cents = int.tryParse(digits) ?? 0;
+                      setState(() {
+                        _hasTypedCount = true;
+                        _countedCents = cents;
+                      });
+                      final formatted = (cents / 100).toStringAsFixed(2).replaceAll('.', ',');
+                      if (formatted != val) {
+                        _countedController.value = TextEditingValue(
+                          text: formatted,
+                          selection: TextSelection.collapsed(offset: formatted.length),
+                        );
+                      }
+                    },
+                  ),
+
+                  // Feedback de Diferença
+                  if (diffCents != null) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: diffCents == 0
+                            ? Colors.green.withValues(alpha: 0.1)
+                            : (diffCents > 0 ? Colors.blue.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        diffCents == 0
+                            ? '✓ Caixa conferido exato (sem sobra ou falta)'
+                            : (diffCents > 0
+                                ? '▲ Sobra de caixa: +${formatCents(diffCents)}'
+                                : '▼ Falta de caixa: ${formatCents(diffCents)}'),
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: diffCents == 0 ? Colors.green.shade800 : (diffCents > 0 ? Colors.blue.shade900 : Colors.red.shade900),
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _closedByController,
+                    decoration: const InputDecoration(
+                      labelText: 'Operador de Fechamento',
+                      prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Observações (Opcional)',
+                      prefixIcon: Icon(Icons.notes_rounded, size: 20),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ],
+          actions: [
+            TextButton(
+              onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton.icon(
+              onPressed: _isSubmitting
+                  ? null
+                  : () => _finishAndPrint(
+                        sales: sales,
+                        totalRevenueCents: totalRevenueCents,
+                        cashRevenueCents: cashRevenueCents,
+                        cashChangeGivenCents: cashChangeGivenCents,
+                        expectedDrawerCents: expectedDrawerCents,
+                        methodTotalsCents: methodTotalsCents,
+                        pendingChangesList: pendingChangesList,
+                      ),
+              icon: const Icon(Icons.print_outlined, size: 18),
+              label: _isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Fechar e Imprimir'),
+              style: FilledButton.styleFrom(
+                backgroundColor: CaixaAppTheme.marianBlue,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -486,6 +506,7 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
   }
 
   Future<void> _finishAndPrint({
+    required List<PosSale> sales,
     required int totalRevenueCents,
     required int cashRevenueCents,
     required int cashChangeGivenCents,
@@ -502,7 +523,16 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
     final countedDrawer = _hasTypedCount ? _countedCents : expectedDrawerCents;
 
     try {
-      // 1. Fechar sessão no banco
+      // 1. Vincular quaisquer vendas sem sessionId desta sessão
+      for (final sale in sales) {
+        if (sale.sessionId == null) {
+          await (db.update(db.sales)..where((tbl) => tbl.id.equals(sale.id))).write(
+            SalesCompanion(sessionId: Value(widget.session.id)),
+          );
+        }
+      }
+
+      // 2. Fechar sessão no banco
       await db.closeCashSession(
         sessionId: widget.session.id,
         closedCashDrawerCents: countedDrawer,
@@ -510,7 +540,7 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
         closedBy: closedBy,
       );
 
-      // 2. Tentar imprimir comprovante
+      // 3. Tentar imprimir comprovante
       final isPrinterReady = await printerService.isConnected();
       if (isPrinterReady) {
         final revenueByMethod = <String, double>{};
@@ -527,7 +557,7 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
           expectedInDrawer: expectedDrawerCents / 100.0,
           countedInDrawer: _hasTypedCount ? _countedCents / 100.0 : null,
           totalRevenue: totalRevenueCents / 100.0,
-          totalSalesCount: widget.sales.length,
+          totalSalesCount: sales.length,
           revenueByPaymentMethod: revenueByMethod,
           pendingChanges: pendingChangesList,
           closedBy: closedBy,

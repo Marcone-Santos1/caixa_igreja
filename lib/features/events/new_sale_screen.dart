@@ -465,6 +465,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             lines: drafts,
           );
         } else {
+          final activeSession = ref.read(activeCashSessionStreamProvider(widget.eventId)).value;
           await db.completeSale(
             eventId: widget.eventId,
             paymentMethod: result.paymentMethod,
@@ -472,6 +473,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             notes: result.notes,
             changePending: result.changePending,
             customerName: result.customerName,
+            sessionId: activeSession?.id,
             lines: drafts,
           );
         }
@@ -1433,14 +1435,11 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 ),
                 onPressed: () async {
                   if (isOpen) {
-                    final salesAsync = ref.read(eventSalesStreamProvider(widget.eventId));
                     final eventAsync = ref.read(eventDetailProvider(widget.eventId));
-                    final sales = (salesAsync.value ?? []).where((s) => s.sessionId == activeSession.id).toList();
                     final eventTitle = eventAsync.value?.title ?? 'Evento';
                     await CloseCashSessionDialog.show(
                       context: context,
                       session: activeSession,
-                      sales: sales,
                       eventTitle: eventTitle,
                     );
                   } else {

@@ -144,12 +144,9 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
                       const SizedBox(width: 8),
                       FilledButton.tonalIcon(
                         onPressed: () async {
-                          final salesAsync = ref.read(eventSalesStreamProvider(widget.eventId));
-                          final sales = (salesAsync.value ?? []).where((s) => s.sessionId == activeSessionAsync.value!.id).toList();
                           await CloseCashSessionDialog.show(
                             context: context,
                             session: activeSessionAsync.value!,
-                            sales: sales,
                             eventTitle: eventTitle,
                           );
                         },
