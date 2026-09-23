@@ -34,6 +34,9 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   bool _isLoadingEdit = false;
   String _selectedCategory = 'Todos';
   bool _isCartExpanded = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _isSearchVisible = false;
 
   bool get _isEditing => widget.editSaleId != null;
 
@@ -43,6 +46,12 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     if (widget.editSaleId != null) {
       _loadEditSale();
     }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadEditSale() async {
@@ -95,6 +104,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   }
 
   void _addProduct(ChurchProduct p) {
+    HapticFeedback.lightImpact();
     if (_isEditing) {
       setState(() {
         final q = _productQty[p.id] ?? 0;
@@ -110,6 +120,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   }
 
   void _setProductQty(ChurchProduct p, int q) {
+    HapticFeedback.selectionClick();
     if (_isEditing) {
       setState(() {
         if (q <= 0) {
@@ -131,6 +142,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   }
 
   void _addFicha(EventDotDenom d) {
+    HapticFeedback.lightImpact();
     if (_isEditing) {
       setState(() {
         final q = _fichaQty[d.id] ?? 0;
@@ -146,6 +158,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
   }
 
   void _setFichaQty(EventDotDenom d, int q) {
+    HapticFeedback.selectionClick();
     if (_isEditing) {
       setState(() {
         if (q <= 0) {
@@ -1398,6 +1411,37 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           ],
         ),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final isConnectedAsync = ref.watch(printerConnectedProvider);
+              final isConnected = isConnectedAsync.value ?? false;
+              return IconButton(
+                tooltip: isConnected ? 'Impressora conectada' : 'Impressora desconectada',
+                icon: Badge(
+                  backgroundColor: isConnected ? Colors.green : Colors.orange,
+                  smallSize: 8,
+                  child: Icon(
+                    Icons.print_outlined,
+                    color: isConnected ? Colors.green : Colors.grey.shade600,
+                  ),
+                ),
+                onPressed: () => context.push('/printer'),
+              );
+            },
+          ),
+          IconButton(
+            icon: Icon(_isSearchVisible ? Icons.search_off : Icons.search),
+            tooltip: _isSearchVisible ? 'Fechar busca' : 'Buscar produto',
+            onPressed: () {
+              setState(() {
+                _isSearchVisible = !_isSearchVisible;
+                if (!_isSearchVisible) {
+                  _searchController.clear();
+                  _searchQuery = '';
+                }
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.add_shopping_cart_outlined),
             tooltip: 'Adicionar valor avulso',
@@ -1416,8 +1460,11 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                 data: (denoms) {
                   final total = _totalCents(products, denoms);
 
-                  // Filtragem de produtos por categoria
+                  // Filtragem de produtos por busca e categoria
                   final filteredProducts = products.where((p) {
+                    if (_searchQuery.isNotEmpty && !p.name.toLowerCase().contains(_searchQuery)) {
+                      return false;
+                    }
                     if (_selectedCategory == 'Todos') return true;
                     if (_selectedCategory == 'Combos') return p.isCombo;
                     if (_selectedCategory == 'Pastéis') {
@@ -1439,6 +1486,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                   }).toList();
 
                   final showFichas = (_selectedCategory == 'Todos' || _selectedCategory == 'Fichas') &&
+                      _searchQuery.isEmpty &&
                       denoms.isNotEmpty;
 
                   return Column(
@@ -1447,6 +1495,42 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                       // Abas de comanda (se não estiver em modo de edição)
                       if (!_isEditing && draftsState != null)
                         _buildDraftTabs(context, ref, draftsState, products, denoms),
+
+                      // Barra de busca rápida colapsável
+                      if (_isSearchVisible)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+                          child: TextField(
+                            controller: _searchController,
+                            autofocus: true,
+                            decoration: InputDecoration(
+                              hintText: 'Buscar pastéis, bebidas, combos...',
+                              prefixIcon: const Icon(Icons.search, size: 20),
+                              suffixIcon: _searchQuery.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.clear, size: 18),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    )
+                                  : null,
+                              isDense: true,
+                              filled: true,
+                              fillColor: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey.shade900
+                                  : Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: BorderSide(color: Colors.grey.shade300),
+                              ),
+                            ),
+                            onChanged: (val) {
+                              setState(() => _searchQuery = val.trim().toLowerCase());
+                            },
+                          ),
+                        ),
 
                       // Filtro de Categorias (Chips)
                       _buildCategorySelector(products, denoms),

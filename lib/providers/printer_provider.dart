@@ -28,3 +28,10 @@ class AutoPrintNotifier extends StateNotifier<bool> {
     await _prefs.setBool(_kAutoPrintKey, enabled);
   }
 }
+
+/// Provider que verifica o status de conexão atual da impressora térmica Bluetooth.
+final printerConnectedProvider = FutureProvider.autoDispose<bool>((ref) async {
+  final service = ref.watch(printerServiceProvider);
+  return await service.isConnected();
+});
+
