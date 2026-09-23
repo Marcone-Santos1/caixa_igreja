@@ -53,6 +53,19 @@ void main() {
       );
     });
 
+    test('printDeliveryVouchers lança StateError se impressora não estiver conectada', () async {
+      final service = PrinterService();
+      expect(
+        () => service.printDeliveryVouchers(
+          orderNumber: '001',
+          items: [
+            {'name': 'Pastel de Carne', 'qty': 2},
+          ],
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
     test('getBondedDevices retorna lista vazia quando mock não tem dispositivos', () async {
       final service = PrinterService();
       final devices = await service.getBondedDevices();

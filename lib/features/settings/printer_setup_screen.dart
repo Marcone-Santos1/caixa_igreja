@@ -177,6 +177,52 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
     }
   }
 
+  Future<void> _printTestVoucher() async {
+    if (!_isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Conecte a impressora antes de imprimir o teste.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isPrinting = true);
+    try {
+      final printerService = ref.read(printerServiceProvider);
+      final perUnit = ref.read(deliveryVouchersPerUnitProvider);
+      await printerService.printDeliveryVouchers(
+        orderNumber: '001',
+        items: [
+          {'name': 'Pastel de Carne', 'qty': 2},
+          {'name': 'Refrigerante Lata', 'qty': 1},
+        ],
+        eventTitle: 'FESTA DA PADROEIRA',
+        customerName: 'Cliente Teste',
+        perUnit: perUnit,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ficha de teste enviada para a impressora!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao imprimir ficha: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isPrinting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -261,14 +307,70 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                 Icons.receipt_long_rounded,
                 color: scheme.primary,
               ),
-              title: const Text('Imprimir a cada venda'),
+              title: const Text('Imprimir cupom a cada venda'),
               subtitle: const Text(
-                'Emite o ticket na impressora automaticamente ao finalizar cada venda.',
+                'Emite o comprovante geral na impressora automaticamente ao finalizar cada venda.',
               ),
               value: ref.watch(autoPrintEnabledProvider),
               onChanged: (val) {
                 ref.read(autoPrintEnabledProvider.notifier).toggle(val);
               },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Card de Preferência: Fichas de Retirada no Balcão
+          Card(
+            child: Column(
+              children: [
+                SwitchListTile(
+                  secondary: Icon(
+                    Icons.confirmation_number_outlined,
+                    color: scheme.primary,
+                  ),
+                  title: const Text('Fichas de Balcão (Cozinha e Bar)'),
+                  subtitle: const Text(
+                    'Emite canhotos destacados para o cliente retirar os itens nos setores.',
+                  ),
+                  value: ref.watch(printDeliveryVouchersEnabledProvider),
+                  onChanged: (val) {
+                    ref.read(printDeliveryVouchersEnabledProvider.notifier).toggle(val);
+                  },
+                ),
+                if (ref.watch(printDeliveryVouchersEnabledProvider)) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      ref.watch(deliveryVouchersPerUnitProvider)
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: ref.watch(deliveryVouchersPerUnitProvider)
+                          ? scheme.primary
+                          : scheme.outline,
+                    ),
+                    title: const Text('1 ficha para cada unidade'),
+                    subtitle: const Text('Ex: 3 Pastéis emitem 3 fichas individuais de 1x'),
+                    onTap: () {
+                      ref.read(deliveryVouchersPerUnitProvider.notifier).toggle(true);
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      !ref.watch(deliveryVouchersPerUnitProvider)
+                          ? Icons.radio_button_checked
+                          : Icons.radio_button_unchecked,
+                      color: !ref.watch(deliveryVouchersPerUnitProvider)
+                          ? scheme.primary
+                          : scheme.outline,
+                    ),
+                    title: const Text('1 ficha agrupada por produto'),
+                    subtitle: const Text('Ex: 3 Pastéis emitem 1 ficha com "3x Pastel"'),
+                    onTap: () {
+                      ref.read(deliveryVouchersPerUnitProvider.notifier).toggle(false);
+                    },
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: 16),
@@ -427,8 +529,16 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.print_outlined),
-                    label: const Text('Imprimir Ticket de Teste'),
+                        : const Icon(Icons.receipt_outlined),
+                    label: const Text('Imprimir Cupom Geral de Teste'),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: (!_isConnected || _isPrinting)
+                        ? null
+                        : _printTestVoucher,
+                    icon: const Icon(Icons.confirmation_number_outlined),
+                    label: const Text('Imprimir Ficha de Balcão de Teste'),
                   ),
                 ],
               ),

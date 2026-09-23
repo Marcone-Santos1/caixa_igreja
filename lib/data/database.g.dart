@@ -47,8 +47,47 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _pixKeyMeta = const VerificationMeta('pixKey');
   @override
-  List<GeneratedColumn> get $columns => [id, title, notes, dateEpochMs];
+  late final GeneratedColumn<String> pixKey = GeneratedColumn<String>(
+    'pix_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pixMerchantNameMeta = const VerificationMeta(
+    'pixMerchantName',
+  );
+  @override
+  late final GeneratedColumn<String> pixMerchantName = GeneratedColumn<String>(
+    'pix_merchant_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pixMerchantCityMeta = const VerificationMeta(
+    'pixMerchantCity',
+  );
+  @override
+  late final GeneratedColumn<String> pixMerchantCity = GeneratedColumn<String>(
+    'pix_merchant_city',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    notes,
+    dateEpochMs,
+    pixKey,
+    pixMerchantName,
+    pixMerchantCity,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -91,6 +130,30 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
     } else if (isInserting) {
       context.missing(_dateEpochMsMeta);
     }
+    if (data.containsKey('pix_key')) {
+      context.handle(
+        _pixKeyMeta,
+        pixKey.isAcceptableOrUnknown(data['pix_key']!, _pixKeyMeta),
+      );
+    }
+    if (data.containsKey('pix_merchant_name')) {
+      context.handle(
+        _pixMerchantNameMeta,
+        pixMerchantName.isAcceptableOrUnknown(
+          data['pix_merchant_name']!,
+          _pixMerchantNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pix_merchant_city')) {
+      context.handle(
+        _pixMerchantCityMeta,
+        pixMerchantCity.isAcceptableOrUnknown(
+          data['pix_merchant_city']!,
+          _pixMerchantCityMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -116,6 +179,18 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
         DriftSqlType.int,
         data['${effectivePrefix}date_epoch_ms'],
       )!,
+      pixKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pix_key'],
+      ),
+      pixMerchantName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pix_merchant_name'],
+      ),
+      pixMerchantCity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pix_merchant_city'],
+      ),
     );
   }
 
@@ -130,11 +205,17 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   final String title;
   final String notes;
   final int dateEpochMs;
+  final String? pixKey;
+  final String? pixMerchantName;
+  final String? pixMerchantCity;
   const ChurchEvent({
     required this.id,
     required this.title,
     required this.notes,
     required this.dateEpochMs,
+    this.pixKey,
+    this.pixMerchantName,
+    this.pixMerchantCity,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -143,6 +224,15 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
     map['title'] = Variable<String>(title);
     map['notes'] = Variable<String>(notes);
     map['date_epoch_ms'] = Variable<int>(dateEpochMs);
+    if (!nullToAbsent || pixKey != null) {
+      map['pix_key'] = Variable<String>(pixKey);
+    }
+    if (!nullToAbsent || pixMerchantName != null) {
+      map['pix_merchant_name'] = Variable<String>(pixMerchantName);
+    }
+    if (!nullToAbsent || pixMerchantCity != null) {
+      map['pix_merchant_city'] = Variable<String>(pixMerchantCity);
+    }
     return map;
   }
 
@@ -152,6 +242,15 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
       title: Value(title),
       notes: Value(notes),
       dateEpochMs: Value(dateEpochMs),
+      pixKey: pixKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pixKey),
+      pixMerchantName: pixMerchantName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pixMerchantName),
+      pixMerchantCity: pixMerchantCity == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pixMerchantCity),
     );
   }
 
@@ -165,6 +264,9 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
       title: serializer.fromJson<String>(json['title']),
       notes: serializer.fromJson<String>(json['notes']),
       dateEpochMs: serializer.fromJson<int>(json['dateEpochMs']),
+      pixKey: serializer.fromJson<String?>(json['pixKey']),
+      pixMerchantName: serializer.fromJson<String?>(json['pixMerchantName']),
+      pixMerchantCity: serializer.fromJson<String?>(json['pixMerchantCity']),
     );
   }
   @override
@@ -175,6 +277,9 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
       'title': serializer.toJson<String>(title),
       'notes': serializer.toJson<String>(notes),
       'dateEpochMs': serializer.toJson<int>(dateEpochMs),
+      'pixKey': serializer.toJson<String?>(pixKey),
+      'pixMerchantName': serializer.toJson<String?>(pixMerchantName),
+      'pixMerchantCity': serializer.toJson<String?>(pixMerchantCity),
     };
   }
 
@@ -183,11 +288,21 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
     String? title,
     String? notes,
     int? dateEpochMs,
+    Value<String?> pixKey = const Value.absent(),
+    Value<String?> pixMerchantName = const Value.absent(),
+    Value<String?> pixMerchantCity = const Value.absent(),
   }) => ChurchEvent(
     id: id ?? this.id,
     title: title ?? this.title,
     notes: notes ?? this.notes,
     dateEpochMs: dateEpochMs ?? this.dateEpochMs,
+    pixKey: pixKey.present ? pixKey.value : this.pixKey,
+    pixMerchantName: pixMerchantName.present
+        ? pixMerchantName.value
+        : this.pixMerchantName,
+    pixMerchantCity: pixMerchantCity.present
+        ? pixMerchantCity.value
+        : this.pixMerchantCity,
   );
   ChurchEvent copyWithCompanion(EventsCompanion data) {
     return ChurchEvent(
@@ -197,6 +312,13 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
       dateEpochMs: data.dateEpochMs.present
           ? data.dateEpochMs.value
           : this.dateEpochMs,
+      pixKey: data.pixKey.present ? data.pixKey.value : this.pixKey,
+      pixMerchantName: data.pixMerchantName.present
+          ? data.pixMerchantName.value
+          : this.pixMerchantName,
+      pixMerchantCity: data.pixMerchantCity.present
+          ? data.pixMerchantCity.value
+          : this.pixMerchantCity,
     );
   }
 
@@ -206,13 +328,24 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('notes: $notes, ')
-          ..write('dateEpochMs: $dateEpochMs')
+          ..write('dateEpochMs: $dateEpochMs, ')
+          ..write('pixKey: $pixKey, ')
+          ..write('pixMerchantName: $pixMerchantName, ')
+          ..write('pixMerchantCity: $pixMerchantCity')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, notes, dateEpochMs);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    notes,
+    dateEpochMs,
+    pixKey,
+    pixMerchantName,
+    pixMerchantCity,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -220,7 +353,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
           other.id == this.id &&
           other.title == this.title &&
           other.notes == this.notes &&
-          other.dateEpochMs == this.dateEpochMs);
+          other.dateEpochMs == this.dateEpochMs &&
+          other.pixKey == this.pixKey &&
+          other.pixMerchantName == this.pixMerchantName &&
+          other.pixMerchantCity == this.pixMerchantCity);
 }
 
 class EventsCompanion extends UpdateCompanion<ChurchEvent> {
@@ -228,12 +364,18 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
   final Value<String> title;
   final Value<String> notes;
   final Value<int> dateEpochMs;
+  final Value<String?> pixKey;
+  final Value<String?> pixMerchantName;
+  final Value<String?> pixMerchantCity;
   final Value<int> rowid;
   const EventsCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.notes = const Value.absent(),
     this.dateEpochMs = const Value.absent(),
+    this.pixKey = const Value.absent(),
+    this.pixMerchantName = const Value.absent(),
+    this.pixMerchantCity = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   EventsCompanion.insert({
@@ -241,6 +383,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     required String title,
     this.notes = const Value.absent(),
     required int dateEpochMs,
+    this.pixKey = const Value.absent(),
+    this.pixMerchantName = const Value.absent(),
+    this.pixMerchantCity = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -250,6 +395,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     Expression<String>? title,
     Expression<String>? notes,
     Expression<int>? dateEpochMs,
+    Expression<String>? pixKey,
+    Expression<String>? pixMerchantName,
+    Expression<String>? pixMerchantCity,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -257,6 +405,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
       if (title != null) 'title': title,
       if (notes != null) 'notes': notes,
       if (dateEpochMs != null) 'date_epoch_ms': dateEpochMs,
+      if (pixKey != null) 'pix_key': pixKey,
+      if (pixMerchantName != null) 'pix_merchant_name': pixMerchantName,
+      if (pixMerchantCity != null) 'pix_merchant_city': pixMerchantCity,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -266,6 +417,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     Value<String>? title,
     Value<String>? notes,
     Value<int>? dateEpochMs,
+    Value<String?>? pixKey,
+    Value<String?>? pixMerchantName,
+    Value<String?>? pixMerchantCity,
     Value<int>? rowid,
   }) {
     return EventsCompanion(
@@ -273,6 +427,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
       title: title ?? this.title,
       notes: notes ?? this.notes,
       dateEpochMs: dateEpochMs ?? this.dateEpochMs,
+      pixKey: pixKey ?? this.pixKey,
+      pixMerchantName: pixMerchantName ?? this.pixMerchantName,
+      pixMerchantCity: pixMerchantCity ?? this.pixMerchantCity,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -292,6 +449,15 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     if (dateEpochMs.present) {
       map['date_epoch_ms'] = Variable<int>(dateEpochMs.value);
     }
+    if (pixKey.present) {
+      map['pix_key'] = Variable<String>(pixKey.value);
+    }
+    if (pixMerchantName.present) {
+      map['pix_merchant_name'] = Variable<String>(pixMerchantName.value);
+    }
+    if (pixMerchantCity.present) {
+      map['pix_merchant_city'] = Variable<String>(pixMerchantCity.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -305,6 +471,9 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
           ..write('title: $title, ')
           ..write('notes: $notes, ')
           ..write('dateEpochMs: $dateEpochMs, ')
+          ..write('pixKey: $pixKey, ')
+          ..write('pixMerchantName: $pixMerchantName, ')
+          ..write('pixMerchantCity: $pixMerchantCity, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3666,6 +3835,9 @@ typedef $$EventsTableCreateCompanionBuilder =
       required String title,
       Value<String> notes,
       required int dateEpochMs,
+      Value<String?> pixKey,
+      Value<String?> pixMerchantName,
+      Value<String?> pixMerchantCity,
       Value<int> rowid,
     });
 typedef $$EventsTableUpdateCompanionBuilder =
@@ -3674,6 +3846,9 @@ typedef $$EventsTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> notes,
       Value<int> dateEpochMs,
+      Value<String?> pixKey,
+      Value<String?> pixMerchantName,
+      Value<String?> pixMerchantCity,
       Value<int> rowid,
     });
 
@@ -3703,6 +3878,21 @@ class $$EventsTableFilterComposer
 
   ColumnFilters<int> get dateEpochMs => $composableBuilder(
     column: $table.dateEpochMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pixKey => $composableBuilder(
+    column: $table.pixKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pixMerchantName => $composableBuilder(
+    column: $table.pixMerchantName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pixMerchantCity => $composableBuilder(
+    column: $table.pixMerchantCity,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -3735,6 +3925,21 @@ class $$EventsTableOrderingComposer
     column: $table.dateEpochMs,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get pixKey => $composableBuilder(
+    column: $table.pixKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pixMerchantName => $composableBuilder(
+    column: $table.pixMerchantName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pixMerchantCity => $composableBuilder(
+    column: $table.pixMerchantCity,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$EventsTableAnnotationComposer
@@ -3757,6 +3962,19 @@ class $$EventsTableAnnotationComposer
 
   GeneratedColumn<int> get dateEpochMs => $composableBuilder(
     column: $table.dateEpochMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pixKey =>
+      $composableBuilder(column: $table.pixKey, builder: (column) => column);
+
+  GeneratedColumn<String> get pixMerchantName => $composableBuilder(
+    column: $table.pixMerchantName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pixMerchantCity => $composableBuilder(
+    column: $table.pixMerchantCity,
     builder: (column) => column,
   );
 }
@@ -3796,12 +4014,18 @@ class $$EventsTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<int> dateEpochMs = const Value.absent(),
+                Value<String?> pixKey = const Value.absent(),
+                Value<String?> pixMerchantName = const Value.absent(),
+                Value<String?> pixMerchantCity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion(
                 id: id,
                 title: title,
                 notes: notes,
                 dateEpochMs: dateEpochMs,
+                pixKey: pixKey,
+                pixMerchantName: pixMerchantName,
+                pixMerchantCity: pixMerchantCity,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3810,12 +4034,18 @@ class $$EventsTableTableManager
                 required String title,
                 Value<String> notes = const Value.absent(),
                 required int dateEpochMs,
+                Value<String?> pixKey = const Value.absent(),
+                Value<String?> pixMerchantName = const Value.absent(),
+                Value<String?> pixMerchantCity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion.insert(
                 id: id,
                 title: title,
                 notes: notes,
                 dateEpochMs: dateEpochMs,
+                pixKey: pixKey,
+                pixMerchantName: pixMerchantName,
+                pixMerchantCity: pixMerchantCity,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

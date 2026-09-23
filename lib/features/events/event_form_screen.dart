@@ -2,6 +2,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/app_theme.dart';
 import '../../data/database.dart';
@@ -22,6 +23,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _notes;
+  late final TextEditingController _pixKey;
+  late final TextEditingController _pixMerchantName;
+  late final TextEditingController _pixMerchantCity;
   DateTime _day = DateTime.now();
   bool _loading = true;
 
@@ -30,6 +34,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     super.initState();
     _title = TextEditingController();
     _notes = TextEditingController();
+    _pixKey = TextEditingController();
+    _pixMerchantName = TextEditingController();
+    _pixMerchantCity = TextEditingController();
     _load();
   }
 
@@ -49,6 +56,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
     }
     _title.text = e.title;
     _notes.text = e.notes;
+    _pixKey.text = e.pixKey ?? '';
+    _pixMerchantName.text = e.pixMerchantName ?? '';
+    _pixMerchantCity.text = e.pixMerchantCity ?? '';
     _day = DateTime.fromMillisecondsSinceEpoch(e.dateEpochMs);
     setState(() => _loading = false);
   }
@@ -57,6 +67,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   void dispose() {
     _title.dispose();
     _notes.dispose();
+    _pixKey.dispose();
+    _pixMerchantName.dispose();
+    _pixMerchantCity.dispose();
     super.dispose();
   }
 
@@ -83,6 +96,9 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
       title: Value(_title.text.trim()),
       notes: Value(_notes.text.trim()),
       dateEpochMs: Value(dayMs),
+      pixKey: Value(_pixKey.text.trim().isEmpty ? null : _pixKey.text.trim()),
+      pixMerchantName: Value(_pixMerchantName.text.trim().isEmpty ? null : _pixMerchantName.text.trim()),
+      pixMerchantCity: Value(_pixMerchantCity.text.trim().isEmpty ? null : _pixMerchantCity.text.trim()),
     );
 
     if (id == null) {
@@ -152,6 +168,85 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
                 onTap: _pickDay,
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Card de Configurações do PIX para este Evento
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: CaixaAppTheme.marianBlue.withValues(alpha: 0.2)),
+              ),
+              color: CaixaAppTheme.marianBlue.withValues(alpha: 0.03),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: CaixaAppTheme.marianBlue.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(Icons.qr_code_2_rounded, color: CaixaAppTheme.marianBlue, size: 20),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chave PIX do Evento',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: CaixaAppTheme.marianBlue,
+                                ),
+                              ),
+                              Text(
+                                'Gera QR Code com valor dinâmico no caixa',
+                                style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _pixKey,
+                      decoration: const InputDecoration(
+                        labelText: 'Chave PIX (Opcional)',
+                        hintText: 'CNPJ, CPF, Celular, E-mail ou Aleatória',
+                        prefixIcon: Icon(Icons.key_rounded, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _pixMerchantName,
+                      decoration: const InputDecoration(
+                        labelText: 'Nome do Recebedor / Paróquia',
+                        hintText: 'Ex: Paroquia Sao Jose (padrão: nome do evento)',
+                        prefixIcon: Icon(Icons.account_balance_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: _pixMerchantCity,
+                      decoration: const InputDecoration(
+                        labelText: 'Cidade do Recebedor',
+                        hintText: 'Ex: Sao Paulo',
+                        prefixIcon: Icon(Icons.location_city_outlined, size: 20),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _save,

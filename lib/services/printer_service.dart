@@ -282,6 +282,158 @@ class PrinterService {
     return true;
   }
 
+  /// Imprime canhotos / fichas individuais de retirada no balcão (Cozinha e Bar).
+  ///
+  /// [orderNumber]: Senha ou número do pedido.
+  /// [items]: Lista com itens vendidos (chaves: 'name'/'nome', 'qty'/'quantidade').
+  /// [eventTitle]: Nome do evento / comunidade.
+  /// [customerName]: Nome do cliente (se informado).
+  /// [perUnit]: Se true, imprime 1 ficha para cada unidade comprada (ex: 2x Pastel = 2 fichas de 1x).
+  ///            Se false, imprime 1 ficha agrupada por produto (ex: 1 ficha de 2x Pastel).
+  Future<bool> printDeliveryVouchers({
+    required String orderNumber,
+    required List<Map<String, dynamic>> items,
+    String? eventTitle,
+    String? customerName,
+    bool perUnit = true,
+  }) async {
+    final connected = await isConnected();
+    if (!connected) {
+      throw StateError('Impressora não conectada via Bluetooth.');
+    }
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    final bytes = <int>[];
+
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd/MM/yyyy HH:mm:ss').format(now);
+    final title = (eventTitle != null && eventTitle.trim().isNotEmpty)
+        ? eventTitle.trim().toUpperCase()
+        : 'CANTINA';
+
+    final vouchersToPrint = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final rawName = (item['name'] ?? item['nome'] ?? item['title'] ?? 'Item').toString();
+      final cleanName = _removeAccents(rawName);
+      final rawQty = item['qty'] ?? item['quantidade'] ?? 1;
+      final int qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 1);
+
+      if (perUnit && qty > 1) {
+        for (int i = 0; i < qty; i++) {
+          vouchersToPrint.add({
+            'name': cleanName,
+            'qty': 1,
+            'unitIndex': i + 1,
+            'unitTotal': qty,
+          });
+        }
+      } else {
+        vouchersToPrint.add({
+          'name': cleanName,
+          'qty': qty,
+        });
+      }
+    }
+
+    if (vouchersToPrint.isEmpty) return false;
+
+    for (int idx = 0; idx < vouchersToPrint.length; idx++) {
+      final v = vouchersToPrint[idx];
+      final itemName = v['name'] as String;
+      final itemQty = v['qty'] as int;
+      final unitIndex = v['unitIndex'] as int?;
+      final unitTotal = v['unitTotal'] as int?;
+
+      // Cabeçalho do Canhoto
+      bytes.addAll(generator.hr());
+      bytes.addAll(
+        generator.text(
+          'FICHA DE RETIRADA',
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+          ),
+        ),
+      );
+      bytes.addAll(
+        generator.text(
+          'PEDIDO #$orderNumber',
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+          ),
+        ),
+      );
+      bytes.addAll(generator.hr(ch: '-'));
+
+      // Nome do Item em destaque
+      final itemLabel = '${itemQty}x $itemName';
+      bytes.addAll(
+        generator.text(
+          itemLabel,
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+          ),
+        ),
+      );
+
+      if (unitIndex != null && unitTotal != null) {
+        bytes.addAll(
+          generator.text(
+            '(Unidade $unitIndex de $unitTotal)',
+            styles: const PosStyles(
+              align: PosAlign.center,
+              bold: true,
+            ),
+          ),
+        );
+      }
+
+      bytes.addAll(generator.hr(ch: '-'));
+
+      if (customerName != null && customerName.trim().isNotEmpty) {
+        bytes.addAll(
+          generator.text(
+            _removeAccents('Cliente: ${customerName.trim()}'),
+            styles: const PosStyles(align: PosAlign.center),
+          ),
+        );
+      }
+
+      bytes.addAll(
+        generator.text(
+          dateStr,
+          styles: const PosStyles(align: PosAlign.center),
+        ),
+      );
+      bytes.addAll(
+        generator.text(
+          _removeAccents(title),
+          styles: const PosStyles(align: PosAlign.center),
+        ),
+      );
+
+      // Linha pontilhada de destaque
+      bytes.addAll(generator.feed(1));
+      bytes.addAll(
+        generator.text(
+          '- - - - - - - - - - - - - - - -',
+          styles: const PosStyles(align: PosAlign.center),
+        ),
+      );
+      bytes.addAll(generator.feed(1));
+    }
+
+    await _printer.writeBytes(Uint8List.fromList(bytes));
+    return true;
+  }
+
   /// Imprime o relatório de fechamento / resumo de vendas na impressora térmica 58mm.
   Future<bool> printSummaryReport({
     required String eventTitle,

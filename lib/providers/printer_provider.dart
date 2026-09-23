@@ -35,3 +35,46 @@ final printerConnectedProvider = FutureProvider.autoDispose<bool>((ref) async {
   return await service.isConnected();
 });
 
+/// Provider de preferência para emitir fichas / canhotos de balcão (Cozinha/Bar).
+final printDeliveryVouchersEnabledProvider =
+    StateNotifierProvider<DeliveryVouchersNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return DeliveryVouchersNotifier(prefs);
+});
+
+class DeliveryVouchersNotifier extends StateNotifier<bool> {
+  DeliveryVouchersNotifier(this._prefs)
+      : super(_prefs.getBool(_kKey) ?? true);
+
+  static const _kKey = 'printer_delivery_vouchers_enabled';
+  final SharedPreferences _prefs;
+
+  Future<void> toggle(bool enabled) async {
+    state = enabled;
+    await _prefs.setBool(_kKey, enabled);
+  }
+}
+
+/// Provider para escolher o formato de fichas:
+/// - true: 1 ficha para cada unidade comprada (ex: 2x Pastel = 2 fichas individuais)
+/// - false: 1 ficha agrupada por produto (ex: 1 ficha com "2x Pastel")
+final deliveryVouchersPerUnitProvider =
+    StateNotifierProvider<DeliveryVouchersPerUnitNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return DeliveryVouchersPerUnitNotifier(prefs);
+});
+
+class DeliveryVouchersPerUnitNotifier extends StateNotifier<bool> {
+  DeliveryVouchersPerUnitNotifier(this._prefs)
+      : super(_prefs.getBool(_kKey) ?? true);
+
+  static const _kKey = 'printer_vouchers_per_unit';
+  final SharedPreferences _prefs;
+
+  Future<void> toggle(bool perUnit) async {
+    state = perUnit;
+    await _prefs.setBool(_kKey, perUnit);
+  }
+}
+
+

@@ -1,8 +1,10 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../app/app_theme.dart';
 import '../../data/database.dart';
@@ -17,6 +19,7 @@ import '../../providers/sync_provider.dart';
 import '../../providers/cash_session_provider.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../utils/money_format.dart';
+import '../../utils/pix_payload.dart';
 import 'cash_session_dialogs.dart';
 
 class NewSaleScreen extends ConsumerStatefulWidget {
@@ -332,7 +335,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     required List<EventDotDenom> denoms,
   }) async {
     final autoPrint = ref.read(autoPrintEnabledProvider);
-    if (!autoPrint) return false;
+    final printVouchers = ref.read(printDeliveryVouchersEnabledProvider);
+    if (!autoPrint && !printVouchers) return false;
 
     final printerService = ref.read(printerServiceProvider);
     final connected = await printerService.isConnected();
@@ -395,21 +399,41 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       });
     }
 
-    final changeCents = result.amountReceivedCents - totalCents;
+    bool printedAny = false;
 
-    return await printerService.printTicket(
-      orderNumber: orderNumber,
-      items: items,
-      total: totalCents / 100.0,
-      headerTitle: headerTitle,
-      paymentMethod: PaymentMethod.label(result.paymentMethod),
-      amountReceived: result.amountReceivedCents > 0
-          ? result.amountReceivedCents / 100.0
-          : null,
-      change: changeCents > 0 ? changeCents / 100.0 : null,
-      customerName: result.customerName,
-      notes: result.notes,
-    );
+    // 1. Imprime o comprovante geral da venda (se habilitado)
+    if (autoPrint) {
+      final changeCents = result.amountReceivedCents - totalCents;
+      final ok = await printerService.printTicket(
+        orderNumber: orderNumber,
+        items: items,
+        total: totalCents / 100.0,
+        headerTitle: headerTitle,
+        paymentMethod: PaymentMethod.label(result.paymentMethod),
+        amountReceived: result.amountReceivedCents > 0
+            ? result.amountReceivedCents / 100.0
+            : null,
+        change: changeCents > 0 ? changeCents / 100.0 : null,
+        customerName: result.customerName,
+        notes: result.notes,
+      );
+      if (ok) printedAny = true;
+    }
+
+    // 2. Imprime as fichas / canhotos de entrega no balcão (se habilitado)
+    if (printVouchers) {
+      final perUnit = ref.read(deliveryVouchersPerUnitProvider);
+      final okVouchers = await printerService.printDeliveryVouchers(
+        orderNumber: orderNumber,
+        items: items,
+        eventTitle: headerTitle,
+        customerName: result.customerName,
+        perUnit: perUnit,
+      );
+      if (okVouchers) printedAny = true;
+    }
+
+    return printedAny;
   }
 
   Future<void> _checkout(
@@ -431,6 +455,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _SaleCheckoutBottomSheet(
+        eventId: widget.eventId,
         totalCents: total,
         denominations: denoms,
         originalSale: _originalSale,
@@ -1720,22 +1745,24 @@ class _CheckoutResult {
   final String? customerName;
 }
 
-class _SaleCheckoutBottomSheet extends StatefulWidget {
+class _SaleCheckoutBottomSheet extends ConsumerStatefulWidget {
   const _SaleCheckoutBottomSheet({
+    required this.eventId,
     required this.totalCents,
     required this.denominations,
     this.originalSale,
   });
 
+  final String eventId;
   final int totalCents;
   final List<EventDotDenom> denominations;
   final PosSale? originalSale;
 
   @override
-  State<_SaleCheckoutBottomSheet> createState() => _SaleCheckoutBottomSheetState();
+  ConsumerState<_SaleCheckoutBottomSheet> createState() => _SaleCheckoutBottomSheetState();
 }
 
-class _SaleCheckoutBottomSheetState extends State<_SaleCheckoutBottomSheet> {
+class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomSheet> {
   String _payment = PaymentMethod.dinheiro;
   final _controller = TextEditingController();
   final _notesController = TextEditingController();
@@ -1793,6 +1820,9 @@ class _SaleCheckoutBottomSheetState extends State<_SaleCheckoutBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final eventAsync = ref.watch(eventDetailProvider(widget.eventId));
+    final event = eventAsync.valueOrNull;
+
     final isCash = _payment == PaymentMethod.dinheiro;
     final rec = _received ?? 0;
     final change = rec - widget.totalCents;
@@ -2037,29 +2067,37 @@ class _SaleCheckoutBottomSheetState extends State<_SaleCheckoutBottomSheet> {
 
                       const SizedBox(height: 16),
 
-                      // Campo de Valor Recebido
-                      TextField(
-                        controller: _controller,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        style: GoogleFonts.outfit(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: isCash ? 'Valor recebido em dinheiro' : 'Valor cobrado',
-                          prefixText: 'R\$ ',
-                          prefixStyle: GoogleFonts.outfit(
-                            fontSize: 18,
+                      // Painel de QR Code PIX Dinâmico (se a forma for PIX)
+                      if (_payment == PaymentMethod.pix) ...[
+                        _buildPixSection(context, event, isDark),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Campo de Valor Recebido (oculto se PIX)
+                      if (_payment != PaymentMethod.pix) ...[
+                        TextField(
+                          controller: _controller,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
-                          filled: true,
-                          fillColor: isDark ? Colors.grey.shade900 : Colors.white,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
+                          decoration: InputDecoration(
+                            labelText: isCash ? 'Valor recebido em dinheiro' : 'Valor cobrado',
+                            prefixText: 'R\$ ',
+                            prefixStyle: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            filled: true,
+                            fillColor: isDark ? Colors.grey.shade900 : Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
+                          onChanged: (_) => setState(() {}),
                         ),
-                        onChanged: (_) => setState(() {}),
-                      ),
+                      ],
 
                       // Atalhos de Dinheiro e Cálculo de Troco
                       if (isCash) ...[
@@ -2297,6 +2335,268 @@ class _SaleCheckoutBottomSheetState extends State<_SaleCheckoutBottomSheet> {
         ),
       ),
     );
+  }
+
+  Widget _buildPixSection(BuildContext context, ChurchEvent? event, bool isDark) {
+    final key = event?.pixKey?.trim();
+    if (key == null || key.isEmpty) {
+      return _buildEmptyPixCard(context, event, isDark);
+    }
+    return _buildPixCard(context, event, key, isDark);
+  }
+
+  Widget _buildPixCard(BuildContext context, ChurchEvent? event, String key, bool isDark) {
+    final merchantName = (event?.pixMerchantName != null && event!.pixMerchantName!.trim().isNotEmpty)
+        ? event.pixMerchantName!.trim()
+        : (event?.title.trim().isNotEmpty == true ? event!.title.trim() : 'CANTINA');
+    final merchantCity = (event?.pixMerchantCity != null && event!.pixMerchantCity!.trim().isNotEmpty)
+        ? event.pixMerchantCity!.trim()
+        : 'CIDADE';
+
+    final payload = PixPayload(
+      pixKey: key,
+      merchantName: merchantName,
+      merchantCity: merchantCity,
+      amount: widget.totalCents / 100.0,
+      description: 'Venda',
+    );
+    final pixCode = payload.generateCode();
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey.shade900 : const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: CaixaAppTheme.marianBlue.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: CaixaAppTheme.marianBlue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.qr_code_2_rounded, color: CaixaAppTheme.marianBlue, size: 20),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Pague com PIX',
+                    style: GoogleFonts.outfit(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: CaixaAppTheme.marianBlue,
+                    ),
+                  ),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, size: 18),
+                tooltip: 'Editar chave PIX',
+                onPressed: () => _showEditPixKeyDialog(context, event),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: QrImageView(
+              data: pixCode,
+              version: QrVersions.auto,
+              size: 160,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Aponte o celular do cliente para o QR Code',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.grey.shade300 : Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Chave: $key • $merchantName',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: Colors.grey.shade600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: pixCode));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Código PIX Copia e Cola copiado!'),
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copiar Código PIX'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyPixCard(BuildContext context, ChurchEvent? event, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey.shade900 : const Color(0xFFFFF9EE),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: CaixaAppTheme.warmGold.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.qr_code_2_rounded, size: 36, color: CaixaAppTheme.warmGold),
+          const SizedBox(height: 8),
+          Text(
+            'Chave PIX não cadastrada',
+            style: GoogleFonts.outfit(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Cadastre a chave PIX deste evento para gerar o QR Code automático com o valor da venda.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: () => _showEditPixKeyDialog(context, event),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Cadastrar Chave PIX'),
+            style: FilledButton.styleFrom(
+              backgroundColor: CaixaAppTheme.marianBlue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEditPixKeyDialog(BuildContext context, ChurchEvent? event) async {
+    final keyCtrl = TextEditingController(text: event?.pixKey ?? '');
+    final nameCtrl = TextEditingController(text: event?.pixMerchantName ?? '');
+    final cityCtrl = TextEditingController(text: event?.pixMerchantCity ?? '');
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.qr_code_2_rounded, color: CaixaAppTheme.marianBlue),
+            const SizedBox(width: 8),
+            Text(
+              'Chave PIX do Evento',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: keyCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Chave PIX',
+                  hintText: 'CNPJ, CPF, Celular, E-mail ou Aleatória',
+                  prefixIcon: Icon(Icons.key_rounded, size: 20),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Nome do Recebedor / Paróquia',
+                  hintText: 'Ex: Paroquia N Sra Aparecida',
+                  prefixIcon: Icon(Icons.account_balance_outlined, size: 20),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: cityCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Cidade do Recebedor',
+                  hintText: 'Ex: Sao Paulo',
+                  prefixIcon: Icon(Icons.location_city_outlined, size: 20),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (keyCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, true);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: CaixaAppTheme.marianBlue,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true && event != null) {
+      final db = ref.read(appDatabaseProvider);
+      await (db.update(db.events)..where((e) => e.id.equals(event.id))).write(
+        EventsCompanion(
+          pixKey: Value(keyCtrl.text.trim()),
+          pixMerchantName: Value(nameCtrl.text.trim().isEmpty ? null : nameCtrl.text.trim()),
+          pixMerchantCity: Value(cityCtrl.text.trim().isEmpty ? null : cityCtrl.text.trim()),
+        ),
+      );
+    }
   }
 }
 

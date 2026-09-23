@@ -21,6 +21,9 @@ class Events extends Table {
   TextColumn get title => text()();
   TextColumn get notes => text().withDefault(const Constant(''))();
   IntColumn get dateEpochMs => integer()();
+  TextColumn get pixKey => text().nullable()();
+  TextColumn get pixMerchantName => text().nullable()();
+  TextColumn get pixMerchantCity => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -281,7 +284,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -389,6 +392,11 @@ PRAGMA foreign_keys = ON;
           if (from < 7) {
             await m.createTable(cashSessions);
             await m.addColumn(sales, sales.sessionId);
+          }
+          if (from < 8) {
+            await m.addColumn(events, events.pixKey);
+            await m.addColumn(events, events.pixMerchantName);
+            await m.addColumn(events, events.pixMerchantCity);
           }
         },
       );
