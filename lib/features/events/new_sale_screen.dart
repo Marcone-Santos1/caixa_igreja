@@ -10,6 +10,7 @@ import '../../domain/payment_method.dart';
 import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/event_dashboard_provider.dart';
+import '../../providers/printer_provider.dart';
 import '../../providers/sales_draft_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
@@ -303,6 +304,95 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     return out;
   }
 
+  Future<bool> _printSaleTicket({
+    required String eventId,
+    required _CheckoutResult result,
+    required int totalCents,
+    required List<SaleLineDraft> drafts,
+    required List<ChurchProduct> products,
+    required List<EventDotDenom> denoms,
+  }) async {
+    final autoPrint = ref.read(autoPrintEnabledProvider);
+    if (!autoPrint) return false;
+
+    final printerService = ref.read(printerServiceProvider);
+    final connected = await printerService.isConnected();
+    if (!connected) return false;
+
+    final db = ref.read(appDatabaseProvider);
+    int orderSeq = 1;
+    String headerTitle = 'CANTINA';
+    try {
+      final ev = await (db.select(db.events)..where((e) => e.id.equals(eventId))).getSingleOrNull();
+      if (ev != null && ev.title.trim().isNotEmpty) {
+        headerTitle = ev.title.trim();
+      }
+      final sales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+      orderSeq = sales.length;
+      if (orderSeq <= 0) orderSeq = 1;
+    } catch (_) {}
+
+    final orderNumber = orderSeq.toString().padLeft(3, '0');
+
+    final items = <Map<String, dynamic>>[];
+    for (final d in drafts) {
+      String name = 'Item';
+      if (d.kind == SaleLineKind.product && d.productId != null) {
+        final p = products.firstWhere(
+          (p) => p.id == d.productId,
+          orElse: () => ChurchProduct(
+            id: '',
+            eventId: '',
+            name: 'Produto',
+            description: '',
+            priceCents: 0,
+            trackStock: false,
+            stockQty: 0,
+            active: true,
+            isCombo: false,
+          ),
+        );
+        name = p.name;
+      } else if (d.kind == SaleLineKind.ficha && d.dotDenominationId != null) {
+        final f = denoms.firstWhere(
+          (f) => f.id == d.dotDenominationId,
+          orElse: () => EventDotDenom(
+            id: '',
+            eventId: '',
+            label: 'Ficha',
+            valueCents: 0,
+            stockQty: 0,
+          ),
+        );
+        name = 'Ficha: ${f.label}';
+      } else if (d.kind == SaleLineKind.valorLivre) {
+        name = d.freeLabel ?? 'Valor avulso';
+      }
+
+      items.add({
+        'name': name,
+        'qty': d.qty,
+        'subtotal': d.resolveLineTotalCents() / 100.0,
+      });
+    }
+
+    final changeCents = result.amountReceivedCents - totalCents;
+
+    return await printerService.printTicket(
+      orderNumber: orderNumber,
+      items: items,
+      total: totalCents / 100.0,
+      headerTitle: headerTitle,
+      paymentMethod: PaymentMethod.label(result.paymentMethod),
+      amountReceived: result.amountReceivedCents > 0
+          ? result.amountReceivedCents / 100.0
+          : null,
+      change: changeCents > 0 ? changeCents / 100.0 : null,
+      customerName: result.customerName,
+      notes: result.notes,
+    );
+  }
+
   Future<void> _checkout(
     int total,
     List<ChurchProduct> products,
@@ -365,6 +455,20 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           );
         }
       }
+
+      // Auto-impressão do ticket na impressora térmica se conectada
+      bool ticketPrinted = false;
+      try {
+        ticketPrinted = await _printSaleTicket(
+          eventId: widget.eventId,
+          result: result,
+          totalCents: total,
+          drafts: drafts,
+          products: products,
+          denoms: denoms,
+        );
+      } catch (_) {}
+
       if (!context.mounted) return;
       
       final change = result.amountReceivedCents - total;
@@ -376,14 +480,37 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(result.changePending ? 'Venda Finalizada (Troco Pendente)' : 'Venda Finalizada'),
-            content: Text(
-              result.changePending 
-                  ? 'Devendo troco de:\n\n${formatCents(change)}\n\nPara: ${result.customerName ?? 'Não informado'}'
-                  : 'Troco a devolver:\n\n${formatCents(change)}',
-              style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
-                fontSize: result.changePending ? 20 : null,
-              ),
-              textAlign: TextAlign.center,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  result.changePending 
+                      ? 'Devendo troco de:\n\n${formatCents(change)}\n\nPara: ${result.customerName ?? 'Não informado'}'
+                      : 'Troco a devolver:\n\n${formatCents(change)}',
+                  style: Theme.of(ctx).textTheme.headlineSmall?.copyWith(
+                    fontSize: result.changePending ? 20 : null,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (ticketPrinted) ...[
+                  const SizedBox(height: 16),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                      SizedBox(width: 6),
+                      Text(
+                        'Ticket impresso na impressora',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
             ),
             actions: [
               FilledButton(
@@ -397,7 +524,13 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
         );
       } else {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Venda registrada')),
+          SnackBar(
+            content: Text(
+              ticketPrinted
+                  ? 'Venda registrada • Ticket impresso!'
+                  : 'Venda registrada',
+            ),
+          ),
         );
       }
 

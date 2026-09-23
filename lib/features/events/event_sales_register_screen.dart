@@ -12,6 +12,7 @@ import '../../domain/sale_line_kind.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../providers/event_dashboard_provider.dart';
+import '../../providers/printer_provider.dart';
 import '../../utils/money_format.dart';
 
 final _dateTimeFmt = DateFormat.yMd('pt_BR').add_Hm();
@@ -20,6 +21,78 @@ class EventSalesRegisterScreen extends ConsumerWidget {
   const EventSalesRegisterScreen({super.key, required this.eventId});
 
   final String eventId;
+
+  Future<void> _reprintSaleTicket(
+    BuildContext context,
+    WidgetRef ref,
+    PosSale sale,
+    List<EventSaleLineRow> lines,
+  ) async {
+    final printerService = ref.read(printerServiceProvider);
+    final connected = await printerService.isConnected();
+    if (!connected) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Conecte a impressora em Configurações > Impressora antes de imprimir.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final db = ref.read(appDatabaseProvider);
+      String headerTitle = 'CANTINA';
+      try {
+        final ev = await (db.select(db.events)..where((e) => e.id.equals(sale.eventId))).getSingleOrNull();
+        if (ev != null && ev.title.trim().isNotEmpty) {
+          headerTitle = ev.title.trim();
+        }
+      } catch (_) {}
+
+      final items = lines.map((l) => {
+        'name': l.itemLabel,
+        'qty': l.qty,
+        'subtotal': l.lineTotalCents / 100.0,
+      }).toList();
+
+      final change = sale.amountReceivedCents - sale.totalCents;
+      final orderNumber = sale.id.length > 4 ? sale.id.substring(0, 4).toUpperCase() : sale.id;
+
+      await printerService.printTicket(
+        orderNumber: orderNumber,
+        items: items,
+        total: sale.totalCents / 100.0,
+        headerTitle: headerTitle,
+        paymentMethod: PaymentMethod.label(sale.paymentMethod),
+        amountReceived: sale.amountReceivedCents > 0 ? sale.amountReceivedCents / 100.0 : null,
+        change: change > 0 ? change / 100.0 : null,
+        customerName: sale.customerName,
+        notes: sale.notes,
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ticket enviado para a impressora!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao imprimir ticket: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
 
   Future<void> _deleteSale(BuildContext context, WidgetRef ref, String saleId) async {
     final confirm = await showDialog<bool>(
@@ -270,7 +343,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                           leading: CircleAvatar(
                             radius: 18,
                             child: Text(
-                              '${s.id}',
+                              s.id,
                               style: const TextStyle(fontSize: 12),
                             ),
                           ),
@@ -376,12 +449,20 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                 const Divider(),
                                 Row(
                                   children: [
+                                    TextButton.icon(
+                                      onPressed: () => _reprintSaleTicket(context, ref, s, lines),
+                                      icon: const Icon(Icons.print_outlined, size: 16),
+                                      label: const Text('Imprimir'),
+                                    ),
                                     if (isClient)
-                                      const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 8),
-                                        child: Text(
-                                          'Edições permitidas apenas no Caixa Central',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                                      const Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 8),
+                                          child: Text(
+                                            'Edições permitidas apenas no Caixa Central',
+                                            textAlign: TextAlign.end,
+                                            style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                                          ),
                                         ),
                                       )
                                     else ...[
