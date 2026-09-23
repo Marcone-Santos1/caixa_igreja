@@ -7,6 +7,7 @@ import '../domain/payment_method.dart';
 import '../domain/stock_constants.dart';
 import 'drift_database_paths.dart';
 import '../domain/sale_line_kind.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'sale_line_draft.dart';
 
@@ -63,10 +64,29 @@ class ProductComboItems extends Table {
   Set<Column> get primaryKey => {comboProductId, childProductId};
 }
 
+@DataClassName('CashSession')
+class CashSessions extends Table {
+  TextColumn get id => text()();
+  TextColumn get eventId => text().references(Events, #id)();
+  TextColumn get title => text()();
+  IntColumn get openedAtMs => integer()();
+  IntColumn get closedAtMs => integer().nullable()();
+  IntColumn get initialCashFloatCents =>
+      integer().withDefault(const Constant(0))();
+  IntColumn get closedCashDrawerCents => integer().nullable()();
+  TextColumn get closedNotes => text().nullable()();
+  TextColumn get closedBy => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 @DataClassName('PosSale')
 class Sales extends Table {
   TextColumn get id => text()();
   TextColumn get eventId => text().references(Events, #id)();
+  TextColumn get sessionId =>
+      text().nullable().references(CashSessions, #id)();
   IntColumn get soldAtMs => integer()();
   IntColumn get totalCents => integer()();
   IntColumn get amountReceivedCents => integer()();
@@ -251,6 +271,7 @@ class EventLowStockCounts {
     EventDotDenominations,
     Products,
     ProductComboItems,
+    CashSessions,
     Sales,
     SaleLines,
     SaleChangeDotAllocations,
@@ -260,7 +281,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -364,6 +385,10 @@ PRAGMA foreign_keys = ON;
             }
             await customStatement('PRAGMA foreign_keys = ON;');
             await m.createAll();
+          }
+          if (from < 7) {
+            await m.createTable(cashSessions);
+            await m.addColumn(sales, sales.sessionId);
           }
         },
       );
@@ -677,6 +702,90 @@ PRAGMA foreign_keys = ON;
     }
   }
 
+  // --- Sessões de Caixa (Cash Sessions) ---
+
+  Stream<CashSession?> watchActiveSession(String eventId) {
+    return (select(cashSessions)
+          ..where((s) => s.eventId.equals(eventId) & s.closedAtMs.isNull())
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)])
+          ..limit(1))
+        .watchSingleOrNull();
+  }
+
+  Future<CashSession?> getActiveSession(String eventId) {
+    return (select(cashSessions)
+          ..where((s) => s.eventId.equals(eventId) & s.closedAtMs.isNull())
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Stream<List<CashSession>> watchSessions(String eventId) {
+    return (select(cashSessions)
+          ..where((s) => s.eventId.equals(eventId))
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)]))
+        .watch();
+  }
+
+  Future<List<CashSession>> getSessions(String eventId) {
+    return (select(cashSessions)
+          ..where((s) => s.eventId.equals(eventId))
+          ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)]))
+        .get();
+  }
+
+  Future<String> openCashSession({
+    required String eventId,
+    required String title,
+    int initialCashFloatCents = 0,
+    String? openedBy,
+  }) async {
+    final id = _uuid.v7();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await into(cashSessions).insert(
+      CashSessionsCompanion.insert(
+        id: id,
+        eventId: eventId,
+        title: title,
+        openedAtMs: now,
+        initialCashFloatCents: Value(initialCashFloatCents),
+        closedBy: Value(openedBy),
+      ),
+    );
+    return id;
+  }
+
+  Future<void> closeCashSession({
+    required String sessionId,
+    required int closedCashDrawerCents,
+    String? closedNotes,
+    String? closedBy,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await (update(cashSessions)..where((s) => s.id.equals(sessionId))).write(
+      CashSessionsCompanion(
+        closedAtMs: Value(now),
+        closedCashDrawerCents: Value(closedCashDrawerCents),
+        closedNotes: Value(closedNotes),
+        closedBy: closedBy != null ? Value(closedBy) : const Value.absent(),
+      ),
+    );
+  }
+
+  Future<String> ensureActiveSession(String eventId) async {
+    final active = await getActiveSession(eventId);
+    if (active != null) return active.id;
+
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd/MM/yyyy').format(now);
+    final title = 'Sessão $dateStr';
+    return openCashSession(
+      eventId: eventId,
+      title: title,
+      initialCashFloatCents: 0,
+    );
+  }
+
   /// Venda completa: linhas (produto, valor livre ou ficha), pagamento e estoques.
   Future<String> completeSale({
     required String eventId,
@@ -685,6 +794,7 @@ PRAGMA foreign_keys = ON;
     String? notes,
     bool changePending = false,
     String? customerName,
+    String? sessionId,
     required List<SaleLineDraft> lines,
   }) {
     if (lines.isEmpty) {
@@ -692,6 +802,8 @@ PRAGMA foreign_keys = ON;
     }
 
     return transaction(() async {
+      final activeSessionId = sessionId ?? await ensureActiveSession(eventId);
+
       var totalCents = 0;
       for (final l in lines) {
         if (l.qty <= 0 && l.kind != SaleLineKind.valorLivre) {
@@ -755,6 +867,7 @@ PRAGMA foreign_keys = ON;
         SalesCompanion.insert(
           id: saleId,
           eventId: eventId,
+          sessionId: Value(activeSessionId),
           soldAtMs: soldAt,
           totalCents: totalCents,
           amountReceivedCents: amountReceivedCents,

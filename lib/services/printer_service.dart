@@ -422,6 +422,189 @@ class PrinterService {
     return true;
   }
 
+  /// Imprime o comprovante oficial de Fechamento de Caixa / Sessão na impressora térmica 58mm.
+  Future<bool> printSessionClosingReceipt({
+    required String eventTitle,
+    required String sessionTitle,
+    required DateTime openedAt,
+    required DateTime closedAt,
+    required double initialCashFloat,
+    required double cashRevenue,
+    required double cashChangeGiven,
+    required double expectedInDrawer,
+    double? countedInDrawer,
+    required double totalRevenue,
+    required int totalSalesCount,
+    required Map<String, double> revenueByPaymentMethod,
+    List<Map<String, dynamic>> pendingChanges = const [],
+    String? closedBy,
+    String? closedNotes,
+  }) async {
+    final connected = await isConnected();
+    if (!connected) {
+      throw StateError('Impressora não conectada via Bluetooth.');
+    }
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    final bytes = <int>[];
+
+    final dateFmt = DateFormat('dd/MM/yyyy HH:mm');
+    final currencyFmt = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+    String fmt(double val) => currencyFmt.format(val).replaceAll('R\$', 'R\$ ');
+
+    // 1. Cabeçalho
+    bytes.addAll(
+      generator.text(
+        _removeAccents(eventTitle.toUpperCase()),
+        styles: const PosStyles(
+          align: PosAlign.center,
+          bold: true,
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+        ),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        'FECHAMENTO DE CAIXA',
+        styles: const PosStyles(align: PosAlign.center, bold: true),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        _removeAccents(sessionTitle),
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(generator.hr());
+
+    // 2. Horários e Operador
+    bytes.addAll(generator.text('Abertura: ${dateFmt.format(openedAt)}'));
+    bytes.addAll(generator.text('Fechamento: ${dateFmt.format(closedAt)}'));
+    if (closedBy != null && closedBy.isNotEmpty) {
+      bytes.addAll(generator.text('Operador: ${_removeAccents(closedBy)}'));
+    }
+    bytes.addAll(generator.hr(ch: '-'));
+
+    // 3. Faturamento Geral
+    bytes.addAll(
+      generator.row([
+        PosColumn(text: 'TOTAL VENDAS', width: 6, styles: const PosStyles(bold: true)),
+        PosColumn(
+          text: _removeAccents(fmt(totalRevenue)),
+          width: 6,
+          styles: const PosStyles(align: PosAlign.right, bold: true),
+        ),
+      ]),
+    );
+    bytes.addAll(generator.text('Comandas: $totalSalesCount'));
+    bytes.addAll(generator.hr(ch: '-'));
+
+    // 4. Detalhamento por Forma de Pagamento
+    bytes.addAll(generator.text('RECEBIMENTOS:', styles: const PosStyles(bold: true)));
+    revenueByPaymentMethod.forEach((method, val) {
+      if (val > 0) {
+        bytes.addAll(
+          generator.row([
+            PosColumn(text: _removeAccents(method), width: 6),
+            PosColumn(
+              text: _removeAccents(fmt(val)),
+              width: 6,
+              styles: const PosStyles(align: PosAlign.right, bold: true),
+            ),
+          ]),
+        );
+      }
+    });
+    bytes.addAll(generator.hr(ch: '-'));
+
+    // 5. Conferência de Gaveta (Dinheiro)
+    bytes.addAll(generator.text('CONFERENCIA DE GAVETA:', styles: const PosStyles(bold: true)));
+    bytes.addAll(
+      generator.row([
+        PosColumn(text: '(+) Fundo Inicial', width: 7),
+        PosColumn(text: _removeAccents(fmt(initialCashFloat)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+      ]),
+    );
+    bytes.addAll(
+      generator.row([
+        PosColumn(text: '(+) Vendas Dinheiro', width: 7),
+        PosColumn(text: _removeAccents(fmt(cashRevenue)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+      ]),
+    );
+    if (cashChangeGiven > 0) {
+      bytes.addAll(
+        generator.row([
+          PosColumn(text: '(-) Troco em Dinheiro', width: 7),
+          PosColumn(text: _removeAccents(fmt(cashChangeGiven)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+        ]),
+      );
+    }
+    bytes.addAll(
+      generator.row([
+        PosColumn(text: '(=) ESPERADO', width: 6, styles: const PosStyles(bold: true)),
+        PosColumn(
+          text: _removeAccents(fmt(expectedInDrawer)),
+          width: 6,
+          styles: const PosStyles(align: PosAlign.right, bold: true),
+        ),
+      ]),
+    );
+
+    if (countedInDrawer != null) {
+      final diff = countedInDrawer - expectedInDrawer;
+      bytes.addAll(
+        generator.row([
+          PosColumn(text: '(=) CONTADO', width: 6, styles: const PosStyles(bold: true)),
+          PosColumn(
+            text: _removeAccents(fmt(countedInDrawer)),
+            width: 6,
+            styles: const PosStyles(align: PosAlign.right, bold: true),
+          ),
+        ]),
+      );
+      final diffLabel = diff.abs() < 0.01
+          ? 'DIFERENCA: OK (R\$ 0,00)'
+          : (diff > 0 ? 'SOBRA: +${fmt(diff)}' : 'FALTA: ${fmt(diff)}');
+      bytes.addAll(generator.text(diffLabel, styles: const PosStyles(align: PosAlign.center, bold: true)));
+    }
+
+    // 6. Trocos pendentes
+    if (pendingChanges.isNotEmpty) {
+      bytes.addAll(generator.hr(ch: '-'));
+      bytes.addAll(generator.text('TROCOS PENDENTES:', styles: const PosStyles(bold: true)));
+      for (final p in pendingChanges) {
+        final name = (p['customerName'] ?? 'Cliente').toString();
+        final changeVal = (p['change'] ?? 0.0) as double;
+        bytes.addAll(
+          generator.row([
+            PosColumn(text: _removeAccents(name), width: 7),
+            PosColumn(text: _removeAccents(fmt(changeVal)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+          ]),
+        );
+      }
+    }
+
+    if (closedNotes != null && closedNotes.isNotEmpty) {
+      bytes.addAll(generator.hr(ch: '-'));
+      bytes.addAll(generator.text('Obs: ${_removeAccents(closedNotes)}'));
+    }
+
+    // 7. Canhoto de Assinaturas
+    bytes.addAll(generator.hr());
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.text('________________________________', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text('Operador de Caixa', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.feed(1));
+    bytes.addAll(generator.text('________________________________', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.text('Coordenador / Pastoral', styles: const PosStyles(align: PosAlign.center)));
+    bytes.addAll(generator.feed(2));
+
+    await _printer.writeBytes(Uint8List.fromList(bytes));
+    return true;
+  }
+
   /// Remove caracteres acentuados e caracteres especiais incompatíveis
   /// com a tabela de caracteres padrão (CodePage 437/ASCII) de mini impressoras chinesas de 58mm.
   String _removeAccents(String text) {

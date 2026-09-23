@@ -336,9 +336,6 @@ class $EventDotDenominationsTable extends EventDotDenominations
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES events (id)',
-    ),
   );
   static const VerificationMeta _labelMeta = const VerificationMeta('label');
   @override
@@ -699,9 +696,6 @@ class $ProductsTable extends Products
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES events (id)',
-    ),
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -1257,9 +1251,6 @@ class $ProductComboItemsTable extends ProductComboItems
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES products (id)',
-    ),
   );
   static const VerificationMeta _childProductIdMeta = const VerificationMeta(
     'childProductId',
@@ -1271,9 +1262,6 @@ class $ProductComboItemsTable extends ProductComboItems
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES products (id)',
-    ),
   );
   static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
   @override
@@ -1525,6 +1513,603 @@ class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
   }
 }
 
+class $CashSessionsTable extends CashSessions
+    with TableInfo<$CashSessionsTable, CashSession> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CashSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _openedAtMsMeta = const VerificationMeta(
+    'openedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> openedAtMs = GeneratedColumn<int>(
+    'opened_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _closedAtMsMeta = const VerificationMeta(
+    'closedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> closedAtMs = GeneratedColumn<int>(
+    'closed_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _initialCashFloatCentsMeta =
+      const VerificationMeta('initialCashFloatCents');
+  @override
+  late final GeneratedColumn<int> initialCashFloatCents = GeneratedColumn<int>(
+    'initial_cash_float_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _closedCashDrawerCentsMeta =
+      const VerificationMeta('closedCashDrawerCents');
+  @override
+  late final GeneratedColumn<int> closedCashDrawerCents = GeneratedColumn<int>(
+    'closed_cash_drawer_cents',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _closedNotesMeta = const VerificationMeta(
+    'closedNotes',
+  );
+  @override
+  late final GeneratedColumn<String> closedNotes = GeneratedColumn<String>(
+    'closed_notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _closedByMeta = const VerificationMeta(
+    'closedBy',
+  );
+  @override
+  late final GeneratedColumn<String> closedBy = GeneratedColumn<String>(
+    'closed_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    eventId,
+    title,
+    openedAtMs,
+    closedAtMs,
+    initialCashFloatCents,
+    closedCashDrawerCents,
+    closedNotes,
+    closedBy,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cash_sessions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CashSession> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('opened_at_ms')) {
+      context.handle(
+        _openedAtMsMeta,
+        openedAtMs.isAcceptableOrUnknown(
+          data['opened_at_ms']!,
+          _openedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_openedAtMsMeta);
+    }
+    if (data.containsKey('closed_at_ms')) {
+      context.handle(
+        _closedAtMsMeta,
+        closedAtMs.isAcceptableOrUnknown(
+          data['closed_at_ms']!,
+          _closedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('initial_cash_float_cents')) {
+      context.handle(
+        _initialCashFloatCentsMeta,
+        initialCashFloatCents.isAcceptableOrUnknown(
+          data['initial_cash_float_cents']!,
+          _initialCashFloatCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('closed_cash_drawer_cents')) {
+      context.handle(
+        _closedCashDrawerCentsMeta,
+        closedCashDrawerCents.isAcceptableOrUnknown(
+          data['closed_cash_drawer_cents']!,
+          _closedCashDrawerCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('closed_notes')) {
+      context.handle(
+        _closedNotesMeta,
+        closedNotes.isAcceptableOrUnknown(
+          data['closed_notes']!,
+          _closedNotesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('closed_by')) {
+      context.handle(
+        _closedByMeta,
+        closedBy.isAcceptableOrUnknown(data['closed_by']!, _closedByMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  CashSession map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CashSession(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      openedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}opened_at_ms'],
+      )!,
+      closedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}closed_at_ms'],
+      ),
+      initialCashFloatCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}initial_cash_float_cents'],
+      )!,
+      closedCashDrawerCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}closed_cash_drawer_cents'],
+      ),
+      closedNotes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}closed_notes'],
+      ),
+      closedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}closed_by'],
+      ),
+    );
+  }
+
+  @override
+  $CashSessionsTable createAlias(String alias) {
+    return $CashSessionsTable(attachedDatabase, alias);
+  }
+}
+
+class CashSession extends DataClass implements Insertable<CashSession> {
+  final String id;
+  final String eventId;
+  final String title;
+  final int openedAtMs;
+  final int? closedAtMs;
+  final int initialCashFloatCents;
+  final int? closedCashDrawerCents;
+  final String? closedNotes;
+  final String? closedBy;
+  const CashSession({
+    required this.id,
+    required this.eventId,
+    required this.title,
+    required this.openedAtMs,
+    this.closedAtMs,
+    required this.initialCashFloatCents,
+    this.closedCashDrawerCents,
+    this.closedNotes,
+    this.closedBy,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['event_id'] = Variable<String>(eventId);
+    map['title'] = Variable<String>(title);
+    map['opened_at_ms'] = Variable<int>(openedAtMs);
+    if (!nullToAbsent || closedAtMs != null) {
+      map['closed_at_ms'] = Variable<int>(closedAtMs);
+    }
+    map['initial_cash_float_cents'] = Variable<int>(initialCashFloatCents);
+    if (!nullToAbsent || closedCashDrawerCents != null) {
+      map['closed_cash_drawer_cents'] = Variable<int>(closedCashDrawerCents);
+    }
+    if (!nullToAbsent || closedNotes != null) {
+      map['closed_notes'] = Variable<String>(closedNotes);
+    }
+    if (!nullToAbsent || closedBy != null) {
+      map['closed_by'] = Variable<String>(closedBy);
+    }
+    return map;
+  }
+
+  CashSessionsCompanion toCompanion(bool nullToAbsent) {
+    return CashSessionsCompanion(
+      id: Value(id),
+      eventId: Value(eventId),
+      title: Value(title),
+      openedAtMs: Value(openedAtMs),
+      closedAtMs: closedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedAtMs),
+      initialCashFloatCents: Value(initialCashFloatCents),
+      closedCashDrawerCents: closedCashDrawerCents == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedCashDrawerCents),
+      closedNotes: closedNotes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedNotes),
+      closedBy: closedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(closedBy),
+    );
+  }
+
+  factory CashSession.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CashSession(
+      id: serializer.fromJson<String>(json['id']),
+      eventId: serializer.fromJson<String>(json['eventId']),
+      title: serializer.fromJson<String>(json['title']),
+      openedAtMs: serializer.fromJson<int>(json['openedAtMs']),
+      closedAtMs: serializer.fromJson<int?>(json['closedAtMs']),
+      initialCashFloatCents: serializer.fromJson<int>(
+        json['initialCashFloatCents'],
+      ),
+      closedCashDrawerCents: serializer.fromJson<int?>(
+        json['closedCashDrawerCents'],
+      ),
+      closedNotes: serializer.fromJson<String?>(json['closedNotes']),
+      closedBy: serializer.fromJson<String?>(json['closedBy']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'eventId': serializer.toJson<String>(eventId),
+      'title': serializer.toJson<String>(title),
+      'openedAtMs': serializer.toJson<int>(openedAtMs),
+      'closedAtMs': serializer.toJson<int?>(closedAtMs),
+      'initialCashFloatCents': serializer.toJson<int>(initialCashFloatCents),
+      'closedCashDrawerCents': serializer.toJson<int?>(closedCashDrawerCents),
+      'closedNotes': serializer.toJson<String?>(closedNotes),
+      'closedBy': serializer.toJson<String?>(closedBy),
+    };
+  }
+
+  CashSession copyWith({
+    String? id,
+    String? eventId,
+    String? title,
+    int? openedAtMs,
+    Value<int?> closedAtMs = const Value.absent(),
+    int? initialCashFloatCents,
+    Value<int?> closedCashDrawerCents = const Value.absent(),
+    Value<String?> closedNotes = const Value.absent(),
+    Value<String?> closedBy = const Value.absent(),
+  }) => CashSession(
+    id: id ?? this.id,
+    eventId: eventId ?? this.eventId,
+    title: title ?? this.title,
+    openedAtMs: openedAtMs ?? this.openedAtMs,
+    closedAtMs: closedAtMs.present ? closedAtMs.value : this.closedAtMs,
+    initialCashFloatCents: initialCashFloatCents ?? this.initialCashFloatCents,
+    closedCashDrawerCents: closedCashDrawerCents.present
+        ? closedCashDrawerCents.value
+        : this.closedCashDrawerCents,
+    closedNotes: closedNotes.present ? closedNotes.value : this.closedNotes,
+    closedBy: closedBy.present ? closedBy.value : this.closedBy,
+  );
+  CashSession copyWithCompanion(CashSessionsCompanion data) {
+    return CashSession(
+      id: data.id.present ? data.id.value : this.id,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      title: data.title.present ? data.title.value : this.title,
+      openedAtMs: data.openedAtMs.present
+          ? data.openedAtMs.value
+          : this.openedAtMs,
+      closedAtMs: data.closedAtMs.present
+          ? data.closedAtMs.value
+          : this.closedAtMs,
+      initialCashFloatCents: data.initialCashFloatCents.present
+          ? data.initialCashFloatCents.value
+          : this.initialCashFloatCents,
+      closedCashDrawerCents: data.closedCashDrawerCents.present
+          ? data.closedCashDrawerCents.value
+          : this.closedCashDrawerCents,
+      closedNotes: data.closedNotes.present
+          ? data.closedNotes.value
+          : this.closedNotes,
+      closedBy: data.closedBy.present ? data.closedBy.value : this.closedBy,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CashSession(')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('title: $title, ')
+          ..write('openedAtMs: $openedAtMs, ')
+          ..write('closedAtMs: $closedAtMs, ')
+          ..write('initialCashFloatCents: $initialCashFloatCents, ')
+          ..write('closedCashDrawerCents: $closedCashDrawerCents, ')
+          ..write('closedNotes: $closedNotes, ')
+          ..write('closedBy: $closedBy')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    eventId,
+    title,
+    openedAtMs,
+    closedAtMs,
+    initialCashFloatCents,
+    closedCashDrawerCents,
+    closedNotes,
+    closedBy,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CashSession &&
+          other.id == this.id &&
+          other.eventId == this.eventId &&
+          other.title == this.title &&
+          other.openedAtMs == this.openedAtMs &&
+          other.closedAtMs == this.closedAtMs &&
+          other.initialCashFloatCents == this.initialCashFloatCents &&
+          other.closedCashDrawerCents == this.closedCashDrawerCents &&
+          other.closedNotes == this.closedNotes &&
+          other.closedBy == this.closedBy);
+}
+
+class CashSessionsCompanion extends UpdateCompanion<CashSession> {
+  final Value<String> id;
+  final Value<String> eventId;
+  final Value<String> title;
+  final Value<int> openedAtMs;
+  final Value<int?> closedAtMs;
+  final Value<int> initialCashFloatCents;
+  final Value<int?> closedCashDrawerCents;
+  final Value<String?> closedNotes;
+  final Value<String?> closedBy;
+  final Value<int> rowid;
+  const CashSessionsCompanion({
+    this.id = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.openedAtMs = const Value.absent(),
+    this.closedAtMs = const Value.absent(),
+    this.initialCashFloatCents = const Value.absent(),
+    this.closedCashDrawerCents = const Value.absent(),
+    this.closedNotes = const Value.absent(),
+    this.closedBy = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CashSessionsCompanion.insert({
+    required String id,
+    required String eventId,
+    required String title,
+    required int openedAtMs,
+    this.closedAtMs = const Value.absent(),
+    this.initialCashFloatCents = const Value.absent(),
+    this.closedCashDrawerCents = const Value.absent(),
+    this.closedNotes = const Value.absent(),
+    this.closedBy = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       eventId = Value(eventId),
+       title = Value(title),
+       openedAtMs = Value(openedAtMs);
+  static Insertable<CashSession> custom({
+    Expression<String>? id,
+    Expression<String>? eventId,
+    Expression<String>? title,
+    Expression<int>? openedAtMs,
+    Expression<int>? closedAtMs,
+    Expression<int>? initialCashFloatCents,
+    Expression<int>? closedCashDrawerCents,
+    Expression<String>? closedNotes,
+    Expression<String>? closedBy,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (eventId != null) 'event_id': eventId,
+      if (title != null) 'title': title,
+      if (openedAtMs != null) 'opened_at_ms': openedAtMs,
+      if (closedAtMs != null) 'closed_at_ms': closedAtMs,
+      if (initialCashFloatCents != null)
+        'initial_cash_float_cents': initialCashFloatCents,
+      if (closedCashDrawerCents != null)
+        'closed_cash_drawer_cents': closedCashDrawerCents,
+      if (closedNotes != null) 'closed_notes': closedNotes,
+      if (closedBy != null) 'closed_by': closedBy,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CashSessionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? eventId,
+    Value<String>? title,
+    Value<int>? openedAtMs,
+    Value<int?>? closedAtMs,
+    Value<int>? initialCashFloatCents,
+    Value<int?>? closedCashDrawerCents,
+    Value<String?>? closedNotes,
+    Value<String?>? closedBy,
+    Value<int>? rowid,
+  }) {
+    return CashSessionsCompanion(
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      title: title ?? this.title,
+      openedAtMs: openedAtMs ?? this.openedAtMs,
+      closedAtMs: closedAtMs ?? this.closedAtMs,
+      initialCashFloatCents:
+          initialCashFloatCents ?? this.initialCashFloatCents,
+      closedCashDrawerCents:
+          closedCashDrawerCents ?? this.closedCashDrawerCents,
+      closedNotes: closedNotes ?? this.closedNotes,
+      closedBy: closedBy ?? this.closedBy,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (openedAtMs.present) {
+      map['opened_at_ms'] = Variable<int>(openedAtMs.value);
+    }
+    if (closedAtMs.present) {
+      map['closed_at_ms'] = Variable<int>(closedAtMs.value);
+    }
+    if (initialCashFloatCents.present) {
+      map['initial_cash_float_cents'] = Variable<int>(
+        initialCashFloatCents.value,
+      );
+    }
+    if (closedCashDrawerCents.present) {
+      map['closed_cash_drawer_cents'] = Variable<int>(
+        closedCashDrawerCents.value,
+      );
+    }
+    if (closedNotes.present) {
+      map['closed_notes'] = Variable<String>(closedNotes.value);
+    }
+    if (closedBy.present) {
+      map['closed_by'] = Variable<String>(closedBy.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CashSessionsCompanion(')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('title: $title, ')
+          ..write('openedAtMs: $openedAtMs, ')
+          ..write('closedAtMs: $closedAtMs, ')
+          ..write('initialCashFloatCents: $initialCashFloatCents, ')
+          ..write('closedCashDrawerCents: $closedCashDrawerCents, ')
+          ..write('closedNotes: $closedNotes, ')
+          ..write('closedBy: $closedBy, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1549,9 +2134,17 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES events (id)',
-    ),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _soldAtMsMeta = const VerificationMeta(
     'soldAtMs',
@@ -1636,6 +2229,7 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   List<GeneratedColumn> get $columns => [
     id,
     eventId,
+    sessionId,
     soldAtMs,
     totalCents,
     amountReceivedCents,
@@ -1668,6 +2262,12 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
       );
     } else if (isInserting) {
       context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
     }
     if (data.containsKey('sold_at_ms')) {
       context.handle(
@@ -1746,6 +2346,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
         DriftSqlType.string,
         data['${effectivePrefix}event_id'],
       )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
       soldAtMs: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sold_at_ms'],
@@ -1786,6 +2390,7 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
 class PosSale extends DataClass implements Insertable<PosSale> {
   final String id;
   final String eventId;
+  final String? sessionId;
   final int soldAtMs;
   final int totalCents;
   final int amountReceivedCents;
@@ -1796,6 +2401,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   const PosSale({
     required this.id,
     required this.eventId,
+    this.sessionId,
     required this.soldAtMs,
     required this.totalCents,
     required this.amountReceivedCents,
@@ -1809,6 +2415,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['event_id'] = Variable<String>(eventId);
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
     map['sold_at_ms'] = Variable<int>(soldAtMs);
     map['total_cents'] = Variable<int>(totalCents);
     map['amount_received_cents'] = Variable<int>(amountReceivedCents);
@@ -1827,6 +2436,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     return SalesCompanion(
       id: Value(id),
       eventId: Value(eventId),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
       soldAtMs: Value(soldAtMs),
       totalCents: Value(totalCents),
       amountReceivedCents: Value(amountReceivedCents),
@@ -1849,6 +2461,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     return PosSale(
       id: serializer.fromJson<String>(json['id']),
       eventId: serializer.fromJson<String>(json['eventId']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
       soldAtMs: serializer.fromJson<int>(json['soldAtMs']),
       totalCents: serializer.fromJson<int>(json['totalCents']),
       amountReceivedCents: serializer.fromJson<int>(
@@ -1866,6 +2479,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'eventId': serializer.toJson<String>(eventId),
+      'sessionId': serializer.toJson<String?>(sessionId),
       'soldAtMs': serializer.toJson<int>(soldAtMs),
       'totalCents': serializer.toJson<int>(totalCents),
       'amountReceivedCents': serializer.toJson<int>(amountReceivedCents),
@@ -1879,6 +2493,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   PosSale copyWith({
     String? id,
     String? eventId,
+    Value<String?> sessionId = const Value.absent(),
     int? soldAtMs,
     int? totalCents,
     int? amountReceivedCents,
@@ -1889,6 +2504,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   }) => PosSale(
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
     soldAtMs: soldAtMs ?? this.soldAtMs,
     totalCents: totalCents ?? this.totalCents,
     amountReceivedCents: amountReceivedCents ?? this.amountReceivedCents,
@@ -1901,6 +2517,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     return PosSale(
       id: data.id.present ? data.id.value : this.id,
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       soldAtMs: data.soldAtMs.present ? data.soldAtMs.value : this.soldAtMs,
       totalCents: data.totalCents.present
           ? data.totalCents.value
@@ -1926,6 +2543,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     return (StringBuffer('PosSale(')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
+          ..write('sessionId: $sessionId, ')
           ..write('soldAtMs: $soldAtMs, ')
           ..write('totalCents: $totalCents, ')
           ..write('amountReceivedCents: $amountReceivedCents, ')
@@ -1941,6 +2559,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   int get hashCode => Object.hash(
     id,
     eventId,
+    sessionId,
     soldAtMs,
     totalCents,
     amountReceivedCents,
@@ -1955,6 +2574,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       (other is PosSale &&
           other.id == this.id &&
           other.eventId == this.eventId &&
+          other.sessionId == this.sessionId &&
           other.soldAtMs == this.soldAtMs &&
           other.totalCents == this.totalCents &&
           other.amountReceivedCents == this.amountReceivedCents &&
@@ -1967,6 +2587,7 @@ class PosSale extends DataClass implements Insertable<PosSale> {
 class SalesCompanion extends UpdateCompanion<PosSale> {
   final Value<String> id;
   final Value<String> eventId;
+  final Value<String?> sessionId;
   final Value<int> soldAtMs;
   final Value<int> totalCents;
   final Value<int> amountReceivedCents;
@@ -1978,6 +2599,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   const SalesCompanion({
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
+    this.sessionId = const Value.absent(),
     this.soldAtMs = const Value.absent(),
     this.totalCents = const Value.absent(),
     this.amountReceivedCents = const Value.absent(),
@@ -1990,6 +2612,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   SalesCompanion.insert({
     required String id,
     required String eventId,
+    this.sessionId = const Value.absent(),
     required int soldAtMs,
     required int totalCents,
     required int amountReceivedCents,
@@ -2006,6 +2629,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   static Insertable<PosSale> custom({
     Expression<String>? id,
     Expression<String>? eventId,
+    Expression<String>? sessionId,
     Expression<int>? soldAtMs,
     Expression<int>? totalCents,
     Expression<int>? amountReceivedCents,
@@ -2018,6 +2642,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (eventId != null) 'event_id': eventId,
+      if (sessionId != null) 'session_id': sessionId,
       if (soldAtMs != null) 'sold_at_ms': soldAtMs,
       if (totalCents != null) 'total_cents': totalCents,
       if (amountReceivedCents != null)
@@ -2033,6 +2658,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   SalesCompanion copyWith({
     Value<String>? id,
     Value<String>? eventId,
+    Value<String?>? sessionId,
     Value<int>? soldAtMs,
     Value<int>? totalCents,
     Value<int>? amountReceivedCents,
@@ -2045,6 +2671,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     return SalesCompanion(
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
+      sessionId: sessionId ?? this.sessionId,
       soldAtMs: soldAtMs ?? this.soldAtMs,
       totalCents: totalCents ?? this.totalCents,
       amountReceivedCents: amountReceivedCents ?? this.amountReceivedCents,
@@ -2064,6 +2691,9 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     }
     if (eventId.present) {
       map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
     }
     if (soldAtMs.present) {
       map['sold_at_ms'] = Variable<int>(soldAtMs.value);
@@ -2097,6 +2727,7 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     return (StringBuffer('SalesCompanion(')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
+          ..write('sessionId: $sessionId, ')
           ..write('soldAtMs: $soldAtMs, ')
           ..write('totalCents: $totalCents, ')
           ..write('amountReceivedCents: $amountReceivedCents, ')
@@ -2133,9 +2764,6 @@ class $SaleLinesTable extends SaleLines
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES sales (id)',
-    ),
   );
   static const VerificationMeta _lineKindMeta = const VerificationMeta(
     'lineKind',
@@ -2159,9 +2787,6 @@ class $SaleLinesTable extends SaleLines
     true,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES products (id)',
-    ),
   );
   static const VerificationMeta _dotDenominationIdMeta = const VerificationMeta(
     'dotDenominationId',
@@ -2174,9 +2799,6 @@ class $SaleLinesTable extends SaleLines
         true,
         type: DriftSqlType.string,
         requiredDuringInsert: false,
-        defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'REFERENCES event_dot_denominations (id)',
-        ),
       );
   static const VerificationMeta _freeLabelMeta = const VerificationMeta(
     'freeLabel',
@@ -2719,9 +3341,6 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES sales (id)',
-    ),
   );
   static const VerificationMeta _dotDenominationIdMeta = const VerificationMeta(
     'dotDenominationId',
@@ -2734,9 +3353,6 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
         false,
         type: DriftSqlType.string,
         requiredDuringInsert: true,
-        defaultConstraints: GeneratedColumn.constraintIsAlways(
-          'REFERENCES event_dot_denominations (id)',
-        ),
       );
   static const VerificationMeta _qtyMeta = const VerificationMeta('qty');
   @override
@@ -3023,6 +3639,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ProductsTable products = $ProductsTable(this);
   late final $ProductComboItemsTable productComboItems =
       $ProductComboItemsTable(this);
+  late final $CashSessionsTable cashSessions = $CashSessionsTable(this);
   late final $SalesTable sales = $SalesTable(this);
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $SaleChangeDotAllocationsTable saleChangeDotAllocations =
@@ -3036,6 +3653,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     eventDotDenominations,
     products,
     productComboItems,
+    cashSessions,
     sales,
     saleLines,
     saleChangeDotAllocations,
@@ -3058,73 +3676,6 @@ typedef $$EventsTableUpdateCompanionBuilder =
       Value<int> dateEpochMs,
       Value<int> rowid,
     });
-
-final class $$EventsTableReferences
-    extends BaseReferences<_$AppDatabase, $EventsTable, ChurchEvent> {
-  $$EventsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static MultiTypedResultKey<$EventDotDenominationsTable, List<EventDotDenom>>
-  _eventDotDenominationsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.eventDotDenominations,
-        aliasName: $_aliasNameGenerator(
-          db.events.id,
-          db.eventDotDenominations.eventId,
-        ),
-      );
-
-  $$EventDotDenominationsTableProcessedTableManager
-  get eventDotDenominationsRefs {
-    final manager = $$EventDotDenominationsTableTableManager(
-      $_db,
-      $_db.eventDotDenominations,
-    ).filter((f) => f.eventId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(
-      _eventDotDenominationsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
-  static MultiTypedResultKey<$ProductsTable, List<ChurchProduct>>
-  _productsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.products,
-    aliasName: $_aliasNameGenerator(db.events.id, db.products.eventId),
-  );
-
-  $$ProductsTableProcessedTableManager get productsRefs {
-    final manager = $$ProductsTableTableManager(
-      $_db,
-      $_db.products,
-    ).filter((f) => f.eventId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_productsRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
-  static MultiTypedResultKey<$SalesTable, List<PosSale>> _salesRefsTable(
-    _$AppDatabase db,
-  ) => MultiTypedResultKey.fromTable(
-    db.sales,
-    aliasName: $_aliasNameGenerator(db.events.id, db.sales.eventId),
-  );
-
-  $$SalesTableProcessedTableManager get salesRefs {
-    final manager = $$SalesTableTableManager(
-      $_db,
-      $_db.sales,
-    ).filter((f) => f.eventId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_salesRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
 
 class $$EventsTableFilterComposer
     extends Composer<_$AppDatabase, $EventsTable> {
@@ -3154,82 +3705,6 @@ class $$EventsTableFilterComposer
     column: $table.dateEpochMs,
     builder: (column) => ColumnFilters(column),
   );
-
-  Expression<bool> eventDotDenominationsRefs(
-    Expression<bool> Function($$EventDotDenominationsTableFilterComposer f) f,
-  ) {
-    final $$EventDotDenominationsTableFilterComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.eventId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableFilterComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
-
-  Expression<bool> productsRefs(
-    Expression<bool> Function($$ProductsTableFilterComposer f) f,
-  ) {
-    final $$ProductsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.eventId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableFilterComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<bool> salesRefs(
-    Expression<bool> Function($$SalesTableFilterComposer f) f,
-  ) {
-    final $$SalesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.eventId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableFilterComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $$EventsTableOrderingComposer
@@ -3284,82 +3759,6 @@ class $$EventsTableAnnotationComposer
     column: $table.dateEpochMs,
     builder: (column) => column,
   );
-
-  Expression<T> eventDotDenominationsRefs<T extends Object>(
-    Expression<T> Function($$EventDotDenominationsTableAnnotationComposer a) f,
-  ) {
-    final $$EventDotDenominationsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.eventId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
-
-  Expression<T> productsRefs<T extends Object>(
-    Expression<T> Function($$ProductsTableAnnotationComposer a) f,
-  ) {
-    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.eventId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<T> salesRefs<T extends Object>(
-    Expression<T> Function($$SalesTableAnnotationComposer a) f,
-  ) {
-    final $$SalesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.eventId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $$EventsTableTableManager
@@ -3373,13 +3772,12 @@ class $$EventsTableTableManager
           $$EventsTableAnnotationComposer,
           $$EventsTableCreateCompanionBuilder,
           $$EventsTableUpdateCompanionBuilder,
-          (ChurchEvent, $$EventsTableReferences),
+          (
+            ChurchEvent,
+            BaseReferences<_$AppDatabase, $EventsTable, ChurchEvent>,
+          ),
           ChurchEvent,
-          PrefetchHooks Function({
-            bool eventDotDenominationsRefs,
-            bool productsRefs,
-            bool salesRefs,
-          })
+          PrefetchHooks Function()
         > {
   $$EventsTableTableManager(_$AppDatabase db, $EventsTable table)
     : super(
@@ -3421,90 +3819,9 @@ class $$EventsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) =>
-                    (e.readTable(table), $$EventsTableReferences(db, table, e)),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback:
-              ({
-                eventDotDenominationsRefs = false,
-                productsRefs = false,
-                salesRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (eventDotDenominationsRefs) db.eventDotDenominations,
-                    if (productsRefs) db.products,
-                    if (salesRefs) db.sales,
-                  ],
-                  addJoins: null,
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (eventDotDenominationsRefs)
-                        await $_getPrefetchedData<
-                          ChurchEvent,
-                          $EventsTable,
-                          EventDotDenom
-                        >(
-                          currentTable: table,
-                          referencedTable: $$EventsTableReferences
-                              ._eventDotDenominationsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$EventsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).eventDotDenominationsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.eventId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                      if (productsRefs)
-                        await $_getPrefetchedData<
-                          ChurchEvent,
-                          $EventsTable,
-                          ChurchProduct
-                        >(
-                          currentTable: table,
-                          referencedTable: $$EventsTableReferences
-                              ._productsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$EventsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).productsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.eventId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                      if (salesRefs)
-                        await $_getPrefetchedData<
-                          ChurchEvent,
-                          $EventsTable,
-                          PosSale
-                        >(
-                          currentTable: table,
-                          referencedTable: $$EventsTableReferences
-                              ._salesRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$EventsTableReferences(db, table, p0).salesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.eventId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -3519,13 +3836,9 @@ typedef $$EventsTableProcessedTableManager =
       $$EventsTableAnnotationComposer,
       $$EventsTableCreateCompanionBuilder,
       $$EventsTableUpdateCompanionBuilder,
-      (ChurchEvent, $$EventsTableReferences),
+      (ChurchEvent, BaseReferences<_$AppDatabase, $EventsTable, ChurchEvent>),
       ChurchEvent,
-      PrefetchHooks Function({
-        bool eventDotDenominationsRefs,
-        bool productsRefs,
-        bool salesRefs,
-      })
+      PrefetchHooks Function()
     >;
 typedef $$EventDotDenominationsTableCreateCompanionBuilder =
     EventDotDenominationsCompanion Function({
@@ -3546,86 +3859,6 @@ typedef $$EventDotDenominationsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-final class $$EventDotDenominationsTableReferences
-    extends
-        BaseReferences<
-          _$AppDatabase,
-          $EventDotDenominationsTable,
-          EventDotDenom
-        > {
-  $$EventDotDenominationsTableReferences(
-    super.$_db,
-    super.$_table,
-    super.$_typedResult,
-  );
-
-  static $EventsTable _eventIdTable(_$AppDatabase db) => db.events.createAlias(
-    $_aliasNameGenerator(db.eventDotDenominations.eventId, db.events.id),
-  );
-
-  $$EventsTableProcessedTableManager get eventId {
-    final $_column = $_itemColumn<String>('event_id')!;
-
-    final manager = $$EventsTableTableManager(
-      $_db,
-      $_db.events,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_eventIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$SaleLinesTable, List<PosSaleLine>>
-  _saleLinesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.saleLines,
-    aliasName: $_aliasNameGenerator(
-      db.eventDotDenominations.id,
-      db.saleLines.dotDenominationId,
-    ),
-  );
-
-  $$SaleLinesTableProcessedTableManager get saleLinesRefs {
-    final manager = $$SaleLinesTableTableManager($_db, $_db.saleLines).filter(
-      (f) => f.dotDenominationId.id.sqlEquals($_itemColumn<String>('id')!),
-    );
-
-    final cache = $_typedResult.readTableOrNull(_saleLinesRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
-  static MultiTypedResultKey<$SaleChangeDotAllocationsTable, List<ChangeDotRow>>
-  _saleChangeDotAllocationsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.saleChangeDotAllocations,
-        aliasName: $_aliasNameGenerator(
-          db.eventDotDenominations.id,
-          db.saleChangeDotAllocations.dotDenominationId,
-        ),
-      );
-
-  $$SaleChangeDotAllocationsTableProcessedTableManager
-  get saleChangeDotAllocationsRefs {
-    final manager =
-        $$SaleChangeDotAllocationsTableTableManager(
-          $_db,
-          $_db.saleChangeDotAllocations,
-        ).filter(
-          (f) => f.dotDenominationId.id.sqlEquals($_itemColumn<String>('id')!),
-        );
-
-    final cache = $_typedResult.readTableOrNull(
-      _saleChangeDotAllocationsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
 class $$EventDotDenominationsTableFilterComposer
     extends Composer<_$AppDatabase, $EventDotDenominationsTable> {
   $$EventDotDenominationsTableFilterComposer({
@@ -3637,6 +3870,11 @@ class $$EventDotDenominationsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3654,81 +3892,6 @@ class $$EventDotDenominationsTableFilterComposer
     column: $table.stockQty,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$EventsTableFilterComposer get eventId {
-    final $$EventsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableFilterComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> saleLinesRefs(
-    Expression<bool> Function($$SaleLinesTableFilterComposer f) f,
-  ) {
-    final $$SaleLinesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.dotDenominationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableFilterComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<bool> saleChangeDotAllocationsRefs(
-    Expression<bool> Function($$SaleChangeDotAllocationsTableFilterComposer f)
-    f,
-  ) {
-    final $$SaleChangeDotAllocationsTableFilterComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.saleChangeDotAllocations,
-          getReferencedColumn: (t) => t.dotDenominationId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$SaleChangeDotAllocationsTableFilterComposer(
-                $db: $db,
-                $table: $db.saleChangeDotAllocations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
 }
 
 class $$EventDotDenominationsTableOrderingComposer
@@ -3742,6 +3905,11 @@ class $$EventDotDenominationsTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -3759,29 +3927,6 @@ class $$EventDotDenominationsTableOrderingComposer
     column: $table.stockQty,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$EventsTableOrderingComposer get eventId {
-    final $$EventsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableOrderingComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$EventDotDenominationsTableAnnotationComposer
@@ -3796,6 +3941,9 @@ class $$EventDotDenominationsTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
   GeneratedColumn<String> get label =>
       $composableBuilder(column: $table.label, builder: (column) => column);
 
@@ -3806,81 +3954,6 @@ class $$EventDotDenominationsTableAnnotationComposer
 
   GeneratedColumn<int> get stockQty =>
       $composableBuilder(column: $table.stockQty, builder: (column) => column);
-
-  $$EventsTableAnnotationComposer get eventId {
-    final $$EventsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> saleLinesRefs<T extends Object>(
-    Expression<T> Function($$SaleLinesTableAnnotationComposer a) f,
-  ) {
-    final $$SaleLinesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.dotDenominationId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<T> saleChangeDotAllocationsRefs<T extends Object>(
-    Expression<T> Function($$SaleChangeDotAllocationsTableAnnotationComposer a)
-    f,
-  ) {
-    final $$SaleChangeDotAllocationsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.saleChangeDotAllocations,
-          getReferencedColumn: (t) => t.dotDenominationId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$SaleChangeDotAllocationsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.saleChangeDotAllocations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
 }
 
 class $$EventDotDenominationsTableTableManager
@@ -3894,13 +3967,16 @@ class $$EventDotDenominationsTableTableManager
           $$EventDotDenominationsTableAnnotationComposer,
           $$EventDotDenominationsTableCreateCompanionBuilder,
           $$EventDotDenominationsTableUpdateCompanionBuilder,
-          (EventDotDenom, $$EventDotDenominationsTableReferences),
+          (
+            EventDotDenom,
+            BaseReferences<
+              _$AppDatabase,
+              $EventDotDenominationsTable,
+              EventDotDenom
+            >,
+          ),
           EventDotDenom,
-          PrefetchHooks Function({
-            bool eventId,
-            bool saleLinesRefs,
-            bool saleChangeDotAllocationsRefs,
-          })
+          PrefetchHooks Function()
         > {
   $$EventDotDenominationsTableTableManager(
     _$AppDatabase db,
@@ -3957,110 +4033,9 @@ class $$EventDotDenominationsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$EventDotDenominationsTableReferences(db, table, e),
-                ),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback:
-              ({
-                eventId = false,
-                saleLinesRefs = false,
-                saleChangeDotAllocationsRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (saleLinesRefs) db.saleLines,
-                    if (saleChangeDotAllocationsRefs)
-                      db.saleChangeDotAllocations,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (eventId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.eventId,
-                                    referencedTable:
-                                        $$EventDotDenominationsTableReferences
-                                            ._eventIdTable(db),
-                                    referencedColumn:
-                                        $$EventDotDenominationsTableReferences
-                                            ._eventIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (saleLinesRefs)
-                        await $_getPrefetchedData<
-                          EventDotDenom,
-                          $EventDotDenominationsTable,
-                          PosSaleLine
-                        >(
-                          currentTable: table,
-                          referencedTable:
-                              $$EventDotDenominationsTableReferences
-                                  ._saleLinesRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$EventDotDenominationsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).saleLinesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.dotDenominationId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                      if (saleChangeDotAllocationsRefs)
-                        await $_getPrefetchedData<
-                          EventDotDenom,
-                          $EventDotDenominationsTable,
-                          ChangeDotRow
-                        >(
-                          currentTable: table,
-                          referencedTable:
-                              $$EventDotDenominationsTableReferences
-                                  ._saleChangeDotAllocationsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$EventDotDenominationsTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).saleChangeDotAllocationsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.dotDenominationId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -4075,13 +4050,16 @@ typedef $$EventDotDenominationsTableProcessedTableManager =
       $$EventDotDenominationsTableAnnotationComposer,
       $$EventDotDenominationsTableCreateCompanionBuilder,
       $$EventDotDenominationsTableUpdateCompanionBuilder,
-      (EventDotDenom, $$EventDotDenominationsTableReferences),
+      (
+        EventDotDenom,
+        BaseReferences<
+          _$AppDatabase,
+          $EventDotDenominationsTable,
+          EventDotDenom
+        >,
+      ),
       EventDotDenom,
-      PrefetchHooks Function({
-        bool eventId,
-        bool saleLinesRefs,
-        bool saleChangeDotAllocationsRefs,
-      })
+      PrefetchHooks Function()
     >;
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
@@ -4110,47 +4088,6 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-final class $$ProductsTableReferences
-    extends BaseReferences<_$AppDatabase, $ProductsTable, ChurchProduct> {
-  $$ProductsTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $EventsTable _eventIdTable(_$AppDatabase db) => db.events.createAlias(
-    $_aliasNameGenerator(db.products.eventId, db.events.id),
-  );
-
-  $$EventsTableProcessedTableManager get eventId {
-    final $_column = $_itemColumn<String>('event_id')!;
-
-    final manager = $$EventsTableTableManager(
-      $_db,
-      $_db.events,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_eventIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$SaleLinesTable, List<PosSaleLine>>
-  _saleLinesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.saleLines,
-    aliasName: $_aliasNameGenerator(db.products.id, db.saleLines.productId),
-  );
-
-  $$SaleLinesTableProcessedTableManager get saleLinesRefs {
-    final manager = $$SaleLinesTableTableManager(
-      $_db,
-      $_db.saleLines,
-    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_saleLinesRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
-
 class $$ProductsTableFilterComposer
     extends Composer<_$AppDatabase, $ProductsTable> {
   $$ProductsTableFilterComposer({
@@ -4162,6 +4099,11 @@ class $$ProductsTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4199,54 +4141,6 @@ class $$ProductsTableFilterComposer
     column: $table.isCombo,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$EventsTableFilterComposer get eventId {
-    final $$EventsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableFilterComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> saleLinesRefs(
-    Expression<bool> Function($$SaleLinesTableFilterComposer f) f,
-  ) {
-    final $$SaleLinesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.productId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableFilterComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $$ProductsTableOrderingComposer
@@ -4260,6 +4154,11 @@ class $$ProductsTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4297,29 +4196,6 @@ class $$ProductsTableOrderingComposer
     column: $table.isCombo,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$EventsTableOrderingComposer get eventId {
-    final $$EventsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableOrderingComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$ProductsTableAnnotationComposer
@@ -4333,6 +4209,9 @@ class $$ProductsTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -4360,54 +4239,6 @@ class $$ProductsTableAnnotationComposer
 
   GeneratedColumn<bool> get isCombo =>
       $composableBuilder(column: $table.isCombo, builder: (column) => column);
-
-  $$EventsTableAnnotationComposer get eventId {
-    final $$EventsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> saleLinesRefs<T extends Object>(
-    Expression<T> Function($$SaleLinesTableAnnotationComposer a) f,
-  ) {
-    final $$SaleLinesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.productId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
 }
 
 class $$ProductsTableTableManager
@@ -4421,9 +4252,12 @@ class $$ProductsTableTableManager
           $$ProductsTableAnnotationComposer,
           $$ProductsTableCreateCompanionBuilder,
           $$ProductsTableUpdateCompanionBuilder,
-          (ChurchProduct, $$ProductsTableReferences),
+          (
+            ChurchProduct,
+            BaseReferences<_$AppDatabase, $ProductsTable, ChurchProduct>,
+          ),
           ChurchProduct,
-          PrefetchHooks Function({bool eventId, bool saleLinesRefs})
+          PrefetchHooks Function()
         > {
   $$ProductsTableTableManager(_$AppDatabase db, $ProductsTable table)
     : super(
@@ -4485,73 +4319,9 @@ class $$ProductsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$ProductsTableReferences(db, table, e),
-                ),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({eventId = false, saleLinesRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (saleLinesRefs) db.saleLines],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (eventId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.eventId,
-                                referencedTable: $$ProductsTableReferences
-                                    ._eventIdTable(db),
-                                referencedColumn: $$ProductsTableReferences
-                                    ._eventIdTable(db)
-                                    .id,
-                              )
-                              as T;
-                    }
-
-                    return state;
-                  },
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (saleLinesRefs)
-                    await $_getPrefetchedData<
-                      ChurchProduct,
-                      $ProductsTable,
-                      PosSaleLine
-                    >(
-                      currentTable: table,
-                      referencedTable: $$ProductsTableReferences
-                          ._saleLinesRefsTable(db),
-                      managerFromTypedResult: (p0) => $$ProductsTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).saleLinesRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.productId == item.id),
-                      typedResults: items,
-                    ),
-                ];
-              },
-            );
-          },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -4566,9 +4336,12 @@ typedef $$ProductsTableProcessedTableManager =
       $$ProductsTableAnnotationComposer,
       $$ProductsTableCreateCompanionBuilder,
       $$ProductsTableUpdateCompanionBuilder,
-      (ChurchProduct, $$ProductsTableReferences),
+      (
+        ChurchProduct,
+        BaseReferences<_$AppDatabase, $ProductsTable, ChurchProduct>,
+      ),
       ChurchProduct,
-      PrefetchHooks Function({bool eventId, bool saleLinesRefs})
+      PrefetchHooks Function()
     >;
 typedef $$ProductComboItemsTableCreateCompanionBuilder =
     ProductComboItemsCompanion Function({
@@ -4585,64 +4358,6 @@ typedef $$ProductComboItemsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-final class $$ProductComboItemsTableReferences
-    extends
-        BaseReferences<
-          _$AppDatabase,
-          $ProductComboItemsTable,
-          ProductComboItem
-        > {
-  $$ProductComboItemsTableReferences(
-    super.$_db,
-    super.$_table,
-    super.$_typedResult,
-  );
-
-  static $ProductsTable _comboProductIdTable(_$AppDatabase db) =>
-      db.products.createAlias(
-        $_aliasNameGenerator(
-          db.productComboItems.comboProductId,
-          db.products.id,
-        ),
-      );
-
-  $$ProductsTableProcessedTableManager get comboProductId {
-    final $_column = $_itemColumn<String>('combo_product_id')!;
-
-    final manager = $$ProductsTableTableManager(
-      $_db,
-      $_db.products,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_comboProductIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static $ProductsTable _childProductIdTable(_$AppDatabase db) =>
-      db.products.createAlias(
-        $_aliasNameGenerator(
-          db.productComboItems.childProductId,
-          db.products.id,
-        ),
-      );
-
-  $$ProductsTableProcessedTableManager get childProductId {
-    final $_column = $_itemColumn<String>('child_product_id')!;
-
-    final manager = $$ProductsTableTableManager(
-      $_db,
-      $_db.products,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_childProductIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-}
-
 class $$ProductComboItemsTableFilterComposer
     extends Composer<_$AppDatabase, $ProductComboItemsTable> {
   $$ProductComboItemsTableFilterComposer({
@@ -4652,56 +4367,20 @@ class $$ProductComboItemsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get comboProductId => $composableBuilder(
+    column: $table.comboProductId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get childProductId => $composableBuilder(
+    column: $table.childProductId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get qty => $composableBuilder(
     column: $table.qty,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$ProductsTableFilterComposer get comboProductId {
-    final $$ProductsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.comboProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableFilterComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableFilterComposer get childProductId {
-    final $$ProductsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.childProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableFilterComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$ProductComboItemsTableOrderingComposer
@@ -4713,56 +4392,20 @@ class $$ProductComboItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get comboProductId => $composableBuilder(
+    column: $table.comboProductId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get childProductId => $composableBuilder(
+    column: $table.childProductId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get qty => $composableBuilder(
     column: $table.qty,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$ProductsTableOrderingComposer get comboProductId {
-    final $$ProductsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.comboProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableOrderingComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableOrderingComposer get childProductId {
-    final $$ProductsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.childProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableOrderingComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$ProductComboItemsTableAnnotationComposer
@@ -4774,54 +4417,18 @@ class $$ProductComboItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get comboProductId => $composableBuilder(
+    column: $table.comboProductId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get childProductId => $composableBuilder(
+    column: $table.childProductId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get qty =>
       $composableBuilder(column: $table.qty, builder: (column) => column);
-
-  $$ProductsTableAnnotationComposer get comboProductId {
-    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.comboProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableAnnotationComposer get childProductId {
-    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.childProductId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$ProductComboItemsTableTableManager
@@ -4835,9 +4442,16 @@ class $$ProductComboItemsTableTableManager
           $$ProductComboItemsTableAnnotationComposer,
           $$ProductComboItemsTableCreateCompanionBuilder,
           $$ProductComboItemsTableUpdateCompanionBuilder,
-          (ProductComboItem, $$ProductComboItemsTableReferences),
+          (
+            ProductComboItem,
+            BaseReferences<
+              _$AppDatabase,
+              $ProductComboItemsTable,
+              ProductComboItem
+            >,
+          ),
           ProductComboItem,
-          PrefetchHooks Function({bool comboProductId, bool childProductId})
+          PrefetchHooks Function()
         > {
   $$ProductComboItemsTableTableManager(
     _$AppDatabase db,
@@ -4880,72 +4494,9 @@ class $$ProductComboItemsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$ProductComboItemsTableReferences(db, table, e),
-                ),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback:
-              ({comboProductId = false, childProductId = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (comboProductId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.comboProductId,
-                                    referencedTable:
-                                        $$ProductComboItemsTableReferences
-                                            ._comboProductIdTable(db),
-                                    referencedColumn:
-                                        $$ProductComboItemsTableReferences
-                                            ._comboProductIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
-                        }
-                        if (childProductId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.childProductId,
-                                    referencedTable:
-                                        $$ProductComboItemsTableReferences
-                                            ._childProductIdTable(db),
-                                    referencedColumn:
-                                        $$ProductComboItemsTableReferences
-                                            ._childProductIdTable(db)
-                                            .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [];
-                  },
-                );
-              },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -4960,14 +4511,308 @@ typedef $$ProductComboItemsTableProcessedTableManager =
       $$ProductComboItemsTableAnnotationComposer,
       $$ProductComboItemsTableCreateCompanionBuilder,
       $$ProductComboItemsTableUpdateCompanionBuilder,
-      (ProductComboItem, $$ProductComboItemsTableReferences),
+      (
+        ProductComboItem,
+        BaseReferences<
+          _$AppDatabase,
+          $ProductComboItemsTable,
+          ProductComboItem
+        >,
+      ),
       ProductComboItem,
-      PrefetchHooks Function({bool comboProductId, bool childProductId})
+      PrefetchHooks Function()
+    >;
+typedef $$CashSessionsTableCreateCompanionBuilder =
+    CashSessionsCompanion Function({
+      required String id,
+      required String eventId,
+      required String title,
+      required int openedAtMs,
+      Value<int?> closedAtMs,
+      Value<int> initialCashFloatCents,
+      Value<int?> closedCashDrawerCents,
+      Value<String?> closedNotes,
+      Value<String?> closedBy,
+      Value<int> rowid,
+    });
+typedef $$CashSessionsTableUpdateCompanionBuilder =
+    CashSessionsCompanion Function({
+      Value<String> id,
+      Value<String> eventId,
+      Value<String> title,
+      Value<int> openedAtMs,
+      Value<int?> closedAtMs,
+      Value<int> initialCashFloatCents,
+      Value<int?> closedCashDrawerCents,
+      Value<String?> closedNotes,
+      Value<String?> closedBy,
+      Value<int> rowid,
+    });
+
+class $$CashSessionsTableFilterComposer
+    extends Composer<_$AppDatabase, $CashSessionsTable> {
+  $$CashSessionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get openedAtMs => $composableBuilder(
+    column: $table.openedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get closedAtMs => $composableBuilder(
+    column: $table.closedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get initialCashFloatCents => $composableBuilder(
+    column: $table.initialCashFloatCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get closedCashDrawerCents => $composableBuilder(
+    column: $table.closedCashDrawerCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get closedNotes => $composableBuilder(
+    column: $table.closedNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get closedBy => $composableBuilder(
+    column: $table.closedBy,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CashSessionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CashSessionsTable> {
+  $$CashSessionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get openedAtMs => $composableBuilder(
+    column: $table.openedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get closedAtMs => $composableBuilder(
+    column: $table.closedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get initialCashFloatCents => $composableBuilder(
+    column: $table.initialCashFloatCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get closedCashDrawerCents => $composableBuilder(
+    column: $table.closedCashDrawerCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get closedNotes => $composableBuilder(
+    column: $table.closedNotes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get closedBy => $composableBuilder(
+    column: $table.closedBy,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CashSessionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CashSessionsTable> {
+  $$CashSessionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<int> get openedAtMs => $composableBuilder(
+    column: $table.openedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get closedAtMs => $composableBuilder(
+    column: $table.closedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get initialCashFloatCents => $composableBuilder(
+    column: $table.initialCashFloatCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get closedCashDrawerCents => $composableBuilder(
+    column: $table.closedCashDrawerCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get closedNotes => $composableBuilder(
+    column: $table.closedNotes,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get closedBy =>
+      $composableBuilder(column: $table.closedBy, builder: (column) => column);
+}
+
+class $$CashSessionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CashSessionsTable,
+          CashSession,
+          $$CashSessionsTableFilterComposer,
+          $$CashSessionsTableOrderingComposer,
+          $$CashSessionsTableAnnotationComposer,
+          $$CashSessionsTableCreateCompanionBuilder,
+          $$CashSessionsTableUpdateCompanionBuilder,
+          (
+            CashSession,
+            BaseReferences<_$AppDatabase, $CashSessionsTable, CashSession>,
+          ),
+          CashSession,
+          PrefetchHooks Function()
+        > {
+  $$CashSessionsTableTableManager(_$AppDatabase db, $CashSessionsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CashSessionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CashSessionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CashSessionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> eventId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<int> openedAtMs = const Value.absent(),
+                Value<int?> closedAtMs = const Value.absent(),
+                Value<int> initialCashFloatCents = const Value.absent(),
+                Value<int?> closedCashDrawerCents = const Value.absent(),
+                Value<String?> closedNotes = const Value.absent(),
+                Value<String?> closedBy = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CashSessionsCompanion(
+                id: id,
+                eventId: eventId,
+                title: title,
+                openedAtMs: openedAtMs,
+                closedAtMs: closedAtMs,
+                initialCashFloatCents: initialCashFloatCents,
+                closedCashDrawerCents: closedCashDrawerCents,
+                closedNotes: closedNotes,
+                closedBy: closedBy,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String eventId,
+                required String title,
+                required int openedAtMs,
+                Value<int?> closedAtMs = const Value.absent(),
+                Value<int> initialCashFloatCents = const Value.absent(),
+                Value<int?> closedCashDrawerCents = const Value.absent(),
+                Value<String?> closedNotes = const Value.absent(),
+                Value<String?> closedBy = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CashSessionsCompanion.insert(
+                id: id,
+                eventId: eventId,
+                title: title,
+                openedAtMs: openedAtMs,
+                closedAtMs: closedAtMs,
+                initialCashFloatCents: initialCashFloatCents,
+                closedCashDrawerCents: closedCashDrawerCents,
+                closedNotes: closedNotes,
+                closedBy: closedBy,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CashSessionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CashSessionsTable,
+      CashSession,
+      $$CashSessionsTableFilterComposer,
+      $$CashSessionsTableOrderingComposer,
+      $$CashSessionsTableAnnotationComposer,
+      $$CashSessionsTableCreateCompanionBuilder,
+      $$CashSessionsTableUpdateCompanionBuilder,
+      (
+        CashSession,
+        BaseReferences<_$AppDatabase, $CashSessionsTable, CashSession>,
+      ),
+      CashSession,
+      PrefetchHooks Function()
     >;
 typedef $$SalesTableCreateCompanionBuilder =
     SalesCompanion Function({
       required String id,
       required String eventId,
+      Value<String?> sessionId,
       required int soldAtMs,
       required int totalCents,
       required int amountReceivedCents,
@@ -4981,6 +4826,7 @@ typedef $$SalesTableUpdateCompanionBuilder =
     SalesCompanion Function({
       Value<String> id,
       Value<String> eventId,
+      Value<String?> sessionId,
       Value<int> soldAtMs,
       Value<int> totalCents,
       Value<int> amountReceivedCents,
@@ -4990,72 +4836,6 @@ typedef $$SalesTableUpdateCompanionBuilder =
       Value<String?> customerName,
       Value<int> rowid,
     });
-
-final class $$SalesTableReferences
-    extends BaseReferences<_$AppDatabase, $SalesTable, PosSale> {
-  $$SalesTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $EventsTable _eventIdTable(_$AppDatabase db) => db.events.createAlias(
-    $_aliasNameGenerator(db.sales.eventId, db.events.id),
-  );
-
-  $$EventsTableProcessedTableManager get eventId {
-    final $_column = $_itemColumn<String>('event_id')!;
-
-    final manager = $$EventsTableTableManager(
-      $_db,
-      $_db.events,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_eventIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static MultiTypedResultKey<$SaleLinesTable, List<PosSaleLine>>
-  _saleLinesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.saleLines,
-    aliasName: $_aliasNameGenerator(db.sales.id, db.saleLines.saleId),
-  );
-
-  $$SaleLinesTableProcessedTableManager get saleLinesRefs {
-    final manager = $$SaleLinesTableTableManager(
-      $_db,
-      $_db.saleLines,
-    ).filter((f) => f.saleId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(_saleLinesRefsTable($_db));
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-
-  static MultiTypedResultKey<$SaleChangeDotAllocationsTable, List<ChangeDotRow>>
-  _saleChangeDotAllocationsRefsTable(_$AppDatabase db) =>
-      MultiTypedResultKey.fromTable(
-        db.saleChangeDotAllocations,
-        aliasName: $_aliasNameGenerator(
-          db.sales.id,
-          db.saleChangeDotAllocations.saleId,
-        ),
-      );
-
-  $$SaleChangeDotAllocationsTableProcessedTableManager
-  get saleChangeDotAllocationsRefs {
-    final manager = $$SaleChangeDotAllocationsTableTableManager(
-      $_db,
-      $_db.saleChangeDotAllocations,
-    ).filter((f) => f.saleId.id.sqlEquals($_itemColumn<String>('id')!));
-
-    final cache = $_typedResult.readTableOrNull(
-      _saleChangeDotAllocationsRefsTable($_db),
-    );
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: cache),
-    );
-  }
-}
 
 class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
   $$SalesTableFilterComposer({
@@ -5067,6 +4847,16 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5104,81 +4894,6 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
     column: $table.customerName,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$EventsTableFilterComposer get eventId {
-    final $$EventsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableFilterComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<bool> saleLinesRefs(
-    Expression<bool> Function($$SaleLinesTableFilterComposer f) f,
-  ) {
-    final $$SaleLinesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.saleId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableFilterComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<bool> saleChangeDotAllocationsRefs(
-    Expression<bool> Function($$SaleChangeDotAllocationsTableFilterComposer f)
-    f,
-  ) {
-    final $$SaleChangeDotAllocationsTableFilterComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.saleChangeDotAllocations,
-          getReferencedColumn: (t) => t.saleId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$SaleChangeDotAllocationsTableFilterComposer(
-                $db: $db,
-                $table: $db.saleChangeDotAllocations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
 }
 
 class $$SalesTableOrderingComposer
@@ -5192,6 +4907,16 @@ class $$SalesTableOrderingComposer
   });
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -5229,29 +4954,6 @@ class $$SalesTableOrderingComposer
     column: $table.customerName,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$EventsTableOrderingComposer get eventId {
-    final $$EventsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableOrderingComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
 }
 
 class $$SalesTableAnnotationComposer
@@ -5265,6 +4967,12 @@ class $$SalesTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
 
   GeneratedColumn<int> get soldAtMs =>
       $composableBuilder(column: $table.soldAtMs, builder: (column) => column);
@@ -5296,81 +5004,6 @@ class $$SalesTableAnnotationComposer
     column: $table.customerName,
     builder: (column) => column,
   );
-
-  $$EventsTableAnnotationComposer get eventId {
-    final $$EventsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.eventId,
-      referencedTable: $db.events,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$EventsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.events,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  Expression<T> saleLinesRefs<T extends Object>(
-    Expression<T> Function($$SaleLinesTableAnnotationComposer a) f,
-  ) {
-    final $$SaleLinesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.id,
-      referencedTable: $db.saleLines,
-      getReferencedColumn: (t) => t.saleId,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SaleLinesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.saleLines,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return f(composer);
-  }
-
-  Expression<T> saleChangeDotAllocationsRefs<T extends Object>(
-    Expression<T> Function($$SaleChangeDotAllocationsTableAnnotationComposer a)
-    f,
-  ) {
-    final $$SaleChangeDotAllocationsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.id,
-          referencedTable: $db.saleChangeDotAllocations,
-          getReferencedColumn: (t) => t.saleId,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$SaleChangeDotAllocationsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.saleChangeDotAllocations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return f(composer);
-  }
 }
 
 class $$SalesTableTableManager
@@ -5384,13 +5017,9 @@ class $$SalesTableTableManager
           $$SalesTableAnnotationComposer,
           $$SalesTableCreateCompanionBuilder,
           $$SalesTableUpdateCompanionBuilder,
-          (PosSale, $$SalesTableReferences),
+          (PosSale, BaseReferences<_$AppDatabase, $SalesTable, PosSale>),
           PosSale,
-          PrefetchHooks Function({
-            bool eventId,
-            bool saleLinesRefs,
-            bool saleChangeDotAllocationsRefs,
-          })
+          PrefetchHooks Function()
         > {
   $$SalesTableTableManager(_$AppDatabase db, $SalesTable table)
     : super(
@@ -5407,6 +5036,7 @@ class $$SalesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> eventId = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
                 Value<int> soldAtMs = const Value.absent(),
                 Value<int> totalCents = const Value.absent(),
                 Value<int> amountReceivedCents = const Value.absent(),
@@ -5418,6 +5048,7 @@ class $$SalesTableTableManager
               }) => SalesCompanion(
                 id: id,
                 eventId: eventId,
+                sessionId: sessionId,
                 soldAtMs: soldAtMs,
                 totalCents: totalCents,
                 amountReceivedCents: amountReceivedCents,
@@ -5431,6 +5062,7 @@ class $$SalesTableTableManager
               ({
                 required String id,
                 required String eventId,
+                Value<String?> sessionId = const Value.absent(),
                 required int soldAtMs,
                 required int totalCents,
                 required int amountReceivedCents,
@@ -5442,6 +5074,7 @@ class $$SalesTableTableManager
               }) => SalesCompanion.insert(
                 id: id,
                 eventId: eventId,
+                sessionId: sessionId,
                 soldAtMs: soldAtMs,
                 totalCents: totalCents,
                 amountReceivedCents: amountReceivedCents,
@@ -5452,104 +5085,9 @@ class $$SalesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) =>
-                    (e.readTable(table), $$SalesTableReferences(db, table, e)),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback:
-              ({
-                eventId = false,
-                saleLinesRefs = false,
-                saleChangeDotAllocationsRefs = false,
-              }) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [
-                    if (saleLinesRefs) db.saleLines,
-                    if (saleChangeDotAllocationsRefs)
-                      db.saleChangeDotAllocations,
-                  ],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (eventId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.eventId,
-                                    referencedTable: $$SalesTableReferences
-                                        ._eventIdTable(db),
-                                    referencedColumn: $$SalesTableReferences
-                                        ._eventIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [
-                      if (saleLinesRefs)
-                        await $_getPrefetchedData<
-                          PosSale,
-                          $SalesTable,
-                          PosSaleLine
-                        >(
-                          currentTable: table,
-                          referencedTable: $$SalesTableReferences
-                              ._saleLinesRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$SalesTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).saleLinesRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.saleId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                      if (saleChangeDotAllocationsRefs)
-                        await $_getPrefetchedData<
-                          PosSale,
-                          $SalesTable,
-                          ChangeDotRow
-                        >(
-                          currentTable: table,
-                          referencedTable: $$SalesTableReferences
-                              ._saleChangeDotAllocationsRefsTable(db),
-                          managerFromTypedResult: (p0) =>
-                              $$SalesTableReferences(
-                                db,
-                                table,
-                                p0,
-                              ).saleChangeDotAllocationsRefs,
-                          referencedItemsForCurrentItem:
-                              (item, referencedItems) => referencedItems.where(
-                                (e) => e.saleId == item.id,
-                              ),
-                          typedResults: items,
-                        ),
-                    ];
-                  },
-                );
-              },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -5564,13 +5102,9 @@ typedef $$SalesTableProcessedTableManager =
       $$SalesTableAnnotationComposer,
       $$SalesTableCreateCompanionBuilder,
       $$SalesTableUpdateCompanionBuilder,
-      (PosSale, $$SalesTableReferences),
+      (PosSale, BaseReferences<_$AppDatabase, $SalesTable, PosSale>),
       PosSale,
-      PrefetchHooks Function({
-        bool eventId,
-        bool saleLinesRefs,
-        bool saleChangeDotAllocationsRefs,
-      })
+      PrefetchHooks Function()
     >;
 typedef $$SaleLinesTableCreateCompanionBuilder =
     SaleLinesCompanion Function({
@@ -5599,71 +5133,6 @@ typedef $$SaleLinesTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-final class $$SaleLinesTableReferences
-    extends BaseReferences<_$AppDatabase, $SaleLinesTable, PosSaleLine> {
-  $$SaleLinesTableReferences(super.$_db, super.$_table, super.$_typedResult);
-
-  static $SalesTable _saleIdTable(_$AppDatabase db) => db.sales.createAlias(
-    $_aliasNameGenerator(db.saleLines.saleId, db.sales.id),
-  );
-
-  $$SalesTableProcessedTableManager get saleId {
-    final $_column = $_itemColumn<String>('sale_id')!;
-
-    final manager = $$SalesTableTableManager(
-      $_db,
-      $_db.sales,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_saleIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static $ProductsTable _productIdTable(_$AppDatabase db) =>
-      db.products.createAlias(
-        $_aliasNameGenerator(db.saleLines.productId, db.products.id),
-      );
-
-  $$ProductsTableProcessedTableManager? get productId {
-    final $_column = $_itemColumn<String>('product_id');
-    if ($_column == null) return null;
-    final manager = $$ProductsTableTableManager(
-      $_db,
-      $_db.products,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_productIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static $EventDotDenominationsTable _dotDenominationIdTable(
-    _$AppDatabase db,
-  ) => db.eventDotDenominations.createAlias(
-    $_aliasNameGenerator(
-      db.saleLines.dotDenominationId,
-      db.eventDotDenominations.id,
-    ),
-  );
-
-  $$EventDotDenominationsTableProcessedTableManager? get dotDenominationId {
-    final $_column = $_itemColumn<String>('dot_denomination_id');
-    if ($_column == null) return null;
-    final manager = $$EventDotDenominationsTableTableManager(
-      $_db,
-      $_db.eventDotDenominations,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_dotDenominationIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-}
-
 class $$SaleLinesTableFilterComposer
     extends Composer<_$AppDatabase, $SaleLinesTable> {
   $$SaleLinesTableFilterComposer({
@@ -5678,8 +5147,23 @@ class $$SaleLinesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get lineKind => $composableBuilder(
     column: $table.lineKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5702,76 +5186,6 @@ class $$SaleLinesTableFilterComposer
     column: $table.lineTotalCents,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$SalesTableFilterComposer get saleId {
-    final $$SalesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableFilterComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableFilterComposer get productId {
-    final $$ProductsTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.productId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableFilterComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableFilterComposer get dotDenominationId {
-    final $$EventDotDenominationsTableFilterComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableFilterComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleLinesTableOrderingComposer
@@ -5788,8 +5202,23 @@ class $$SaleLinesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get lineKind => $composableBuilder(
     column: $table.lineKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get productId => $composableBuilder(
+    column: $table.productId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -5812,76 +5241,6 @@ class $$SaleLinesTableOrderingComposer
     column: $table.lineTotalCents,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$SalesTableOrderingComposer get saleId {
-    final $$SalesTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableOrderingComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableOrderingComposer get productId {
-    final $$ProductsTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.productId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableOrderingComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableOrderingComposer get dotDenominationId {
-    final $$EventDotDenominationsTableOrderingComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableOrderingComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleLinesTableAnnotationComposer
@@ -5896,8 +5255,19 @@ class $$SaleLinesTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
   GeneratedColumn<int> get lineKind =>
       $composableBuilder(column: $table.lineKind, builder: (column) => column);
+
+  GeneratedColumn<String> get productId =>
+      $composableBuilder(column: $table.productId, builder: (column) => column);
+
+  GeneratedColumn<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get freeLabel =>
       $composableBuilder(column: $table.freeLabel, builder: (column) => column);
@@ -5914,76 +5284,6 @@ class $$SaleLinesTableAnnotationComposer
     column: $table.lineTotalCents,
     builder: (column) => column,
   );
-
-  $$SalesTableAnnotationComposer get saleId {
-    final $$SalesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$ProductsTableAnnotationComposer get productId {
-    final $$ProductsTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.productId,
-      referencedTable: $db.products,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$ProductsTableAnnotationComposer(
-            $db: $db,
-            $table: $db.products,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableAnnotationComposer get dotDenominationId {
-    final $$EventDotDenominationsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleLinesTableTableManager
@@ -5997,13 +5297,12 @@ class $$SaleLinesTableTableManager
           $$SaleLinesTableAnnotationComposer,
           $$SaleLinesTableCreateCompanionBuilder,
           $$SaleLinesTableUpdateCompanionBuilder,
-          (PosSaleLine, $$SaleLinesTableReferences),
+          (
+            PosSaleLine,
+            BaseReferences<_$AppDatabase, $SaleLinesTable, PosSaleLine>,
+          ),
           PosSaleLine,
-          PrefetchHooks Function({
-            bool saleId,
-            bool productId,
-            bool dotDenominationId,
-          })
+          PrefetchHooks Function()
         > {
   $$SaleLinesTableTableManager(_$AppDatabase db, $SaleLinesTable table)
     : super(
@@ -6065,81 +5364,9 @@ class $$SaleLinesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$SaleLinesTableReferences(db, table, e),
-                ),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback:
-              ({saleId = false, productId = false, dotDenominationId = false}) {
-                return PrefetchHooks(
-                  db: db,
-                  explicitlyWatchedTables: [],
-                  addJoins:
-                      <
-                        T extends TableManagerState<
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic,
-                          dynamic
-                        >
-                      >(state) {
-                        if (saleId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.saleId,
-                                    referencedTable: $$SaleLinesTableReferences
-                                        ._saleIdTable(db),
-                                    referencedColumn: $$SaleLinesTableReferences
-                                        ._saleIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
-                        if (productId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.productId,
-                                    referencedTable: $$SaleLinesTableReferences
-                                        ._productIdTable(db),
-                                    referencedColumn: $$SaleLinesTableReferences
-                                        ._productIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
-                        if (dotDenominationId) {
-                          state =
-                              state.withJoin(
-                                    currentTable: table,
-                                    currentColumn: table.dotDenominationId,
-                                    referencedTable: $$SaleLinesTableReferences
-                                        ._dotDenominationIdTable(db),
-                                    referencedColumn: $$SaleLinesTableReferences
-                                        ._dotDenominationIdTable(db)
-                                        .id,
-                                  )
-                                  as T;
-                        }
-
-                        return state;
-                      },
-                  getPrefetchedDataCallback: (items) async {
-                    return [];
-                  },
-                );
-              },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -6154,13 +5381,12 @@ typedef $$SaleLinesTableProcessedTableManager =
       $$SaleLinesTableAnnotationComposer,
       $$SaleLinesTableCreateCompanionBuilder,
       $$SaleLinesTableUpdateCompanionBuilder,
-      (PosSaleLine, $$SaleLinesTableReferences),
+      (
+        PosSaleLine,
+        BaseReferences<_$AppDatabase, $SaleLinesTable, PosSaleLine>,
+      ),
       PosSaleLine,
-      PrefetchHooks Function({
-        bool saleId,
-        bool productId,
-        bool dotDenominationId,
-      })
+      PrefetchHooks Function()
     >;
 typedef $$SaleChangeDotAllocationsTableCreateCompanionBuilder =
     SaleChangeDotAllocationsCompanion Function({
@@ -6179,61 +5405,6 @@ typedef $$SaleChangeDotAllocationsTableUpdateCompanionBuilder =
       Value<int> rowid,
     });
 
-final class $$SaleChangeDotAllocationsTableReferences
-    extends
-        BaseReferences<
-          _$AppDatabase,
-          $SaleChangeDotAllocationsTable,
-          ChangeDotRow
-        > {
-  $$SaleChangeDotAllocationsTableReferences(
-    super.$_db,
-    super.$_table,
-    super.$_typedResult,
-  );
-
-  static $SalesTable _saleIdTable(_$AppDatabase db) => db.sales.createAlias(
-    $_aliasNameGenerator(db.saleChangeDotAllocations.saleId, db.sales.id),
-  );
-
-  $$SalesTableProcessedTableManager get saleId {
-    final $_column = $_itemColumn<String>('sale_id')!;
-
-    final manager = $$SalesTableTableManager(
-      $_db,
-      $_db.sales,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_saleIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-
-  static $EventDotDenominationsTable _dotDenominationIdTable(
-    _$AppDatabase db,
-  ) => db.eventDotDenominations.createAlias(
-    $_aliasNameGenerator(
-      db.saleChangeDotAllocations.dotDenominationId,
-      db.eventDotDenominations.id,
-    ),
-  );
-
-  $$EventDotDenominationsTableProcessedTableManager get dotDenominationId {
-    final $_column = $_itemColumn<String>('dot_denomination_id')!;
-
-    final manager = $$EventDotDenominationsTableTableManager(
-      $_db,
-      $_db.eventDotDenominations,
-    ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_dotDenominationIdTable($_db));
-    if (item == null) return manager;
-    return ProcessedTableManager(
-      manager.$state.copyWith(prefetchedData: [item]),
-    );
-  }
-}
-
 class $$SaleChangeDotAllocationsTableFilterComposer
     extends Composer<_$AppDatabase, $SaleChangeDotAllocationsTable> {
   $$SaleChangeDotAllocationsTableFilterComposer({
@@ -6248,57 +5419,20 @@ class $$SaleChangeDotAllocationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get qty => $composableBuilder(
     column: $table.qty,
     builder: (column) => ColumnFilters(column),
   );
-
-  $$SalesTableFilterComposer get saleId {
-    final $$SalesTableFilterComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableFilterComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableFilterComposer get dotDenominationId {
-    final $$EventDotDenominationsTableFilterComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableFilterComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleChangeDotAllocationsTableOrderingComposer
@@ -6315,57 +5449,20 @@ class $$SaleChangeDotAllocationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get qty => $composableBuilder(
     column: $table.qty,
     builder: (column) => ColumnOrderings(column),
   );
-
-  $$SalesTableOrderingComposer get saleId {
-    final $$SalesTableOrderingComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableOrderingComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableOrderingComposer get dotDenominationId {
-    final $$EventDotDenominationsTableOrderingComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableOrderingComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleChangeDotAllocationsTableAnnotationComposer
@@ -6380,55 +5477,16 @@ class $$SaleChangeDotAllocationsTableAnnotationComposer
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
+  GeneratedColumn<String> get dotDenominationId => $composableBuilder(
+    column: $table.dotDenominationId,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get qty =>
       $composableBuilder(column: $table.qty, builder: (column) => column);
-
-  $$SalesTableAnnotationComposer get saleId {
-    final $$SalesTableAnnotationComposer composer = $composerBuilder(
-      composer: this,
-      getCurrentColumn: (t) => t.saleId,
-      referencedTable: $db.sales,
-      getReferencedColumn: (t) => t.id,
-      builder:
-          (
-            joinBuilder, {
-            $addJoinBuilderToRootComposer,
-            $removeJoinBuilderFromRootComposer,
-          }) => $$SalesTableAnnotationComposer(
-            $db: $db,
-            $table: $db.sales,
-            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-            joinBuilder: joinBuilder,
-            $removeJoinBuilderFromRootComposer:
-                $removeJoinBuilderFromRootComposer,
-          ),
-    );
-    return composer;
-  }
-
-  $$EventDotDenominationsTableAnnotationComposer get dotDenominationId {
-    final $$EventDotDenominationsTableAnnotationComposer composer =
-        $composerBuilder(
-          composer: this,
-          getCurrentColumn: (t) => t.dotDenominationId,
-          referencedTable: $db.eventDotDenominations,
-          getReferencedColumn: (t) => t.id,
-          builder:
-              (
-                joinBuilder, {
-                $addJoinBuilderToRootComposer,
-                $removeJoinBuilderFromRootComposer,
-              }) => $$EventDotDenominationsTableAnnotationComposer(
-                $db: $db,
-                $table: $db.eventDotDenominations,
-                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
-                joinBuilder: joinBuilder,
-                $removeJoinBuilderFromRootComposer:
-                    $removeJoinBuilderFromRootComposer,
-              ),
-        );
-    return composer;
-  }
 }
 
 class $$SaleChangeDotAllocationsTableTableManager
@@ -6442,9 +5500,16 @@ class $$SaleChangeDotAllocationsTableTableManager
           $$SaleChangeDotAllocationsTableAnnotationComposer,
           $$SaleChangeDotAllocationsTableCreateCompanionBuilder,
           $$SaleChangeDotAllocationsTableUpdateCompanionBuilder,
-          (ChangeDotRow, $$SaleChangeDotAllocationsTableReferences),
+          (
+            ChangeDotRow,
+            BaseReferences<
+              _$AppDatabase,
+              $SaleChangeDotAllocationsTable,
+              ChangeDotRow
+            >,
+          ),
           ChangeDotRow,
-          PrefetchHooks Function({bool saleId, bool dotDenominationId})
+          PrefetchHooks Function()
         > {
   $$SaleChangeDotAllocationsTableTableManager(
     _$AppDatabase db,
@@ -6497,71 +5562,9 @@ class $$SaleChangeDotAllocationsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map(
-                (e) => (
-                  e.readTable(table),
-                  $$SaleChangeDotAllocationsTableReferences(db, table, e),
-                ),
-              )
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
               .toList(),
-          prefetchHooksCallback: ({saleId = false, dotDenominationId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (saleId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.saleId,
-                                referencedTable:
-                                    $$SaleChangeDotAllocationsTableReferences
-                                        ._saleIdTable(db),
-                                referencedColumn:
-                                    $$SaleChangeDotAllocationsTableReferences
-                                        ._saleIdTable(db)
-                                        .id,
-                              )
-                              as T;
-                    }
-                    if (dotDenominationId) {
-                      state =
-                          state.withJoin(
-                                currentTable: table,
-                                currentColumn: table.dotDenominationId,
-                                referencedTable:
-                                    $$SaleChangeDotAllocationsTableReferences
-                                        ._dotDenominationIdTable(db),
-                                referencedColumn:
-                                    $$SaleChangeDotAllocationsTableReferences
-                                        ._dotDenominationIdTable(db)
-                                        .id,
-                              )
-                              as T;
-                    }
-
-                    return state;
-                  },
-              getPrefetchedDataCallback: (items) async {
-                return [];
-              },
-            );
-          },
+          prefetchHooksCallback: null,
         ),
       );
 }
@@ -6576,9 +5579,16 @@ typedef $$SaleChangeDotAllocationsTableProcessedTableManager =
       $$SaleChangeDotAllocationsTableAnnotationComposer,
       $$SaleChangeDotAllocationsTableCreateCompanionBuilder,
       $$SaleChangeDotAllocationsTableUpdateCompanionBuilder,
-      (ChangeDotRow, $$SaleChangeDotAllocationsTableReferences),
+      (
+        ChangeDotRow,
+        BaseReferences<
+          _$AppDatabase,
+          $SaleChangeDotAllocationsTable,
+          ChangeDotRow
+        >,
+      ),
       ChangeDotRow,
-      PrefetchHooks Function({bool saleId, bool dotDenominationId})
+      PrefetchHooks Function()
     >;
 
 class $AppDatabaseManager {
@@ -6592,6 +5602,8 @@ class $AppDatabaseManager {
       $$ProductsTableTableManager(_db, _db.products);
   $$ProductComboItemsTableTableManager get productComboItems =>
       $$ProductComboItemsTableTableManager(_db, _db.productComboItems);
+  $$CashSessionsTableTableManager get cashSessions =>
+      $$CashSessionsTableTableManager(_db, _db.cashSessions);
   $$SalesTableTableManager get sales =>
       $$SalesTableTableManager(_db, _db.sales);
   $$SaleLinesTableTableManager get saleLines =>

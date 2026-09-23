@@ -14,7 +14,10 @@ import '../../providers/event_dashboard_provider.dart';
 import '../../providers/printer_provider.dart';
 import '../../providers/sales_draft_provider.dart';
 import '../../providers/sync_provider.dart';
+import '../../providers/cash_session_provider.dart';
+import '../../providers/event_detail_provider.dart';
 import '../../utils/money_format.dart';
+import 'cash_session_dialogs.dart';
 
 class NewSaleScreen extends ConsumerStatefulWidget {
   const NewSaleScreen({super.key, required this.eventId, this.editSaleId});
@@ -1411,6 +1414,42 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           ],
         ),
         actions: [
+          Consumer(
+            builder: (context, ref, _) {
+              final activeSessionAsync = ref.watch(activeCashSessionStreamProvider(widget.eventId));
+              final activeSession = activeSessionAsync.value;
+              final isOpen = activeSession != null;
+              return IconButton(
+                tooltip: isOpen
+                    ? 'Caixa Aberto: ${activeSession.title} (Troco: ${formatCents(activeSession.initialCashFloatCents)})'
+                    : 'Caixa Fechado (Toque para abrir)',
+                icon: Badge(
+                  backgroundColor: isOpen ? Colors.green : Colors.grey,
+                  smallSize: 8,
+                  child: Icon(
+                    Icons.point_of_sale_rounded,
+                    color: isOpen ? Colors.green : Colors.grey.shade600,
+                  ),
+                ),
+                onPressed: () async {
+                  if (isOpen) {
+                    final salesAsync = ref.read(eventSalesStreamProvider(widget.eventId));
+                    final eventAsync = ref.read(eventDetailProvider(widget.eventId));
+                    final sales = (salesAsync.value ?? []).where((s) => s.sessionId == activeSession.id).toList();
+                    final eventTitle = eventAsync.value?.title ?? 'Evento';
+                    await CloseCashSessionDialog.show(
+                      context: context,
+                      session: activeSession,
+                      sales: sales,
+                      eventTitle: eventTitle,
+                    );
+                  } else {
+                    await OpenCashSessionDialog.show(context, widget.eventId);
+                  }
+                },
+              );
+            },
+          ),
           Consumer(
             builder: (context, ref, _) {
               final isConnectedAsync = ref.watch(printerConnectedProvider);

@@ -14,6 +14,7 @@ import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../providers/event_dashboard_provider.dart';
 import '../../providers/printer_provider.dart';
+import '../../providers/cash_session_provider.dart';
 import '../../utils/money_format.dart';
 
 final _dateTimeFmt = DateFormat.yMd('pt_BR').add_Hm();
@@ -190,7 +191,11 @@ class EventSalesRegisterScreen extends ConsumerWidget {
 
   Future<void> _shareSalesSummary(BuildContext context, WidgetRef ref) async {
     final db = ref.read(appDatabaseProvider);
-    final sales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+    final allSales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+    final selectedSessionId = ref.read(selectedSessionFilterProvider(eventId));
+    final sales = selectedSessionId != null
+        ? allSales.where((s) => s.sessionId == selectedSessionId).toList()
+        : allSales;
     
     if (sales.isEmpty) {
       if (context.mounted) {
@@ -200,6 +205,10 @@ class EventSalesRegisterScreen extends ConsumerWidget {
     }
 
     final event = await (db.select(db.events)..where((e) => e.id.equals(eventId))).getSingle();
+    CashSession? session;
+    if (selectedSessionId != null) {
+      session = await (db.select(db.cashSessions)..where((s) => s.id.equals(selectedSessionId))).getSingleOrNull();
+    }
 
     int totalAmount = 0;
     Map<String, int> totalByMethod = {};
@@ -215,7 +224,15 @@ class EventSalesRegisterScreen extends ConsumerWidget {
 
     final buffer = StringBuffer();
     buffer.writeln('📊 *Resumo de Vendas: ${event.title}*');
-    buffer.writeln('📅 Data: ${_dateTimeFmt.format(DateTime.now())}');
+    if (session != null) {
+      buffer.writeln('🏷️ *Sessão*: ${session.title}');
+      if (session.initialCashFloatCents > 0) {
+        buffer.writeln('💵 Fundo Inicial de Troco: ${formatCents(session.initialCashFloatCents)}');
+      }
+    } else {
+      buffer.writeln('🏷️ *Período*: Todo o Evento (Acumulado)');
+    }
+    buffer.writeln('📅 Data da emissão: ${_dateTimeFmt.format(DateTime.now())}');
     buffer.writeln('');
     buffer.writeln('💰 *Total Arrecadado*: ${formatCents(totalAmount)}');
     buffer.writeln('');
@@ -224,7 +241,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
       buffer.writeln('• ${PaymentMethod.label(method)}: ${formatCents(amount)}');
     });
     buffer.writeln('');
-    buffer.writeln('🧾 *Total de Vendas*: ${sales.length}');
+    buffer.writeln('🧾 *Total de Comandas*: ${sales.length}');
 
     if (pendingChanges.isNotEmpty) {
       buffer.writeln('');
@@ -279,7 +296,12 @@ class EventSalesRegisterScreen extends ConsumerWidget {
     }
 
     final db = ref.read(appDatabaseProvider);
-    final sales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+    final allSales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+    final selectedSessionId = ref.read(selectedSessionFilterProvider(eventId));
+    final sales = selectedSessionId != null
+        ? allSales.where((s) => s.sessionId == selectedSessionId).toList()
+        : allSales;
+
     if (sales.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -290,8 +312,14 @@ class EventSalesRegisterScreen extends ConsumerWidget {
     }
 
     final event = await (db.select(db.events)..where((e) => e.id.equals(eventId))).getSingle();
+    CashSession? session;
+    if (selectedSessionId != null) {
+      session = await (db.select(db.cashSessions)..where((s) => s.id.equals(selectedSessionId))).getSingleOrNull();
+    }
 
     int totalAmount = 0;
+    int cashRevenue = 0;
+    int cashChangeGiven = 0;
     final Map<String, double> totalByMethod = {};
     final List<Map<String, dynamic>> pendingChanges = [];
 
@@ -299,6 +327,15 @@ class EventSalesRegisterScreen extends ConsumerWidget {
       totalAmount += s.totalCents;
       final label = PaymentMethod.label(s.paymentMethod);
       totalByMethod[label] = (totalByMethod[label] ?? 0.0) + (s.totalCents / 100.0);
+
+      if (s.paymentMethod == PaymentMethod.dinheiro) {
+        cashRevenue += s.totalCents;
+        final ch = s.amountReceivedCents - s.totalCents;
+        if (ch > 0 && !s.changePending) {
+          cashChangeGiven += ch;
+        }
+      }
+
       if (s.changePending) {
         final change = (s.amountReceivedCents - s.totalCents) / 100.0;
         pendingChanges.add({
@@ -309,13 +346,43 @@ class EventSalesRegisterScreen extends ConsumerWidget {
     }
 
     try {
-      await printerService.printSummaryReport(
-        eventTitle: event.title,
-        totalRevenue: totalAmount / 100.0,
-        totalSalesCount: sales.length,
-        revenueByPaymentMethod: totalByMethod,
-        pendingChanges: pendingChanges,
-      );
+      if (session != null && session.closedAtMs != null) {
+        final initialFloat = session.initialCashFloatCents / 100.0;
+        final cashRev = cashRevenue / 100.0;
+        final changeGiven = cashChangeGiven / 100.0;
+        final expected = initialFloat + cashRev - changeGiven;
+        final counted = session.closedCashDrawerCents != null ? session.closedCashDrawerCents! / 100.0 : null;
+
+        await printerService.printSessionClosingReceipt(
+          eventTitle: event.title,
+          sessionTitle: session.title,
+          openedAt: DateTime.fromMillisecondsSinceEpoch(session.openedAtMs),
+          closedAt: DateTime.fromMillisecondsSinceEpoch(session.closedAtMs!),
+          initialCashFloat: initialFloat,
+          cashRevenue: cashRev,
+          cashChangeGiven: changeGiven,
+          expectedInDrawer: expected,
+          countedInDrawer: counted,
+          totalRevenue: totalAmount / 100.0,
+          totalSalesCount: sales.length,
+          revenueByPaymentMethod: totalByMethod,
+          pendingChanges: pendingChanges,
+          closedBy: session.closedBy,
+          closedNotes: session.closedNotes,
+        );
+      } else {
+        final title = session != null
+            ? '${event.title}\n(${session.title})'
+            : '${event.title}\n(GERAL)';
+
+        await printerService.printSummaryReport(
+          eventTitle: title,
+          totalRevenue: totalAmount / 100.0,
+          totalSalesCount: sales.length,
+          revenueByPaymentMethod: totalByMethod,
+          pendingChanges: pendingChanges,
+        );
+      }
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -367,32 +434,106 @@ class EventSalesRegisterScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: salesAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Erro: $err', style: TextStyle(color: Theme.of(context).colorScheme.error))),
-        data: (list) {
-          if (list.isEmpty) {
-            return const CaixaEmptyHint(
-              icon: Icons.receipt_long_outlined,
-              message: 'Nenhuma venda neste evento',
-            );
-          }
-          return linesAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Center(child: Text('Erro: $err')),
-            data: (linesList) => productsAsync.when(
+      body: Column(
+        children: [
+          Consumer(
+            builder: (context, ref, _) {
+              final sessionsAsync = ref.watch(eventCashSessionsStreamProvider(eventId));
+              final selectedSessionId = ref.watch(selectedSessionFilterProvider(eventId));
+              final sessions = sessionsAsync.value ?? [];
+
+              if (sessions.isEmpty) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history_toggle_off_rounded, size: 18, color: CaixaAppTheme.marianBlue),
+                    const SizedBox(width: 8),
+                    Text('Sessão:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          isExpanded: true,
+                          value: selectedSessionId,
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'Todas as Sessões (Geral)',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            ...sessions.map((sess) {
+                              final isOpen = sess.closedAtMs == null;
+                              return DropdownMenuItem<String?>(
+                                value: sess.id,
+                                child: Text(
+                                  '${isOpen ? '🟢 ' : ''}${sess.title}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: isOpen ? Colors.green.shade800 : null,
+                                    fontWeight: isOpen ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            ref.read(selectedSessionFilterProvider(eventId).notifier).state = val;
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          Expanded(
+            child: salesAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Erro: $err')),
-              data: (productsList) => denomsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Center(child: Text('Erro: $err')),
-                data: (denomsList) {
-                  return ListView.separated(
-                    padding: kCaixaScreenPadding.copyWith(top: 8, bottom: 24),
-                    itemCount: list.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 6),
-                    itemBuilder: (context, i) {
-                      final s = list[i];
+              error: (err, _) => Center(child: Text('Erro: $err', style: TextStyle(color: Theme.of(context).colorScheme.error))),
+              data: (list) {
+                final selectedSessionId = ref.watch(selectedSessionFilterProvider(eventId));
+                final filteredList = selectedSessionId != null
+                    ? list.where((s) => s.sessionId == selectedSessionId).toList()
+                    : list;
+
+                if (filteredList.isEmpty) {
+                  return CaixaEmptyHint(
+                    icon: Icons.receipt_long_outlined,
+                    message: selectedSessionId != null
+                        ? 'Nenhuma venda registrada nesta sessão'
+                        : 'Nenhuma venda neste evento',
+                  );
+                }
+                return linesAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, _) => Center(child: Text('Erro: $err')),
+                  data: (linesList) => productsAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (err, _) => Center(child: Text('Erro: $err')),
+                    data: (productsList) => denomsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (err, _) => Center(child: Text('Erro: $err')),
+                      data: (denomsList) {
+                        return ListView.separated(
+                          padding: kCaixaScreenPadding.copyWith(top: 8, bottom: 24),
+                          itemCount: filteredList.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 6),
+                          itemBuilder: (context, i) {
+                            final s = filteredList[i];
                       final when = DateTime.fromMillisecondsSinceEpoch(s.soldAtMs);
                       final change = s.amountReceivedCents - s.totalCents;
                       final pay = PaymentMethod.label(s.paymentMethod);
@@ -675,6 +816,9 @@ class EventSalesRegisterScreen extends ConsumerWidget {
           );
         },
       ),
-    );
+    ),
+  ],
+),
+);
   }
 }

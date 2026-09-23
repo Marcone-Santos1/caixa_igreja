@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../app/app_theme.dart';
-import '../../app/ui_kit.dart';
 import '../../domain/payment_method.dart';
 import '../../providers/event_dashboard_provider.dart';
 import '../../providers/event_detail_provider.dart';
+import '../../providers/cash_session_provider.dart';
 import '../../utils/money_format.dart';
+import 'cash_session_dialogs.dart';
 
 enum DashboardTab { geral, produtos, outros }
 
@@ -76,28 +77,143 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
           ],
         ),
       ),
-      body: dashboardAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Erro ao carregar dashboard: $err',
-              style: TextStyle(color: scheme.error),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        data: (data) {
-          if (data.totalSalesCount == 0) {
-            return const CaixaEmptyHint(
-              icon: Icons.analytics_outlined,
-              message: 'Nenhuma venda registrada neste evento para gerar dados.',
-            );
-          }
+      body: Column(
+        children: [
+          // Barra de Seleção de Sessão / Período
+          Consumer(
+            builder: (context, ref, _) {
+              final sessionsAsync = ref.watch(eventCashSessionsStreamProvider(widget.eventId));
+              final activeSessionAsync = ref.watch(activeCashSessionStreamProvider(widget.eventId));
+              final selectedSessionId = ref.watch(selectedSessionFilterProvider(widget.eventId));
+              final sessions = sessionsAsync.value ?? [];
 
-          return Column(
-            children: [
+              if (sessions.isEmpty) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history_toggle_off_rounded, size: 18, color: CaixaAppTheme.marianBlue),
+                    const SizedBox(width: 8),
+                    Text('Período:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          isExpanded: true,
+                          value: selectedSessionId,
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'Todo o Evento (Acumulado)',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            ...sessions.map((sess) {
+                              final isOpen = sess.closedAtMs == null;
+                              return DropdownMenuItem<String?>(
+                                value: sess.id,
+                                child: Text(
+                                  '${isOpen ? '🟢 ' : ''}${sess.title}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: isOpen ? Colors.green.shade800 : null,
+                                    fontWeight: isOpen ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            ref.read(selectedSessionFilterProvider(widget.eventId).notifier).state = val;
+                          },
+                        ),
+                      ),
+                    ),
+                    if (activeSessionAsync.value != null && (selectedSessionId == null || selectedSessionId == activeSessionAsync.value!.id)) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          final salesAsync = ref.read(eventSalesStreamProvider(widget.eventId));
+                          final sales = (salesAsync.value ?? []).where((s) => s.sessionId == activeSessionAsync.value!.id).toList();
+                          await CloseCashSessionDialog.show(
+                            context: context,
+                            session: activeSessionAsync.value!,
+                            sales: sales,
+                            eventTitle: eventTitle,
+                          );
+                        },
+                        icon: const Icon(Icons.lock_clock_rounded, size: 16),
+                        label: Text('Fechar Caixa', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+          Expanded(
+            child: dashboardAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'Erro ao carregar dashboard: $err',
+                    style: TextStyle(color: scheme.error),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              data: (data) {
+                if (data.totalSalesCount == 0) {
+                  final isFiltered = ref.watch(selectedSessionFilterProvider(widget.eventId)) != null;
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text(
+                            isFiltered
+                                ? 'Nenhuma venda registrada nesta sessão.'
+                                : 'Nenhuma venda registrada neste evento para gerar dados.',
+                            style: GoogleFonts.inter(fontSize: 15, color: Colors.grey.shade700),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (isFiltered) ...[
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: () {
+                                ref.read(selectedSessionFilterProvider(widget.eventId).notifier).state = null;
+                              },
+                              child: const Text('Ver Todo o Evento (Acumulado)'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: SegmentedButton<DashboardTab>(
@@ -140,7 +256,10 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
           );
         },
       ),
-    );
+    ),
+  ],
+),
+);
   }
 
   Widget _buildGeralTab(BuildContext context, EventDashboardData data) {
