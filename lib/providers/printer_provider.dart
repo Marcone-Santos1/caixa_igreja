@@ -44,7 +44,7 @@ final printDeliveryVouchersEnabledProvider =
 
 class DeliveryVouchersNotifier extends StateNotifier<bool> {
   DeliveryVouchersNotifier(this._prefs)
-      : super(_prefs.getBool(_kKey) ?? true);
+      : super(_prefs.getBool(_kKey) ?? false);
 
   static const _kKey = 'printer_delivery_vouchers_enabled';
   final SharedPreferences _prefs;
