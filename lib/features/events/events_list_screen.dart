@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../app/ui_kit.dart';
 import '../../data/database.dart';
+import '../../data/database_seeder.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import 'event_delete_dialog.dart';
@@ -137,7 +138,18 @@ class EventsListScreen extends ConsumerWidget {
     final db = ref.watch(appDatabaseProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Eventos'),
+        title: Row(
+          children: [
+            Image.asset(
+              'assets/images/logo.png',
+              height: 32,
+              width: 32,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 10),
+            const Text('Eventos'),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Conectar a Caixa Central',
@@ -162,10 +174,40 @@ class EventsListScreen extends ConsumerWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (list.isEmpty) {
-            return const CaixaEmptyHint(
-              icon: Icons.event_available_outlined,
-              message: 'Nenhum evento ainda',
-              detail: 'Toque em + para cadastrar o primeiro.',
+            return Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CaixaEmptyHint(
+                      icon: Icons.event_available_outlined,
+                      message: 'Nenhum evento ainda',
+                      detail:
+                          'Toque em + para cadastrar o primeiro ou carregue dados de demonstração para testar.',
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final seeder = DatabaseSeeder(ref.read(appDatabaseProvider));
+                        final res = await seeder.seedAll();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Dados de exemplo carregados (${res.eventsCount} eventos).',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.dataset_outlined),
+                      label: const Text('Carregar dados de exemplo (Seeder)'),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
           return ListView.separated(
