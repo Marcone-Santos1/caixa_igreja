@@ -5,12 +5,20 @@ import 'package:google_fonts/google_fonts.dart';
 /// Identidade visual: Cantina Padroeira (Google Stitch DESIGN.md).
 /// Cores: Azul Mariano (#16437D), Dourado Festivo (#C98614), Terracota Amendoim (#8B4B27), Marfim (#FAF6EE).
 /// Tipografia: Outfit (Headlines/Títulos/Labels) + Inter (Corpo/Numéricos/Moeda).
+abstract final class CaixaAppTheme {
+  static const marianBlue = Color(0xFF16437D);
+  static const warmGold = Color(0xFFC98614);
+  static const peanutTerracotta = Color(0xFF8B4B27);
+  static const ivoryCanvas = Color(0xFFFAF6EE);
+  static const espressoCoffee = Color(0xFF251F1A);
+}
+
 ThemeData caixaIgrejaTheme() {
-  const marianBlue = Color(0xFF16437D);
-  const warmGold = Color(0xFFC98614);
-  const peanutTerracotta = Color(0xFF8B4B27);
-  const ivoryCanvas = Color(0xFFFAF6EE);
-  const espressoCoffee = Color(0xFF251F1A);
+  const marianBlue = CaixaAppTheme.marianBlue;
+  const warmGold = CaixaAppTheme.warmGold;
+  const peanutTerracotta = CaixaAppTheme.peanutTerracotta;
+  const ivoryCanvas = CaixaAppTheme.ivoryCanvas;
+  const espressoCoffee = CaixaAppTheme.espressoCoffee;
 
   const scheme = ColorScheme(
     brightness: Brightness.light,
