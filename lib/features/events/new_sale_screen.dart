@@ -1425,7 +1425,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
                     color: isConnected ? Colors.green : Colors.grey.shade600,
                   ),
                 ),
-                onPressed: () => context.push('/printer'),
+                onPressed: () => context.push('/settings/printer'),
               );
             },
           ),

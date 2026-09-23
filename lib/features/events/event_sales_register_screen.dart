@@ -269,7 +269,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
             content: const Text('Conecte a impressora em Configurações > Impressora antes de imprimir.'),
             action: SnackBarAction(
               label: 'Conectar',
-              onPressed: () => context.push('/printer'),
+              onPressed: () => context.push('/settings/printer'),
             ),
             behavior: SnackBarBehavior.floating,
           ),

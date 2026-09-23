@@ -130,6 +130,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,
+        path: '/printer',
+        redirect: (context, state) => '/settings/printer',
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/event/:eventId/sale/:saleId/troco',
         builder: (context, state) {
           final eid = state.pathParameters['eventId']!;
