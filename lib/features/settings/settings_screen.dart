@@ -30,14 +30,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/icon/app_icon.png',
                   height: 110,
                   width: 110,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Comunidade Nossa Senhora Aparecida',
+                  'Cantina Padroeira',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
@@ -45,7 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Cantina e PDV',
+                  'Comunidade N. Sra. Aparecida',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.outline,
                         fontWeight: FontWeight.w500,

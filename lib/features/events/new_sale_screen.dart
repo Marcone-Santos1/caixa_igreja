@@ -15,6 +15,7 @@ import '../../providers/database_provider.dart';
 import '../../providers/event_dashboard_provider.dart';
 import '../../providers/printer_provider.dart';
 import '../../providers/sales_draft_provider.dart';
+import '../../services/printer_service.dart';
 import '../../providers/sync_provider.dart';
 import '../../providers/cash_session_provider.dart';
 import '../../providers/event_detail_provider.dart';
@@ -423,18 +424,98 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
     // 2. Imprime as fichas / canhotos de entrega no balcão (se habilitado)
     if (printVouchers) {
       final perUnit = ref.read(deliveryVouchersPerUnitProvider);
-      final okVouchers = await printerService.printDeliveryVouchers(
-        orderNumber: orderNumber,
-        items: items,
-        eventTitle: headerTitle,
-        customerName: result.customerName,
-        perUnit: perUnit,
-      );
-      if (okVouchers) printedAny = true;
+      final oneByOne = ref.read(deliveryVouchersOneByOneProvider);
+
+      if (oneByOne) {
+        // Modo "uma por vez": monta os bytes de cada ficha e exibe diálogo de confirmação
+        final voucherBytesList = await printerService.buildDeliveryVoucherBytes(
+          orderNumber: orderNumber,
+          items: items,
+          eventTitle: headerTitle,
+          customerName: result.customerName,
+          perUnit: perUnit,
+        );
+
+        if (voucherBytesList.isNotEmpty && mounted) {
+          final done = await _showVoucherStepDialog(
+            printerService: printerService,
+            voucherBytesList: voucherBytesList,
+          );
+          if (done) printedAny = true;
+        }
+      } else {
+        // Modo padrão: imprime tudo de uma vez
+        final okVouchers = await printerService.printDeliveryVouchers(
+          orderNumber: orderNumber,
+          items: items,
+          eventTitle: headerTitle,
+          customerName: result.customerName,
+          perUnit: perUnit,
+        );
+        if (okVouchers) printedAny = true;
+      }
     }
 
     return printedAny;
   }
+
+  /// Exibe um diálogo passo a passo para imprimir fichas uma por vez.
+  /// O operador confirma cada impressão antes de avançar para a próxima.
+  Future<bool> _showVoucherStepDialog({
+    required PrinterService printerService,
+    required List<Uint8List> voucherBytesList,
+  }) async {
+    int currentIndex = 0;
+    final total = voucherBytesList.length;
+    bool printedAtLeastOne = false;
+
+    // Imprime a primeira ficha imediatamente
+    await printerService.printVoucherBytes(voucherBytesList[currentIndex]);
+    printedAtLeastOne = true;
+    currentIndex++;
+
+    while (currentIndex < total && mounted) {
+      final ctx = context;
+      // ignore: use_build_context_synchronously
+      final shouldContinue = await showDialog<bool>(
+        context: ctx,
+        barrierDismissible: false,
+        builder: (dlgCtx) => AlertDialog(
+          icon: const Icon(Icons.confirmation_number_outlined, size: 32),
+          title: Text('Ficha $currentIndex de $total impressa'),
+          content: Text(
+            currentIndex < total
+                ? 'Destaque a ficha e toque em "Próxima" para imprimir a ficha ${currentIndex + 1}.'
+                : 'Última ficha. Toque em "Concluir" para finalizar.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dlgCtx).pop(false),
+              child: const Text('Cancelar restantes'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.of(dlgCtx).pop(true),
+              icon: Icon(
+                currentIndex < total
+                    ? Icons.arrow_forward_rounded
+                    : Icons.check_rounded,
+              ),
+              label: Text(currentIndex < total ? 'Próxima →' : 'Concluir'),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldContinue != true) break;
+
+      await printerService.printVoucherBytes(voucherBytesList[currentIndex]);
+      printedAtLeastOne = true;
+      currentIndex++;
+    }
+
+    return printedAtLeastOne;
+  }
+
 
   Future<void> _checkout(
     int total,

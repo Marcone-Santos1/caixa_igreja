@@ -434,6 +434,139 @@ class PrinterService {
     return true;
   }
 
+  /// Monta os bytes de cada ficha de retirada separadamente, sem imprimi-los.
+  ///
+  /// Retorna uma lista de [Uint8List], onde cada elemento corresponde aos bytes
+  /// de uma ficha individual, pronta para ser enviada à impressora via [printVoucherBytes].
+  /// Isso permite que o chamador controle quando cada ficha é enviada (modo "uma por vez").
+  Future<List<Uint8List>> buildDeliveryVoucherBytes({
+    required String orderNumber,
+    required List<Map<String, dynamic>> items,
+    String? eventTitle,
+    String? customerName,
+    bool perUnit = true,
+  }) async {
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd/MM/yyyy HH:mm:ss').format(now);
+    final title = (eventTitle != null && eventTitle.trim().isNotEmpty)
+        ? eventTitle.trim().toUpperCase()
+        : 'CANTINA';
+
+    final vouchersToPrint = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final rawName = (item['name'] ?? item['nome'] ?? item['title'] ?? 'Item').toString();
+      final cleanName = _removeAccents(rawName);
+      final rawQty = item['qty'] ?? item['quantidade'] ?? 1;
+      final int qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 1);
+
+      if (perUnit && qty > 1) {
+        for (int i = 0; i < qty; i++) {
+          vouchersToPrint.add({
+            'name': cleanName,
+            'qty': 1,
+            'unitIndex': i + 1,
+            'unitTotal': qty,
+          });
+        }
+      } else {
+        vouchersToPrint.add({
+          'name': cleanName,
+          'qty': qty,
+        });
+      }
+    }
+
+    final result = <Uint8List>[];
+    for (final v in vouchersToPrint) {
+      final bytes = <int>[];
+      final itemName = v['name'] as String;
+      final itemQty = v['qty'] as int;
+      final unitIndex = v['unitIndex'] as int?;
+      final unitTotal = v['unitTotal'] as int?;
+
+      bytes.addAll(generator.hr());
+      bytes.addAll(
+        generator.text(
+          'FICHA DE RETIRADA',
+          styles: const PosStyles(align: PosAlign.center, bold: true),
+        ),
+      );
+      bytes.addAll(
+        generator.text(
+          'PEDIDO #$orderNumber',
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+          ),
+        ),
+      );
+      bytes.addAll(generator.hr(ch: '-'));
+
+      final itemLabel = '${itemQty}x $itemName';
+      bytes.addAll(
+        generator.text(
+          itemLabel,
+          styles: const PosStyles(
+            align: PosAlign.center,
+            bold: true,
+            height: PosTextSize.size2,
+            width: PosTextSize.size2,
+          ),
+        ),
+      );
+
+      if (unitIndex != null && unitTotal != null) {
+        bytes.addAll(
+          generator.text(
+            '(Unidade $unitIndex de $unitTotal)',
+            styles: const PosStyles(align: PosAlign.center, bold: true),
+          ),
+        );
+      }
+
+      bytes.addAll(generator.hr(ch: '-'));
+
+      if (customerName != null && customerName.trim().isNotEmpty) {
+        bytes.addAll(
+          generator.text(
+            _removeAccents('Cliente: ${customerName.trim()}'),
+            styles: const PosStyles(align: PosAlign.center),
+          ),
+        );
+      }
+
+      bytes.addAll(
+        generator.text(dateStr, styles: const PosStyles(align: PosAlign.center)),
+      );
+      bytes.addAll(
+        generator.text(_removeAccents(title), styles: const PosStyles(align: PosAlign.center)),
+      );
+      bytes.addAll(generator.feed(1));
+      bytes.addAll(
+        generator.text(
+          '- - - - - - - - - - - - - - - -',
+          styles: const PosStyles(align: PosAlign.center),
+        ),
+      );
+      bytes.addAll(generator.feed(1));
+
+      result.add(Uint8List.fromList(bytes));
+    }
+
+    return result;
+  }
+
+  /// Envia os bytes de uma única ficha para a impressora.
+  /// Use em conjunto com [buildDeliveryVoucherBytes] para o modo "uma por vez".
+  Future<void> printVoucherBytes(Uint8List voucherBytes) async {
+    await _printer.writeBytes(voucherBytes);
+  }
+
   /// Imprime o relatório de fechamento / resumo de vendas na impressora térmica 58mm.
   Future<bool> printSummaryReport({
     required String eventTitle,
@@ -564,7 +697,7 @@ class PrinterService {
     bytes.addAll(generator.hr());
     bytes.addAll(
       generator.text(
-        _removeAccents('Comunidade N. Sra Aparecida'),
+        _removeAccents('Cantina Padroeira'),
         styles: const PosStyles(align: PosAlign.center, bold: true),
       ),
     );

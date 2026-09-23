@@ -369,6 +369,24 @@ class _PrinterSetupScreenState extends ConsumerState<PrinterSetupScreen> {
                       ref.read(deliveryVouchersPerUnitProvider.notifier).toggle(false);
                     },
                   ),
+                  const Divider(height: 1),
+                  SwitchListTile(
+                    secondary: Icon(
+                      Icons.touch_app_rounded,
+                      color: ref.watch(deliveryVouchersOneByOneProvider)
+                          ? scheme.primary
+                          : scheme.outline,
+                    ),
+                    title: const Text('Imprimir uma ficha por vez'),
+                    subtitle: const Text(
+                      'Pausa entre fichas para o operador destacar. '
+                      'O app exibe um botão "Próxima" após cada impressão.',
+                    ),
+                    value: ref.watch(deliveryVouchersOneByOneProvider),
+                    onChanged: (val) {
+                      ref.read(deliveryVouchersOneByOneProvider.notifier).toggle(val);
+                    },
+                  ),
                 ],
               ],
             ),

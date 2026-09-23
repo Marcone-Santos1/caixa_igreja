@@ -77,4 +77,24 @@ class DeliveryVouchersPerUnitNotifier extends StateNotifier<bool> {
   }
 }
 
+/// Provider para o modo de impressão de fichas:
+/// - true: imprime uma ficha por vez, exibindo confirmação entre cada uma ("Próxima →")
+/// - false: imprime todas as fichas de uma só vez (padrão)
+final deliveryVouchersOneByOneProvider =
+    StateNotifierProvider<DeliveryVouchersOneByOneNotifier, bool>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
+  return DeliveryVouchersOneByOneNotifier(prefs);
+});
 
+class DeliveryVouchersOneByOneNotifier extends StateNotifier<bool> {
+  DeliveryVouchersOneByOneNotifier(this._prefs)
+      : super(_prefs.getBool(_kKey) ?? false);
+
+  static const _kKey = 'printer_vouchers_one_by_one';
+  final SharedPreferences _prefs;
+
+  Future<void> toggle(bool oneByOne) async {
+    state = oneByOne;
+    await _prefs.setBool(_kKey, oneByOne);
+  }
+}

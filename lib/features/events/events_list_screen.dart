@@ -142,15 +142,15 @@ class EventsListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Row(
           children: [
-            Image.asset(
-              'assets/images/logo.png',
+                      Image.asset(
+              'assets/icon/app_icon.png',
               height: 34,
               width: 34,
               fit: BoxFit.contain,
             ),
             const SizedBox(width: 12),
             Text(
-              'Cantina e PDV',
+              'Cantina Padroeira',
               style: GoogleFonts.outfit(fontSize: 19, fontWeight: FontWeight.bold),
             ),
           ],
