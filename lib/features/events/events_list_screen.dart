@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
 import '../../data/database.dart';
+import '../../data/database_seeder.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import 'event_delete_dialog.dart';
@@ -137,7 +140,21 @@ class EventsListScreen extends ConsumerWidget {
     final db = ref.watch(appDatabaseProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Eventos'),
+        title: Row(
+          children: [
+                      Image.asset(
+              'assets/icon/app_icon.png',
+              height: 34,
+              width: 34,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Cantina Padroeira',
+              style: GoogleFonts.outfit(fontSize: 19, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Conectar a Caixa Central',
@@ -162,57 +179,162 @@ class EventsListScreen extends ConsumerWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (list.isEmpty) {
-            return const CaixaEmptyHint(
-              icon: Icons.event_available_outlined,
-              message: 'Nenhum evento ainda',
-              detail: 'Toque em + para cadastrar o primeiro.',
+            return Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CaixaEmptyHint(
+                      icon: Icons.event_available_outlined,
+                      message: 'Nenhum evento ainda',
+                      detail:
+                          'Toque em + para cadastrar o primeiro ou carregue dados de demonstração para testar.',
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final seeder = DatabaseSeeder(ref.read(appDatabaseProvider));
+                        final res = await seeder.seedAll();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Dados de exemplo carregados (${res.eventsCount} eventos).',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.dataset_outlined),
+                      label: const Text('Carregar dados de exemplo (Seeder)'),
+                    ),
+                  ],
+                ),
+              ),
             );
           }
           return ListView.separated(
-            padding: const EdgeInsets.only(top: 8, bottom: 88),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             itemCount: list.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 2),
+            separatorBuilder: (context, index) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
               final e = list[i];
               final day = DateTime.fromMillisecondsSinceEpoch(e.dateEpochMs);
-              return CaixaListRow(
-                title: e.title,
-                subtitle:
-                    '${_dateFmt.format(day)}\n${e.notes.isEmpty ? '—' : e.notes}',
-                isThreeLine: true,
-                onTap: () => context.go('/event/${e.id}'),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Editar',
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () async {
-                        await Navigator.of(context).push<bool>(
-                          MaterialPageRoute(
-                            builder: (_) => EventFormScreen(eventId: e.id),
+              final isDark = Theme.of(context).brightness == Brightness.dark;
+
+              return Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  side: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+                color: isDark ? Colors.grey.shade900 : Colors.white,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => context.go('/event/${e.id}'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: CaixaAppTheme.warmGold.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.event, size: 14, color: CaixaAppTheme.warmGold),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _dateFmt.format(day),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF7A4E00),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'Editar evento',
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                              onPressed: () async {
+                                await Navigator.of(context).push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (_) => EventFormScreen(eventId: e.id),
+                                  ),
+                                );
+                              },
+                            ),
+                            IconButton(
+                              tooltip: 'Excluir',
+                              icon: Icon(
+                                Icons.delete_outline_rounded,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              onPressed: () async {
+                                final sure = await confirmDeleteEventDialog(
+                                  context,
+                                  eventTitle: e.title,
+                                );
+                                if (!sure || !context.mounted) return;
+                                await ref
+                                    .read(appDatabaseProvider)
+                                    .deleteEventCascade(e.id);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          e.title,
+                          style: GoogleFonts.outfit(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
                           ),
-                        );
-                      },
+                        ),
+                        if (e.notes.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            e.notes,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => context.go('/event/${e.id}'),
+                              icon: const Icon(Icons.point_of_sale_outlined, size: 18),
+                              label: const Text('Abrir Caixa / PDV'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: CaixaAppTheme.marianBlue,
+                                textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      tooltip: 'Excluir',
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                      onPressed: () async {
-                        final sure = await confirmDeleteEventDialog(
-                          context,
-                          eventTitle: e.title,
-                        );
-                        if (!sure || !context.mounted) return;
-                        await ref
-                            .read(appDatabaseProvider)
-                            .deleteEventCascade(e.id);
-                      },
-                    ),
-                  ],
+                  ),
                 ),
               );
             },

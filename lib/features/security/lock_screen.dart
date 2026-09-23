@@ -47,7 +47,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
               Icon(Icons.lock_outline_rounded, size: 56, color: scheme.primary),
               const SizedBox(height: 20),
               Text(
-                'Caixa Igreja',
+                'Cantina Padroeira',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,

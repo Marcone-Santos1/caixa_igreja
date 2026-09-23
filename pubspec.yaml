@@ -30,6 +30,8 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^7.2.0
   uuid: ^4.5.3
+  blue_thermal_printer: ^1.2.3
+  esc_pos_utils_plus: ^2.0.3
 
 dev_dependencies:
   flutter_test:
@@ -37,6 +39,18 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   drift_dev: ^2.29.0
   build_runner: ^2.5.4
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/icon/

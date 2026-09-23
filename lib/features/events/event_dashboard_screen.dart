@@ -1,12 +1,16 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:math';
-import '../../app/ui_kit.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../app/app_theme.dart';
 import '../../domain/payment_method.dart';
 import '../../providers/event_dashboard_provider.dart';
 import '../../providers/event_detail_provider.dart';
+import '../../providers/cash_session_provider.dart';
 import '../../utils/money_format.dart';
+import 'cash_session_dialogs.dart';
 
 enum DashboardTab { geral, produtos, outros }
 
@@ -61,10 +65,10 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Dashboard', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Dashboard', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
             Text(
               eventTitle,
-              style: TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 12,
                 color: scheme.onSurfaceVariant,
                 fontWeight: FontWeight.normal,
@@ -73,28 +77,140 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
           ],
         ),
       ),
-      body: dashboardAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(
-              'Erro ao carregar dashboard: $err',
-              style: TextStyle(color: scheme.error),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-        data: (data) {
-          if (data.totalSalesCount == 0) {
-            return const CaixaEmptyHint(
-              icon: Icons.analytics_outlined,
-              message: 'Nenhuma venda registrada neste evento para gerar dados.',
-            );
-          }
+      body: Column(
+        children: [
+          // Barra de Seleção de Sessão / Período
+          Consumer(
+            builder: (context, ref, _) {
+              final sessionsAsync = ref.watch(eventCashSessionsStreamProvider(widget.eventId));
+              final activeSessionAsync = ref.watch(activeCashSessionStreamProvider(widget.eventId));
+              final selectedSessionId = ref.watch(selectedSessionFilterProvider(widget.eventId));
+              final sessions = sessionsAsync.value ?? [];
 
-          return Column(
-            children: [
+              if (sessions.isEmpty) return const SizedBox.shrink();
+
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.history_toggle_off_rounded, size: 18, color: CaixaAppTheme.marianBlue),
+                    const SizedBox(width: 8),
+                    Text('Período:', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          isExpanded: true,
+                          value: selectedSessionId,
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'Todo o Evento (Acumulado)',
+                                style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            ...sessions.map((sess) {
+                              final isOpen = sess.closedAtMs == null;
+                              return DropdownMenuItem<String?>(
+                                value: sess.id,
+                                child: Text(
+                                  '${isOpen ? '🟢 ' : ''}${sess.title}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: isOpen ? Colors.green.shade800 : null,
+                                    fontWeight: isOpen ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              );
+                            }),
+                          ],
+                          onChanged: (val) {
+                            ref.read(selectedSessionFilterProvider(widget.eventId).notifier).state = val;
+                          },
+                        ),
+                      ),
+                    ),
+                    if (activeSessionAsync.value != null && (selectedSessionId == null || selectedSessionId == activeSessionAsync.value!.id)) ...[
+                      const SizedBox(width: 8),
+                      FilledButton.tonalIcon(
+                        onPressed: () async {
+                          await CloseCashSessionDialog.show(
+                            context: context,
+                            session: activeSessionAsync.value!,
+                            eventTitle: eventTitle,
+                          );
+                        },
+                        icon: const Icon(Icons.lock_clock_rounded, size: 16),
+                        label: Text('Fechar Caixa', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+          Expanded(
+            child: dashboardAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, stack) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'Erro ao carregar dashboard: $err',
+                    style: TextStyle(color: scheme.error),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              data: (data) {
+                if (data.totalSalesCount == 0) {
+                  final isFiltered = ref.watch(selectedSessionFilterProvider(widget.eventId)) != null;
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.analytics_outlined, size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          Text(
+                            isFiltered
+                                ? 'Nenhuma venda registrada nesta sessão.'
+                                : 'Nenhuma venda registrada neste evento para gerar dados.',
+                            style: GoogleFonts.inter(fontSize: 15, color: Colors.grey.shade700),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (isFiltered) ...[
+                            const SizedBox(height: 12),
+                            OutlinedButton(
+                              onPressed: () {
+                                ref.read(selectedSessionFilterProvider(widget.eventId).notifier).state = null;
+                              },
+                              child: const Text('Ver Todo o Evento (Acumulado)'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
               Padding(
                 padding: const EdgeInsets.all(12),
                 child: SegmentedButton<DashboardTab>(
@@ -137,7 +253,10 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
           );
         },
       ),
-    );
+    ),
+  ],
+),
+);
   }
 
   Widget _buildGeralTab(BuildContext context, EventDashboardData data) {
@@ -203,97 +322,138 @@ class _EventDashboardScreenState extends ConsumerState<EventDashboardScreen> {
           const SizedBox(height: 10),
         ],
 
-        // Summary Cards Grid
-        GridView.count(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisCount: 2,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.4,
-          children: [
-            Card(
-              color: scheme.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
+        // Faturamento Banner (Stitch Marian Blue gradient)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [CaixaAppTheme.marianBlue, Color(0xFF0C2B54)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: CaixaAppTheme.marianBlue.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.monetization_on_outlined,
+                  color: CaixaAppTheme.warmGold,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Icon(Icons.monetization_on_outlined, color: scheme.onPrimaryContainer, size: 20),
-                        const SizedBox(width: 6),
-                        Text('Faturamento', style: TextStyle(color: scheme.onPrimaryContainer, fontSize: 13, fontWeight: FontWeight.w500)),
-                      ],
+                    Text(
+                      'FATURAMENTO TOTAL',
+                      style: GoogleFonts.inter(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.1,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       formatCents(data.totalRevenueCents),
-                      style: TextStyle(
-                        color: scheme.onPrimaryContainer,
-                        fontSize: 20,
+                      style: GoogleFonts.outfit(
+                        color: Colors.white,
+                        fontSize: 28,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-            Card(
-              color: scheme.secondaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(14),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Resumos Rápidos (Comandas e Ticket Médio)
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.shopping_bag_outlined, color: scheme.onSecondaryContainer, size: 20),
+                        const Icon(Icons.receipt_outlined, size: 18, color: CaixaAppTheme.marianBlue),
                         const SizedBox(width: 6),
-                        Text('Vendas Totais', style: TextStyle(color: scheme.onSecondaryContainer, fontSize: 13, fontWeight: FontWeight.w500)),
+                        Text(
+                          'Comandas',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                        ),
                       ],
                     ),
+                    const SizedBox(height: 8),
                     Text(
                       '${data.totalSalesCount}',
-                      style: TextStyle(
-                        color: scheme.onSecondaryContainer,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.analytics_outlined, size: 18, color: CaixaAppTheme.warmGold),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ticket Médio',
+                          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      formatCents(data.averageTicketCents),
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 10),
-        Card(
-          color: scheme.tertiaryContainer,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Icon(Icons.confirmation_num_outlined, color: scheme.onTertiaryContainer, size: 24),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Ticket Médio Geral', style: TextStyle(color: scheme.onTertiaryContainer, fontSize: 12)),
-                    Text(
-                      formatCents(data.averageTicketCents),
-                      style: TextStyle(
-                        color: scheme.onTertiaryContainer,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
         ),
         const SizedBox(height: 16),
 

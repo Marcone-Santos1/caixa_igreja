@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database.dart';
 import '../domain/sale_line_kind.dart';
 import 'database_provider.dart';
+import 'cash_session_provider.dart';
 
 class ProductSaleStat {
   final String productId;
@@ -499,6 +500,7 @@ final eventChangeDotAllocationsStreamProvider = StreamProvider.autoDispose
 
 final eventDashboardProvider =
     Provider.family<AsyncValue<EventDashboardData>, String>((ref, eventId) {
+      final selectedSessionId = ref.watch(selectedSessionFilterProvider(eventId));
       final salesAsync = ref.watch(eventSalesStreamProvider(eventId));
       final linesAsync = ref.watch(eventSaleLinesStreamProvider(eventId));
       final productsAsync = ref.watch(eventProductsStreamProvider(eventId));
@@ -536,11 +538,19 @@ final eventDashboardProvider =
         );
       }
 
-      final sales = salesAsync.value!;
-      final lines = linesAsync.value!;
+      var sales = salesAsync.value!;
+      var lines = linesAsync.value!;
       final products = productsAsync.value!;
       final denoms = denomsAsync.value!;
-      final changeDotAllocations = changeDotAllocAsync.value!;
+      var changeDotAllocations = changeDotAllocAsync.value!;
+
+      if (selectedSessionId != null) {
+        sales = sales.where((s) => s.sessionId == selectedSessionId).toList();
+        final saleIds = sales.map((s) => s.id).toSet();
+        lines = lines.where((l) => saleIds.contains(l.saleId)).toList();
+        changeDotAllocations =
+            changeDotAllocations.where((c) => saleIds.contains(c.saleId)).toList();
+      }
 
       final data = EventDashboardData.compute(
         sales: sales,

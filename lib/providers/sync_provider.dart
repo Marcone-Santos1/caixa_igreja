@@ -7,8 +7,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' show Value, InsertMode;
 import '../data/database.dart';
 import '../data/sale_line_draft.dart';
+import '../domain/payment_method.dart';
 import '../domain/sale_line_kind.dart';
 import 'database_provider.dart';
+import 'printer_provider.dart';
 
 enum SyncMode { standalone, server, client }
 
@@ -64,11 +66,12 @@ final Map<String, StreamController<List<dynamic>>> _clientStreamControllers = {
 
 final syncProvider = StateNotifierProvider<SyncNotifier, SyncState>((ref) {
   final db = ref.watch(appDatabaseProvider);
-  return SyncNotifier(db);
+  return SyncNotifier(db, ref);
 });
 
 class SyncNotifier extends StateNotifier<SyncState> {
   final AppDatabase _db;
+  final Ref _ref;
   HttpServer? _httpServer;
   RawDatagramSocket? _udpBroadcastSocket;
   RawDatagramSocket? _udpListenerSocket;
@@ -77,7 +80,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
   final List<WebSocket> _serverWebSockets = [];
   Timer? _discoveredCleanupTimer;
 
-  SyncNotifier(this._db) : super(SyncState()) {
+  SyncNotifier(this._db, this._ref) : super(SyncState()) {
     // Start discovery listener by default to find servers
     _startUdpListener();
     _startDiscoveredCleanupTimer();
@@ -323,6 +326,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         }
 
         if (request.method == 'POST' && endpoint == 'sales') {
+          final clientIp = request.connectionInfo?.remoteAddress.address;
           final content = await utf8.decoder.bind(request).join();
           final Map<String, dynamic> body = jsonDecode(content);
 
@@ -331,6 +335,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
           final notes = body['notes'] as String?;
           final changePending = body['changePending'] as bool? ?? false;
           final customerName = body['customerName'] as String?;
+          final terminalName = body['terminalName'] as String?;
           final linesJson = body['lines'] as List;
 
           final drafts = linesJson.map((l) {
@@ -380,14 +385,30 @@ class SyncNotifier extends StateNotifier<SyncState> {
             request.response.write(
               jsonEncode({'success': true, 'saleId': saleId}),
             );
+            await request.response.close();
+
+            // Auto-impressão da venda remota no Caixa Central (Host)
+            unawaited(
+              _autoPrintRemoteSale(
+                eventId: eventId,
+                paymentMethod: paymentMethod,
+                amountReceivedCents: amountReceivedCents,
+                notes: notes,
+                customerName: customerName,
+                drafts: drafts,
+                clientIp: clientIp,
+                terminalName: terminalName,
+              ),
+            );
+            return;
           } catch (e) {
             request.response.statusCode = HttpStatus.badRequest;
             request.response.write(
               jsonEncode({'success': false, 'error': e.toString()}),
             );
+            await request.response.close();
+            return;
           }
-          await request.response.close();
-          return;
         }
 
         if (request.method == 'POST' && endpoint == 'products') {
@@ -931,6 +952,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
       'changePending': changePending,
       'customerName': customerName,
       'lines': linesJson,
+      'terminalName': Platform.localHostname,
     };
 
     request.write(jsonEncode(body));
@@ -1360,6 +1382,105 @@ class SyncNotifier extends StateNotifier<SyncState> {
     if (response.statusCode != HttpStatus.ok || data['success'] != true) {
       throw StateError(
         data['error'] as String? ?? 'Erro ao resolver troco no servidor.',
+      );
+    }
+  }
+
+  /// Dispara a impressão automática na impressora Bluetooth conectada ao Host
+  /// quando uma venda é recebida de um terminal remoto (celular conectado via Wi-Fi).
+  Future<void> _autoPrintRemoteSale({
+    required String eventId,
+    required String paymentMethod,
+    required int amountReceivedCents,
+    required String? notes,
+    required String? customerName,
+    required List<SaleLineDraft> drafts,
+    String? clientIp,
+    String? terminalName,
+  }) async {
+    try {
+      final autoPrint = _ref.read(autoPrintEnabledProvider);
+      if (!autoPrint) return;
+
+      final printerService = _ref.read(printerServiceProvider);
+      final connected = await printerService.isConnected();
+      if (!connected) return;
+
+      // Obter título do evento e sequência do pedido
+      String headerTitle = 'CANTINA';
+      int orderSeq = 1;
+      try {
+        final ev = await (_db.select(_db.events)..where((e) => e.id.equals(eventId))).getSingleOrNull();
+        if (ev != null && ev.title.trim().isNotEmpty) {
+          headerTitle = ev.title.trim();
+        }
+        final sales = await (_db.select(_db.sales)..where((s) => s.eventId.equals(eventId))).get();
+        orderSeq = sales.length;
+        if (orderSeq <= 0) orderSeq = 1;
+      } catch (_) {}
+
+      final orderNumber = orderSeq.toString().padLeft(3, '0');
+
+      // Obter nomes dos itens
+      final items = <Map<String, dynamic>>[];
+      int totalCents = 0;
+
+      for (final d in drafts) {
+        String name = 'Item';
+        if (d.kind == SaleLineKind.product && d.productId != null) {
+          final p = await (_db.select(_db.products)..where((prod) => prod.id.equals(d.productId!))).getSingleOrNull();
+          if (p != null) {
+            name = p.name;
+          }
+        } else if (d.kind == SaleLineKind.ficha && d.dotDenominationId != null) {
+          final f = await (_db.select(_db.eventDotDenominations)..where((denom) => denom.id.equals(d.dotDenominationId!))).getSingleOrNull();
+          if (f != null) {
+            name = 'Ficha: ${f.label}';
+          }
+        } else if (d.kind == SaleLineKind.valorLivre) {
+          name = d.freeLabel ?? 'Valor avulso';
+        }
+
+        final lineTotal = d.resolveLineTotalCents();
+        totalCents += lineTotal;
+
+        items.add({
+          'name': name,
+          'qty': d.qty,
+          'subtotal': lineTotal / 100.0,
+        });
+      }
+
+      final changeCents = amountReceivedCents - totalCents;
+
+      // Monta tag de identificação do terminal remoto
+      String tag;
+      if (terminalName != null && terminalName.isNotEmpty && terminalName != 'localhost') {
+        tag = 'TERMINAL REMOTO ($terminalName)';
+      } else if (clientIp != null && clientIp.isNotEmpty) {
+        tag = 'TERMINAL REMOTO ($clientIp)';
+      } else {
+        tag = 'TERMINAL REMOTO';
+      }
+
+      await printerService.printTicket(
+        orderNumber: orderNumber,
+        items: items,
+        total: totalCents / 100.0,
+        headerTitle: headerTitle,
+        paymentMethod: PaymentMethod.label(paymentMethod),
+        amountReceived: amountReceivedCents > 0 ? amountReceivedCents / 100.0 : null,
+        change: changeCents > 0 ? changeCents / 100.0 : null,
+        customerName: customerName,
+        notes: notes,
+        terminalTag: tag,
+      );
+    } catch (e, stack) {
+      developer.log(
+        'Erro na auto-impressão remota no Host: $e',
+        name: 'SyncServer',
+        error: e,
+        stackTrace: stack,
       );
     }
   }

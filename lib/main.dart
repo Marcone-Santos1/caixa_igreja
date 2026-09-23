@@ -45,7 +45,7 @@ class CaixaIgrejaApp extends ConsumerWidget {
 
     if (needsLock) {
       return MaterialApp(
-        title: 'Caixa Igreja',
+        title: 'Cantina Padroeira',
         debugShowCheckedModeBanner: false,
         theme: light,
         darkTheme: dark,
@@ -58,7 +58,7 @@ class CaixaIgrejaApp extends ConsumerWidget {
     }
 
     return MaterialApp.router(
-      title: 'Caixa Igreja',
+      title: 'Cantina Padroeira',
       debugShowCheckedModeBanner: false,
       theme: light,
       darkTheme: dark,
