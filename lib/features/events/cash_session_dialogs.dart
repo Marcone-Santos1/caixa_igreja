@@ -290,6 +290,7 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
 
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           title: Row(
             children: [
               Container(
@@ -341,8 +342,19 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Faturamento Total (${sales.length} vendas)', style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13)),
-                        Text(formatCents(totalRevenueCents), style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: CaixaAppTheme.marianBlue)),
+                        Expanded(
+                          child: Text(
+                            'Faturamento Total (${sales.length} vendas)',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          formatCents(totalRevenueCents),
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16, color: CaixaAppTheme.marianBlue),
+                        ),
                       ],
                     ),
                   ),
@@ -354,7 +366,15 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('• ${e.key}', style: GoogleFonts.inter(fontSize: 13)),
+                            Expanded(
+                              child: Text(
+                                '• ${e.key}',
+                                style: GoogleFonts.inter(fontSize: 13),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Text(formatCents(e.value), style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
@@ -491,7 +511,15 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 13, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Text(
             value,
             style: GoogleFonts.outfit(
