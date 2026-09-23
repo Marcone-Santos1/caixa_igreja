@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -258,6 +259,85 @@ class EventSalesRegisterScreen extends ConsumerWidget {
     await SharePlus.instance.share(ShareParams(text: buffer.toString()));
   }
 
+  Future<void> _printSalesSummary(BuildContext context, WidgetRef ref) async {
+    final printerService = ref.read(printerServiceProvider);
+    final connected = await printerService.isConnected();
+    if (!connected) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Conecte a impressora em Configurações > Impressora antes de imprimir.'),
+            action: SnackBarAction(
+              label: 'Conectar',
+              onPressed: () => context.push('/printer'),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    final db = ref.read(appDatabaseProvider);
+    final sales = await (db.select(db.sales)..where((s) => s.eventId.equals(eventId))).get();
+    if (sales.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não há vendas para imprimir.')),
+        );
+      }
+      return;
+    }
+
+    final event = await (db.select(db.events)..where((e) => e.id.equals(eventId))).getSingle();
+
+    int totalAmount = 0;
+    final Map<String, double> totalByMethod = {};
+    final List<Map<String, dynamic>> pendingChanges = [];
+
+    for (final s in sales) {
+      totalAmount += s.totalCents;
+      final label = PaymentMethod.label(s.paymentMethod);
+      totalByMethod[label] = (totalByMethod[label] ?? 0.0) + (s.totalCents / 100.0);
+      if (s.changePending) {
+        final change = (s.amountReceivedCents - s.totalCents) / 100.0;
+        pendingChanges.add({
+          'customerName': s.customerName ?? 'Cliente #${s.id}',
+          'change': change,
+        });
+      }
+    }
+
+    try {
+      await printerService.printSummaryReport(
+        eventTitle: event.title,
+        totalRevenue: totalAmount / 100.0,
+        totalSalesCount: sales.length,
+        revenueByPaymentMethod: totalByMethod,
+        pendingChanges: pendingChanges,
+      );
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Resumo de vendas impresso com sucesso!'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao imprimir resumo: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncProvider);
@@ -270,11 +350,19 @@ class EventSalesRegisterScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Registro de vendas'),
+        title: Text(
+          'Registro de vendas',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Imprimir Resumo',
+            onPressed: () => _printSalesSummary(context, ref),
+          ),
+          IconButton(
             icon: const Icon(Icons.share),
-            tooltip: 'Exportar Resumo',
+            tooltip: 'Compartilhar Resumo',
             onPressed: () => _shareSalesSummary(context, ref),
           ),
         ],
@@ -332,31 +420,68 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                         );
                       }).toList();
 
+                      final cardBg = isPending
+                          ? CaixaAppTheme.warmGold.withValues(alpha: 0.12)
+                          : isResolved
+                              ? Colors.green.withValues(alpha: 0.08)
+                              : Theme.of(context).colorScheme.surface;
+
+                      final borderColor = isPending
+                          ? CaixaAppTheme.warmGold.withValues(alpha: 0.6)
+                          : isResolved
+                              ? Colors.green.withValues(alpha: 0.4)
+                              : Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5);
+
                       return Card(
-                        color: isPending
-                            ? Colors.orange.withValues(alpha: 0.15)
-                            : isResolved
-                                ? Colors.green.withValues(alpha: 0.15)
-                                : null,
+                        color: cardBg,
+                        elevation: isPending ? 1 : 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: borderColor, width: isPending ? 1.5 : 1.0),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 12),
                         child: ExpansionTile(
                           key: ValueKey(s.id),
-                          leading: CircleAvatar(
-                            radius: 18,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            side: BorderSide.none,
+                          ),
+                          collapsedShape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.all(Radius.circular(16)),
+                            side: BorderSide.none,
+                          ),
+                          leading: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: CaixaAppTheme.marianBlue.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: CaixaAppTheme.marianBlue.withValues(alpha: 0.2),
+                              ),
+                            ),
                             child: Text(
-                              s.id,
-                              style: const TextStyle(fontSize: 12),
+                              s.id.length > 6 ? s.id.substring(0, 6) : s.id,
+                              style: GoogleFonts.outfit(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: CaixaAppTheme.marianBlue,
+                              ),
                             ),
                           ),
                           title: Text(
                             _dateTimeFmt.format(when),
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style: GoogleFonts.outfit(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                            ),
                           ),
                           subtitle: Text(
                             '$pay · Total ${formatCents(s.totalCents)}'
                             '${change != 0 ? ' · Troco ${formatCents(change)}' : ''}',
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                            ),
                           ),
                           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           children: [
@@ -364,28 +489,45 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 if (s.notes != null && s.notes!.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                     child: Row(
                                       children: [
                                         const Icon(Icons.notes, size: 16, color: Colors.grey),
                                         const SizedBox(width: 8),
-                                        Expanded(child: Text(s.notes!, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic))),
+                                        Expanded(
+                                          child: Text(
+                                            s.notes!,
+                                            style: GoogleFonts.inter(fontSize: 12, fontStyle: FontStyle.italic),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
                                 if (s.changePending)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: CaixaAppTheme.warmGold.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: CaixaAppTheme.warmGold.withValues(alpha: 0.5)),
+                                    ),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
+                                        const Icon(Icons.warning_amber_rounded, size: 18, color: CaixaAppTheme.warmGold),
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
                                             'Troco pendente (${formatCents(s.amountReceivedCents - s.totalCents)}) para: ${s.customerName ?? 'Não informado'}',
-                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                              color: Colors.orange.shade800,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              color: Colors.brown.shade900,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
@@ -394,12 +536,17 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                     ),
                                   ),
                                 Text(
-                                  'Itens',
-                                  style: Theme.of(context).textTheme.labelLarge,
+                                  'ITENS',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 if (lines.isEmpty)
-                                  const Text('Sem itens.')
+                                  Text('Sem itens.', style: GoogleFonts.inter(fontSize: 13))
                                 else
                                   ...lines.map(
                                     (l) => Padding(
@@ -411,14 +558,14 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                             flex: 3,
                                             child: Text(
                                               l.itemLabel,
-                                              style: Theme.of(context).textTheme.bodyMedium,
+                                              style: GoogleFonts.inter(fontSize: 13),
                                             ),
                                           ),
                                           Expanded(
                                             child: Text(
                                               '${l.qty}× ${formatCents(l.unitPriceCents)}',
                                               textAlign: TextAlign.end,
-                                              style: Theme.of(context).textTheme.bodySmall,
+                                              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade600),
                                             ),
                                           ),
                                           SizedBox(
@@ -426,64 +573,93 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                             child: Text(
                                               formatCents(l.lineTotalCents),
                                               textAlign: TextAlign.end,
-                                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
+                                              style: GoogleFonts.outfit(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
                                   ),
-                                const Divider(),
+                                const Divider(height: 20),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       'Recebido',
-                                      style: Theme.of(context).textTheme.bodySmall,
+                                      style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600),
                                     ),
-                                    Text(formatCents(s.amountReceivedCents)),
+                                    Text(
+                                      formatCents(s.amountReceivedCents),
+                                      style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
+                                    ),
                                   ],
                                 ),
-                                const Divider(),
-                                Row(
+                                const Divider(height: 20),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  alignment: WrapAlignment.spaceBetween,
+                                  crossAxisAlignment: WrapCrossAlignment.center,
                                   children: [
-                                    TextButton.icon(
+                                    OutlinedButton.icon(
                                       onPressed: () => _reprintSaleTicket(context, ref, s, lines),
                                       icon: const Icon(Icons.print_outlined, size: 16),
-                                      label: const Text('Imprimir'),
+                                      label: Text('Imprimir', style: GoogleFonts.inter(fontSize: 13)),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                        visualDensity: VisualDensity.compact,
+                                      ),
                                     ),
                                     if (isClient)
-                                      const Expanded(
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(vertical: 8),
-                                          child: Text(
-                                            'Edições permitidas apenas no Caixa Central',
-                                            textAlign: TextAlign.end,
-                                            style: TextStyle(fontSize: 12, color: Colors.grey, fontStyle: FontStyle.italic),
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 4),
+                                        child: Text(
+                                          'Edições permitidas apenas no Caixa Central',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            color: Colors.grey,
+                                            fontStyle: FontStyle.italic,
                                           ),
                                         ),
                                       )
-                                    else ...[
-                                      if (s.changePending)
-                                        TextButton.icon(
-                                          onPressed: () => _resolvePendingChange(context, ref, s),
-                                          icon: const Icon(Icons.check_circle, size: 16, color: Colors.green),
-                                          label: const Text('Baixar troco', style: TextStyle(color: Colors.green)),
-                                        ),
-                                      const Spacer(),
-                                      TextButton.icon(
-                                        onPressed: () => context.push('/event/${s.eventId}/edit_sale/${s.id}'),
-                                        icon: const Icon(Icons.edit, size: 16),
-                                        label: const Text('Editar'),
+                                    else
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                        children: [
+                                          if (s.changePending)
+                                            FilledButton.icon(
+                                              onPressed: () => _resolvePendingChange(context, ref, s),
+                                              icon: const Icon(Icons.check_circle_outline, size: 16),
+                                              label: Text('Baixar troco', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: Colors.green.shade700,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                visualDensity: VisualDensity.compact,
+                                              ),
+                                            ),
+                                          IconButton.outlined(
+                                            onPressed: () => context.push('/event/${s.eventId}/edit_sale/${s.id}'),
+                                            icon: const Icon(Icons.edit_outlined, size: 16),
+                                            tooltip: 'Editar Venda',
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                          IconButton.outlined(
+                                            onPressed: () => _deleteSale(context, ref, s.id),
+                                            icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                                            tooltip: 'Excluir Venda',
+                                            visualDensity: VisualDensity.compact,
+                                            style: IconButton.styleFrom(
+                                              side: BorderSide(color: Colors.red.withValues(alpha: 0.3)),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      TextButton.icon(
-                                        onPressed: () => _deleteSale(context, ref, s.id),
-                                        icon: const Icon(Icons.delete, size: 16, color: Colors.red),
-                                        label: const Text('Excluir', style: TextStyle(color: Colors.red)),
-                                      ),
-                                    ],
                                   ],
                                 ),
                               ],

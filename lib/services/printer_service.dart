@@ -282,6 +282,146 @@ class PrinterService {
     return true;
   }
 
+  /// Imprime o relatório de fechamento / resumo de vendas na impressora térmica 58mm.
+  Future<bool> printSummaryReport({
+    required String eventTitle,
+    required double totalRevenue,
+    required int totalSalesCount,
+    required Map<String, double> revenueByPaymentMethod,
+    List<Map<String, dynamic>> pendingChanges = const [],
+  }) async {
+    final connected = await isConnected();
+    if (!connected) {
+      throw StateError('Impressora não conectada via Bluetooth.');
+    }
+
+    final profile = await CapabilityProfile.load();
+    final generator = Generator(PaperSize.mm58, profile);
+    final bytes = <int>[];
+
+    final now = DateTime.now();
+    final dateStr = DateFormat('dd/MM/yyyy HH:mm:ss').format(now);
+    final currencyFmt = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+
+    // 1. Cabeçalho
+    bytes.addAll(
+      generator.text(
+        _removeAccents(eventTitle.toUpperCase()),
+        styles: const PosStyles(
+          align: PosAlign.center,
+          bold: true,
+          height: PosTextSize.size2,
+          width: PosTextSize.size2,
+        ),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        'RESUMO DE VENDAS',
+        styles: const PosStyles(align: PosAlign.center, bold: true),
+      ),
+    );
+    bytes.addAll(
+      generator.text(
+        dateStr,
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(generator.hr());
+
+    // 2. Total Geral e Contagem
+    final totalFormatted = currencyFmt.format(totalRevenue).replaceAll('R\$', 'R\$ ');
+    bytes.addAll(
+      generator.row([
+        PosColumn(
+          text: 'TOTAL',
+          width: 5,
+          styles: const PosStyles(bold: true, height: PosTextSize.size2),
+        ),
+        PosColumn(
+          text: _removeAccents(totalFormatted),
+          width: 7,
+          styles: const PosStyles(align: PosAlign.right, bold: true, height: PosTextSize.size2),
+        ),
+      ]),
+    );
+    bytes.addAll(
+      generator.text(
+        'Comandas emitidas: $totalSalesCount',
+        styles: const PosStyles(align: PosAlign.center),
+      ),
+    );
+    bytes.addAll(generator.hr(ch: '-'));
+
+    // 3. Por Forma de Pagamento
+    bytes.addAll(
+      generator.text(
+        'POR FORMA DE PAGAMENTO:',
+        styles: const PosStyles(bold: true),
+      ),
+    );
+    revenueByPaymentMethod.forEach((method, val) {
+      if (val > 0) {
+        final valStr = currencyFmt.format(val).replaceAll('R\$', 'R\$ ');
+        bytes.addAll(
+          generator.row([
+            PosColumn(
+              text: _removeAccents(method),
+              width: 6,
+            ),
+            PosColumn(
+              text: _removeAccents(valStr),
+              width: 6,
+              styles: const PosStyles(align: PosAlign.right, bold: true),
+            ),
+          ]),
+        );
+      }
+    });
+
+    // 4. Trocos Pendentes (se houver)
+    if (pendingChanges.isNotEmpty) {
+      bytes.addAll(generator.hr(ch: '-'));
+      bytes.addAll(
+        generator.text(
+          'TROCOS PENDENTES:',
+          styles: const PosStyles(bold: true),
+        ),
+      );
+      for (final p in pendingChanges) {
+        final name = (p['customerName'] ?? 'Cliente').toString();
+        final changeVal = (p['change'] ?? 0.0) as double;
+        final changeStr = currencyFmt.format(changeVal).replaceAll('R\$', 'R\$ ');
+        bytes.addAll(
+          generator.row([
+            PosColumn(
+              text: _removeAccents(name),
+              width: 7,
+            ),
+            PosColumn(
+              text: _removeAccents(changeStr),
+              width: 5,
+              styles: const PosStyles(align: PosAlign.right, bold: true),
+            ),
+          ]),
+        );
+      }
+    }
+
+    // 5. Rodapé
+    bytes.addAll(generator.hr());
+    bytes.addAll(
+      generator.text(
+        _removeAccents('Comunidade N. Sra Aparecida'),
+        styles: const PosStyles(align: PosAlign.center, bold: true),
+      ),
+    );
+    bytes.addAll(generator.feed(1));
+
+    await _printer.writeBytes(Uint8List.fromList(bytes));
+    return true;
+  }
+
   /// Remove caracteres acentuados e caracteres especiais incompatíveis
   /// com a tabela de caracteres padrão (CodePage 437/ASCII) de mini impressoras chinesas de 58mm.
   String _removeAccents(String text) {
