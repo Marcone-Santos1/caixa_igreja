@@ -75,3 +75,23 @@ Para evitar divergências financeiras e conflitos nos bancos de dados locais dos
 - **Solução**:
   - Evite que a tela do Caixa Central bloqueie totalmente ou configure o celular para não desligar o Wi-Fi em modo de suspensão.
   - Aproxime os celulares do roteador Wi-Fi para melhor estabilidade.
+
+---
+
+## 🔄 Mudanças com a sincronização pela nuvem (schema v9)
+
+Desde a entrega da Fase A da nuvem (`sincronizacao_nuvem.md`):
+
+- **Venda feita offline num terminal não é mais perdida.** Se o terminal
+  perder a conexão e registrar a venda localmente, o próximo refresh
+  **reenvia a venda ao host** (mantendo id e horário) em vez de apagá-la.
+  Se o reenvio falhar (ex.: produto não existe mais no host), a venda é
+  preservada localmente até conseguir.
+- O snapshot do host transporta também as colunas de sincronização
+  (`rowVersion`, `updatedAtMs`, `updatedByDevice`, `deletedAtMs`), e o
+  cliente as grava sem alterá-las (modo *bypass* dos triggers).
+- Exclusões de produto/ficha/venda no host são lógicas (tombstones); os
+  terminais deixam de exibi-las no próximo refresh.
+- **Terminais (modo cliente) não enviam para a nuvem** — só o Caixa Central
+  ou aparelhos em modo normal. Ambos os celulares precisam estar na mesma
+  versão do app (o schema v9 muda o formato do snapshot).

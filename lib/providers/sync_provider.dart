@@ -336,6 +336,9 @@ class SyncNotifier extends StateNotifier<SyncState> {
           final changePending = body['changePending'] as bool? ?? false;
           final customerName = body['customerName'] as String?;
           final terminalName = body['terminalName'] as String?;
+          // Venda criada offline no terminal: preserva id e horário originais.
+          final requestedSaleId = body['saleId'] as String?;
+          final requestedSoldAtMs = body['soldAtMs'] as int?;
           final linesJson = body['lines'] as List;
 
           final drafts = linesJson.map((l) {
@@ -375,6 +378,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
               notes: notes,
               changePending: changePending,
               customerName: customerName,
+              saleId: requestedSaleId,
+              soldAtMs: requestedSoldAtMs,
               lines: drafts,
             );
 
@@ -453,29 +458,17 @@ class SyncNotifier extends StateNotifier<SyncState> {
                 );
               }
             } else {
-              if (id == null) {
-                final idToUse = _db.generateUuid();
-                await _db.into(_db.products).insert(ProductsCompanion.insert(
-                  id: idToUse,
-                  eventId: eventId,
-                  name: name,
-                  priceCents: priceCents,
-                  description: Value(description),
-                  trackStock: Value(trackStock),
-                  stockQty: Value(stockQty),
-                  active: Value(active),
-                  isCombo: const Value(false),
-                ));
-              } else {
-                await (_db.update(_db.products)..where((t) => t.id.equals(id))).write(ProductsCompanion(
-                  name: Value(name),
-                  priceCents: Value(priceCents),
-                  description: Value(description),
-                  trackStock: Value(trackStock),
-                  stockQty: Value(stockQty),
-                  active: Value(active),
-                ));
-              }
+              // saveProduct registra a diferença de estoque como movimentação
+              await _db.saveProduct(
+                id: id,
+                eventId: eventId,
+                name: name,
+                priceCents: priceCents,
+                description: description,
+                trackStock: trackStock,
+                stockQty: stockQty,
+                active: active,
+              );
             }
 
             _broadcastServerRefresh();
@@ -521,22 +514,14 @@ class SyncNotifier extends StateNotifier<SyncState> {
           final stockQty = body['stockQty'] as int? ?? 0;
 
           try {
-            if (id == null) {
-              final idToUse = _db.generateUuid();
-              await _db.into(_db.eventDotDenominations).insert(EventDotDenominationsCompanion.insert(
-                id: idToUse,
-                eventId: eventId,
-                label: label,
-                valueCents: valueCents,
-                stockQty: Value(stockQty),
-              ));
-            } else {
-              await (_db.update(_db.eventDotDenominations)..where((t) => t.id.equals(id))).write(EventDotDenominationsCompanion(
-                label: Value(label),
-                valueCents: Value(valueCents),
-                stockQty: Value(stockQty),
-              ));
-            }
+            // saveDotDenomination registra a diferença de estoque como movimentação
+            await _db.saveDotDenomination(
+              id: id,
+              eventId: eventId,
+              label: label,
+              valueCents: valueCents,
+              stockQty: stockQty,
+            );
 
             _broadcastServerRefresh();
 
@@ -842,9 +827,21 @@ class SyncNotifier extends StateNotifier<SyncState> {
       );
 
       // 5. Obter vendas
-      final salesList = await _pullDataListFromServer<PosSale>(
+      var salesList = await _pullDataListFromServer<PosSale>(
         ip, port, eventId, 'sales', (json) => PosSale.fromJson(json),
       );
+
+      // 5b. Reenviar ao host vendas registradas offline neste terminal.
+      // Sem isso, o snapshot do host apagaria a venda local em silêncio.
+      final pushed = await _pushLocalOnlySalesToHost(
+        eventId,
+        salesList.map((s) => s.id).toSet(),
+      );
+      if (pushed > 0) {
+        salesList = await _pullDataListFromServer<PosSale>(
+          ip, port, eventId, 'sales', (json) => PosSale.fromJson(json),
+        );
+      }
 
       // 6. Obter linhas de vendas
       final saleLinesList = await _pullDataListFromServer<PosSaleLine>(
@@ -888,6 +885,70 @@ class SyncNotifier extends StateNotifier<SyncState> {
     }
   }
 
+  /// Reenvia ao host vendas que só existem localmente (criadas enquanto o
+  /// terminal estava offline), preservando id e horário originais.
+  /// Retorna quantas foram enviadas com sucesso; as que falharem permanecem
+  /// locais e são preservadas pelo [AppDatabase.syncEventData].
+  Future<int> _pushLocalOnlySalesToHost(
+    String eventId,
+    Set<String> hostSaleIds,
+  ) async {
+    final pending = await _db.localOnlySalesForEvent(eventId, hostSaleIds);
+    if (pending.isEmpty) return 0;
+
+    var pushed = 0;
+    for (final sale in pending) {
+      try {
+        final lines = await _db.saleLinesRaw(sale.id);
+        if (lines.isEmpty) continue;
+        final drafts = lines.map((l) {
+          if (l.lineKind == SaleLineKind.product) {
+            return SaleLineDraft.product(
+              productId: l.productId!,
+              qty: l.qty,
+              unitPriceCents: l.unitPriceCents,
+            );
+          } else if (l.lineKind == SaleLineKind.ficha) {
+            return SaleLineDraft.ficha(
+              dotDenominationId: l.dotDenominationId!,
+              qty: l.qty,
+              unitPriceCents: l.unitPriceCents,
+            );
+          }
+          return SaleLineDraft.valorLivre(
+            freeLabel: l.freeLabel ?? 'Valor avulso',
+            lineTotalCents: l.lineTotalCents,
+          );
+        }).toList();
+
+        await submitSaleToHost(
+          eventId,
+          sale.paymentMethod,
+          sale.amountReceivedCents,
+          sale.notes,
+          sale.changePending,
+          sale.customerName,
+          drafts,
+          saleId: sale.id,
+          soldAtMs: sale.soldAtMs,
+        );
+        pushed++;
+      } catch (e) {
+        developer.log(
+          'Falha ao reenviar venda offline ${sale.id} ao host: $e',
+          name: 'SyncClient',
+        );
+      }
+    }
+    if (pushed > 0) {
+      developer.log(
+        '$pushed venda(s) offline reenviada(s) ao host para o evento $eventId',
+        name: 'SyncClient',
+      );
+    }
+    return pushed;
+  }
+
   Future<ChurchEvent?> fetchEventDetailsFromServer(String eventId) async {
     final ip = state.serverIp;
     final port = state.serverPort;
@@ -921,8 +982,10 @@ class SyncNotifier extends StateNotifier<SyncState> {
     String? notes,
     bool changePending,
     String? customerName,
-    List<SaleLineDraft> lines,
-  ) async {
+    List<SaleLineDraft> lines, {
+    String? saleId,
+    int? soldAtMs,
+  }) async {
     final ip = state.serverIp;
     final port = state.serverPort;
     if (ip == null) throw StateError('Não conectado ao servidor host.');
@@ -953,6 +1016,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       'customerName': customerName,
       'lines': linesJson,
       'terminalName': Platform.localHostname,
+      'saleId': ?saleId,
+      'soldAtMs': ?soldAtMs,
     };
 
     request.write(jsonEncode(body));
