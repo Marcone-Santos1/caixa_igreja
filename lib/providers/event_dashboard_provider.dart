@@ -164,6 +164,8 @@ class EventDashboardData {
       }
 
       return PosSale(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: id,
         eventId: eventId,
         soldAtMs: soldAtMs,
@@ -202,6 +204,8 @@ class EventDashboardData {
       }
 
       return PosSaleLine(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: id,
         saleId: saleId,
         lineKind: lineKind,
@@ -227,6 +231,8 @@ class EventDashboardData {
       final isCombo = pDyn.isCombo as bool? ?? false;
 
       return ChurchProduct(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: id,
         eventId: eventId,
         name: name,
@@ -248,6 +254,8 @@ class EventDashboardData {
       final stockQty = dDyn.stockQty as int? ?? 0;
 
       return EventDotDenom(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: id,
         eventId: eventId,
         label: label,
@@ -264,6 +272,8 @@ class EventDashboardData {
       final qty = cDyn.qty as int? ?? 0;
 
       return ChangeDotRow(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: id,
         saleId: saleId,
         dotDenominationId: dotDenominationId,

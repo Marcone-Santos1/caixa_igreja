@@ -5,6 +5,8 @@ import 'package:drift_flutter/drift_flutter.dart';
 
 import '../domain/payment_method.dart';
 import '../domain/stock_constants.dart';
+import '../domain/stock_movement_reason.dart';
+import 'device_identity.dart';
 import 'drift_database_paths.dart';
 import '../domain/sale_line_kind.dart';
 import 'package:intl/intl.dart';
@@ -15,8 +17,31 @@ part 'database.g.dart';
 
 const _uuid = Uuid();
 
+/// Versão atual do schema. Deve coincidir com [AppDatabase.schemaVersion].
+/// Usada pelo backup/nuvem para bloquear restauração de bases mais novas.
+const kAppSchemaVersion = 9;
+
+/// Colunas de sincronização presentes em todas as tabelas (schema v9).
+///
+/// `rowVersion` é um relógio lógico por linha (Lamport): começa em 1 no
+/// insert e é incrementado por trigger a cada UPDATE local. Decide "quem é
+/// mais novo" na junção, com desempate por `updatedByDevice`.
+/// `updatedAtMs` é relógio de parede e serve APENAS para exibição.
+/// `deletedAtMs` é a exclusão lógica (tombstone): linhas nunca são apagadas
+/// fisicamente fora de fluxos internos de agregado.
+///
+/// As colunas são mantidas por triggers SQLite instalados em `beforeOpen`
+/// (ver `_installSyncInfrastructure`), para que nenhum ponto de escrita
+/// precise lembrar de atualizá-las.
+mixin SyncColumns on Table {
+  IntColumn get rowVersion => integer().withDefault(const Constant(1))();
+  IntColumn get updatedAtMs => integer().withDefault(const Constant(0))();
+  TextColumn get updatedByDevice => text().nullable()();
+  IntColumn get deletedAtMs => integer().nullable()();
+}
+
 @DataClassName('ChurchEvent')
-class Events extends Table {
+class Events extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get title => text()();
   TextColumn get notes => text().withDefault(const Constant(''))();
@@ -31,7 +56,7 @@ class Events extends Table {
 
 /// “Fichas” / pontos do evento (valor unitário + estoque).
 @DataClassName('EventDotDenom')
-class EventDotDenominations extends Table {
+class EventDotDenominations extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get eventId => text().references(Events, #id)();
   TextColumn get label => text()();
@@ -43,7 +68,7 @@ class EventDotDenominations extends Table {
 }
 
 @DataClassName('ChurchProduct')
-class Products extends Table {
+class Products extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get eventId => text().references(Events, #id)();
   TextColumn get name => text()();
@@ -58,7 +83,7 @@ class Products extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-class ProductComboItems extends Table {
+class ProductComboItems extends Table with SyncColumns {
   TextColumn get comboProductId => text().references(Products, #id)();
   TextColumn get childProductId => text().references(Products, #id)();
   IntColumn get qty => integer()();
@@ -68,11 +93,12 @@ class ProductComboItems extends Table {
 }
 
 @DataClassName('CashSession')
-class CashSessions extends Table {
+class CashSessions extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get eventId => text().references(Events, #id)();
   TextColumn get title => text()();
   IntColumn get openedAtMs => integer()();
+  TextColumn get openedBy => text().nullable()();
   IntColumn get closedAtMs => integer().nullable()();
   IntColumn get initialCashFloatCents =>
       integer().withDefault(const Constant(0))();
@@ -85,7 +111,7 @@ class CashSessions extends Table {
 }
 
 @DataClassName('PosSale')
-class Sales extends Table {
+class Sales extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get eventId => text().references(Events, #id)();
   TextColumn get sessionId =>
@@ -104,7 +130,7 @@ class Sales extends Table {
 }
 
 @DataClassName('PosSaleLine')
-class SaleLines extends Table {
+class SaleLines extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get saleId => text().references(Sales, #id)();
   IntColumn get lineKind => integer().withDefault(const Constant(0))();
@@ -122,12 +148,37 @@ class SaleLines extends Table {
 
 /// Fichas entregues como troco (auditoria + baixa de estoque).
 @DataClassName('ChangeDotRow')
-class SaleChangeDotAllocations extends Table {
+class SaleChangeDotAllocations extends Table with SyncColumns {
   TextColumn get id => text()();
   TextColumn get saleId => text().references(Sales, #id)();
   TextColumn get dotDenominationId =>
       text().references(EventDotDenominations, #id)();
   IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Movimentações de estoque (E1 da RFC de sincronização).
+///
+/// Append-only: cada alteração de estoque gera uma linha com `delta`.
+/// `stockQty` nos produtos/fichas é um cache derivado — o saldo verdadeiro é
+/// a soma dos deltas. Na junção entre celulares as movimentações são unidas
+/// por UUID e o cache é recalculado, nunca somando contadores.
+@DataClassName('StockMovement')
+class StockMovements extends Table with SyncColumns {
+  TextColumn get id => text()();
+
+  /// 0 = produto, 1 = ficha.
+  IntColumn get itemType => integer()();
+  TextColumn get itemId => text()();
+  IntColumn get delta => integer()();
+
+  /// Ver [StockMovementReason].
+  IntColumn get reason => integer()();
+  TextColumn get saleId => text().nullable()();
+  IntColumn get atMs => integer()();
+  TextColumn get deviceId => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -278,18 +329,21 @@ class EventLowStockCounts {
     Sales,
     SaleLines,
     SaleChangeDotAllocations,
+    StockMovements,
   ],
 )
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor]) : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => kAppSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON');
+          await customStatement('PRAGMA recursive_triggers = OFF');
+          await _installSyncInfrastructure();
         },
         onCreate: (Migrator m) async {
           await m.createAll();
@@ -398,6 +452,61 @@ PRAGMA foreign_keys = ON;
             await m.addColumn(events, events.pixMerchantName);
             await m.addColumn(events, events.pixMerchantCity);
           }
+          if (from < 9) {
+            // Sincronização (RFC nuvem, revisão D2): colunas de versão lógica,
+            // tombstones, operador de abertura e movimentações de estoque.
+            final syncedTables = <TableInfo>[
+              events,
+              eventDotDenominations,
+              products,
+              productComboItems,
+              cashSessions,
+              sales,
+              saleLines,
+              saleChangeDotAllocations,
+            ];
+            for (final t in syncedTables) {
+              for (final name in const [
+                'row_version',
+                'updated_at_ms',
+                'updated_by_device',
+                'deleted_at_ms',
+              ]) {
+                final col = t.columnsByName[name];
+                if (col != null) {
+                  await m.addColumn(t, col);
+                }
+              }
+            }
+            await m.addColumn(cashSessions, cashSessions.openedBy);
+            await m.createTable(stockMovements);
+
+            final now = DateTime.now().millisecondsSinceEpoch;
+            final dev = _sqlQuote(DeviceIdentity.deviceId);
+            for (final t in syncedTables) {
+              await customStatement(
+                'UPDATE ${t.actualTableName} SET updated_at_ms = $now',
+              );
+            }
+            // Baseline das movimentações: uma carga inicial por item com
+            // estoque, para que soma(movimentações) == stock_qty.
+            await customStatement('''
+INSERT INTO stock_movements
+  (id, item_type, item_id, delta, reason, sale_id, at_ms, device_id,
+   row_version, updated_at_ms, updated_by_device, deleted_at_ms)
+SELECT lower(hex(randomblob(16))), 0, id, stock_qty, ${StockMovementReason.initial}, NULL, $now, $dev,
+       1, $now, $dev, NULL
+FROM products WHERE track_stock = 1 AND stock_qty != 0;
+''');
+            await customStatement('''
+INSERT INTO stock_movements
+  (id, item_type, item_id, delta, reason, sale_id, at_ms, device_id,
+   row_version, updated_at_ms, updated_by_device, deleted_at_ms)
+SELECT lower(hex(randomblob(16))), 1, id, stock_qty, ${StockMovementReason.initial}, NULL, $now, $dev,
+       1, $now, $dev, NULL
+FROM event_dot_denominations WHERE stock_qty != 0;
+''');
+          }
         },
       );
 
@@ -405,16 +514,113 @@ PRAGMA foreign_keys = ON;
     return driftDatabase(name: kCaixaIgrejaDriftDbName);
   }
 
+  static String _sqlQuote(String value) => "'${value.replaceAll("'", "''")}'";
+
+  /// Tabela auxiliar local (fora do schema Drift) + triggers que mantêm as
+  /// colunas de sincronização em TODA escrita, independentemente do caminho
+  /// de código. Ver [SyncColumns].
+  ///
+  /// `local_kv` guarda o id deste aparelho e a flag `sync_bypass`. A flag é
+  /// ligada por [runWithSyncBypass] durante a aplicação de dados remotos
+  /// (sync Wi-Fi, junção da nuvem), para que os valores vindos de fora sejam
+  /// preservados em vez de carimbados como alterações locais.
+  ///
+  /// Importante: `local_kv` viaja dentro do arquivo em snapshots/restaurações,
+  /// por isso `device_id` é reescrito a cada abertura do banco.
+  Future<void> _installSyncInfrastructure() async {
+    await customStatement(
+      'CREATE TABLE IF NOT EXISTS local_kv ('
+      'key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL)',
+    );
+    await customStatement(
+      "INSERT OR REPLACE INTO local_kv (key, value) "
+      "VALUES ('device_id', ${_sqlQuote(DeviceIdentity.deviceId)})",
+    );
+    await customStatement(
+      "INSERT OR REPLACE INTO local_kv (key, value) VALUES ('sync_bypass', '0')",
+    );
+
+    const tablePk = <String, String>{
+      'events': 'id = NEW.id',
+      'event_dot_denominations': 'id = NEW.id',
+      'products': 'id = NEW.id',
+      'product_combo_items': 'combo_product_id = NEW.combo_product_id '
+          'AND child_product_id = NEW.child_product_id',
+      'cash_sessions': 'id = NEW.id',
+      'sales': 'id = NEW.id',
+      'sale_lines': 'id = NEW.id',
+      'sale_change_dot_allocations': 'id = NEW.id',
+      'stock_movements': 'id = NEW.id',
+    };
+    const bypassOff =
+        "COALESCE((SELECT value FROM local_kv WHERE key = 'sync_bypass'), '0') <> '1'";
+    const nowMs =
+        "CAST((julianday('now') - 2440587.5) * 86400000 AS INTEGER)";
+    const deviceSql =
+        "COALESCE((SELECT value FROM local_kv WHERE key = 'device_id'), 'local')";
+
+    for (final entry in tablePk.entries) {
+      final t = entry.key;
+      final pk = entry.value;
+      await customStatement('DROP TRIGGER IF EXISTS trg_touch_ins_$t');
+      await customStatement('''
+CREATE TRIGGER trg_touch_ins_$t AFTER INSERT ON $t
+WHEN $bypassOff AND NEW.updated_at_ms = 0
+BEGIN
+  UPDATE $t SET
+    updated_at_ms = $nowMs,
+    updated_by_device = $deviceSql
+  WHERE $pk;
+END''');
+      await customStatement('DROP TRIGGER IF EXISTS trg_touch_upd_$t');
+      // O filtro NEW.updated_at_ms = OLD.updated_at_ms impede o re-disparo
+      // pelo UPDATE interno do trigger de INSERT (que muda o updated_at_ms);
+      // escritas normais do app nunca tocam nessa coluna diretamente.
+      await customStatement('''
+CREATE TRIGGER trg_touch_upd_$t AFTER UPDATE ON $t
+WHEN $bypassOff AND NEW.row_version = OLD.row_version
+  AND NEW.updated_at_ms = OLD.updated_at_ms
+BEGIN
+  UPDATE $t SET
+    row_version = OLD.row_version + 1,
+    updated_at_ms = $nowMs,
+    updated_by_device = $deviceSql
+  WHERE $pk;
+END''');
+    }
+  }
+
+  /// Executa [action] numa transação com os triggers de carimbo desligados.
+  ///
+  /// Usado ao aplicar dados vindos de outro aparelho (sync Wi-Fi, junção da
+  /// nuvem): as colunas `rowVersion`/`updatedAtMs`/`updatedByDevice` chegam
+  /// prontas e NÃO devem ser tratadas como alteração local.
+  Future<T> runWithSyncBypass<T>(Future<T> Function() action) {
+    return transaction(() async {
+      await customStatement(
+        "INSERT OR REPLACE INTO local_kv (key, value) VALUES ('sync_bypass', '1')",
+      );
+      try {
+        return await action();
+      } finally {
+        await customStatement(
+          "INSERT OR REPLACE INTO local_kv (key, value) VALUES ('sync_bypass', '0')",
+        );
+      }
+    });
+  }
+
   String generateUuid() => _uuid.v7();
 
   Stream<ChurchEvent?> watchEvent(String id) {
-    return (select(events)..where((e) => e.id.equals(id)))
+    return (select(events)
+          ..where((e) => e.id.equals(id) & e.deletedAtMs.isNull()))
         .watchSingleOrNull();
   }
 
   Stream<List<EventDotDenom>> watchDotDenominations(String eventId) {
     return (select(eventDotDenominations)
-          ..where((t) => t.eventId.equals(eventId))
+          ..where((t) => t.eventId.equals(eventId) & t.deletedAtMs.isNull())
           ..orderBy([(t) => OrderingTerm.desc(t.valueCents)]))
         .watch();
   }
@@ -466,6 +672,7 @@ PRAGMA foreign_keys = ON;
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
           ..where((p) => p.active.equals(true))
+          ..where((p) => p.deletedAtMs.isNull())
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
         .watch()
         .asyncMap(_mapProductsWithEffectiveStock);
@@ -474,20 +681,23 @@ PRAGMA foreign_keys = ON;
   Stream<List<ChurchProduct>> watchAllProductsForEvent(String eventId) {
     return (select(products)
           ..where((p) => p.eventId.equals(eventId))
+          ..where((p) => p.deletedAtMs.isNull())
           ..orderBy([(p) => OrderingTerm.asc(p.name)]))
         .watch()
         .asyncMap(_mapProductsWithEffectiveStock);
   }
 
   Stream<List<ChurchEvent>> watchAllEvents() {
-    return (select(events)..orderBy([(e) => OrderingTerm.desc(e.dateEpochMs)]))
+    return (select(events)
+          ..where((e) => e.deletedAtMs.isNull())
+          ..orderBy([(e) => OrderingTerm.desc(e.dateEpochMs)]))
         .watch();
   }
 
   /// Vendas do evento, mais recentes primeiro (registro / livro-caixa).
   Stream<List<PosSale>> watchSalesForEvent(String eventId) {
     return (select(sales)
-          ..where((s) => s.eventId.equals(eventId))
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull())
           ..orderBy([(s) => OrderingTerm.desc(s.soldAtMs)]))
         .watch();
   }
@@ -495,25 +705,27 @@ PRAGMA foreign_keys = ON;
   Stream<List<PosSaleLine>> watchSaleLinesForEvent(String eventId) {
     final q = select(saleLines).join([
       innerJoin(sales, sales.id.equalsExp(saleLines.saleId)),
-    ])..where(sales.eventId.equals(eventId));
+    ])..where(sales.eventId.equals(eventId) & sales.deletedAtMs.isNull());
     return q.watch().map((rows) => rows.map((r) => r.readTable(saleLines)).toList());
   }
 
   Stream<List<ChangeDotRow>> watchChangeDotAllocationsForEvent(String eventId) {
     final q = select(saleChangeDotAllocations).join([
       innerJoin(sales, sales.id.equalsExp(saleChangeDotAllocations.saleId)),
-    ])..where(sales.eventId.equals(eventId));
+    ])..where(sales.eventId.equals(eventId) & sales.deletedAtMs.isNull());
     return q.watch().map((rows) => rows.map((r) => r.readTable(saleChangeDotAllocations)).toList());
   }
 
   Stream<EventFinanceSummary> watchEventFinanceSummary(String eventId) {
-    return (select(sales)..where((s) => s.eventId.equals(eventId)))
+    return (select(sales)
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull()))
         .watch()
         .map(EventFinanceSummary.fromSales);
   }
 
   Future<EventFinanceSummary> eventFinanceSummary(String eventId) {
-    return (select(sales)..where((s) => s.eventId.equals(eventId)))
+    return (select(sales)
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull()))
         .get()
         .then(EventFinanceSummary.fromSales);
   }
@@ -550,17 +762,18 @@ PRAGMA foreign_keys = ON;
 
     controller = StreamController<EventLowStockCounts>(
       onListen: () {
-        sub1 = (select(products)..where((p) => p.eventId.equals(eventId)))
+        sub1 = (select(products)
+              ..where((p) => p.eventId.equals(eventId) & p.deletedAtMs.isNull()))
             .watch()
             .asyncMap(_mapProductsWithEffectiveStock)
             .listen((list) {
           latestP = list;
           emit();
         });
-        sub2 =
-            (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId)))
-                .watch()
-                .listen((list) {
+        sub2 = (select(eventDotDenominations)
+              ..where((d) => d.eventId.equals(eventId) & d.deletedAtMs.isNull()))
+            .watch()
+            .listen((list) {
           latestD = list;
           emit();
         });
@@ -654,7 +867,8 @@ PRAGMA foreign_keys = ON;
   }
 
   Future<List<ChurchEvent>> eventsForDayMs(int dayStartMs) {
-    return (select(events)..where((e) => e.dateEpochMs.equals(dayStartMs)))
+    return (select(events)
+          ..where((e) => e.dateEpochMs.equals(dayStartMs) & e.deletedAtMs.isNull()))
         .get();
   }
 
@@ -673,13 +887,81 @@ PRAGMA foreign_keys = ON;
     }
   }
 
-  Future<void> _abateProductStock(String productId, int qtyMultiplier) async {
+  /// Item de produto em [StockMovements.itemType].
+  static const kStockItemProduct = 0;
+
+  /// Item de ficha em [StockMovements.itemType].
+  static const kStockItemDot = 1;
+
+  /// Registra uma movimentação de estoque (trilha append-only, E1).
+  Future<void> _recordStockMovement({
+    required int itemType,
+    required String itemId,
+    required int delta,
+    required int reason,
+    String? saleId,
+  }) async {
+    if (delta == 0) return;
+    await into(stockMovements).insert(
+      StockMovementsCompanion.insert(
+        id: _uuid.v7(),
+        itemType: itemType,
+        itemId: itemId,
+        delta: delta,
+        reason: reason,
+        saleId: Value(saleId),
+        atMs: DateTime.now().millisecondsSinceEpoch,
+        deviceId: DeviceIdentity.deviceId,
+      ),
+    );
+  }
+
+  /// Ajusta o estoque de uma ficha (contador + movimentação), validando
+  /// disponibilidade quando [delta] é negativo.
+  Future<void> _adjustDotStock(
+    String dotDenominationId,
+    int delta, {
+    required int reason,
+    String? saleId,
+    bool tolerateMissing = false,
+  }) async {
+    if (delta == 0) return;
+    final d = await (select(eventDotDenominations)
+          ..where((t) => t.id.equals(dotDenominationId)))
+        .getSingleOrNull();
+    if (d == null) {
+      if (tolerateMissing) return;
+      throw StateError('Ficha não encontrada');
+    }
+    if (delta < 0 && d.stockQty < -delta) {
+      throw StateError('Estoque de fichas insuficiente (${d.label})');
+    }
+    await (update(eventDotDenominations)
+          ..where((t) => t.id.equals(dotDenominationId)))
+        .write(
+      EventDotDenominationsCompanion(stockQty: Value(d.stockQty + delta)),
+    );
+    await _recordStockMovement(
+      itemType: kStockItemDot,
+      itemId: dotDenominationId,
+      delta: delta,
+      reason: reason,
+      saleId: saleId,
+    );
+  }
+
+  Future<void> _abateProductStock(
+    String productId,
+    int qtyMultiplier, {
+    String? saleId,
+  }) async {
     final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
     if (p == null) return;
     if (p.isCombo) {
       final children = await (select(productComboItems)..where((t) => t.comboProductId.equals(productId))).get();
       for (final child in children) {
-        await _abateProductStock(child.childProductId, child.qty * qtyMultiplier);
+        await _abateProductStock(child.childProductId, child.qty * qtyMultiplier,
+            saleId: saleId);
       }
     } else {
       if (p.trackStock) {
@@ -689,22 +971,41 @@ PRAGMA foreign_keys = ON;
         await (update(products)..where((t) => t.id.equals(productId))).write(
           ProductsCompanion(stockQty: Value(p.stockQty - qtyMultiplier)),
         );
+        await _recordStockMovement(
+          itemType: kStockItemProduct,
+          itemId: productId,
+          delta: -qtyMultiplier,
+          reason: StockMovementReason.sale,
+          saleId: saleId,
+        );
       }
     }
   }
 
-  Future<void> _revertProductStock(String productId, int qtyMultiplier) async {
+  Future<void> _revertProductStock(
+    String productId,
+    int qtyMultiplier, {
+    String? saleId,
+  }) async {
     final p = await (select(products)..where((t) => t.id.equals(productId))).getSingleOrNull();
     if (p == null) return;
     if (p.isCombo) {
       final children = await (select(productComboItems)..where((t) => t.comboProductId.equals(productId))).get();
       for (final child in children) {
-        await _revertProductStock(child.childProductId, child.qty * qtyMultiplier);
+        await _revertProductStock(child.childProductId, child.qty * qtyMultiplier,
+            saleId: saleId);
       }
     } else {
       if (p.trackStock) {
         await (update(products)..where((t) => t.id.equals(productId))).write(
           ProductsCompanion(stockQty: Value(p.stockQty + qtyMultiplier)),
+        );
+        await _recordStockMovement(
+          itemType: kStockItemProduct,
+          itemId: productId,
+          delta: qtyMultiplier,
+          reason: StockMovementReason.saleRevert,
+          saleId: saleId,
         );
       }
     }
@@ -714,7 +1015,10 @@ PRAGMA foreign_keys = ON;
 
   Stream<CashSession?> watchActiveSession(String eventId) {
     return (select(cashSessions)
-          ..where((s) => s.eventId.equals(eventId) & s.closedAtMs.isNull())
+          ..where((s) =>
+              s.eventId.equals(eventId) &
+              s.closedAtMs.isNull() &
+              s.deletedAtMs.isNull())
           ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)])
           ..limit(1))
         .watchSingleOrNull();
@@ -722,7 +1026,10 @@ PRAGMA foreign_keys = ON;
 
   Future<CashSession?> getActiveSession(String eventId) {
     return (select(cashSessions)
-          ..where((s) => s.eventId.equals(eventId) & s.closedAtMs.isNull())
+          ..where((s) =>
+              s.eventId.equals(eventId) &
+              s.closedAtMs.isNull() &
+              s.deletedAtMs.isNull())
           ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)])
           ..limit(1))
         .getSingleOrNull();
@@ -730,14 +1037,14 @@ PRAGMA foreign_keys = ON;
 
   Stream<List<CashSession>> watchSessions(String eventId) {
     return (select(cashSessions)
-          ..where((s) => s.eventId.equals(eventId))
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull())
           ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)]))
         .watch();
   }
 
   Future<List<CashSession>> getSessions(String eventId) {
     return (select(cashSessions)
-          ..where((s) => s.eventId.equals(eventId))
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull())
           ..orderBy([(s) => OrderingTerm.desc(s.openedAtMs)]))
         .get();
   }
@@ -757,7 +1064,7 @@ PRAGMA foreign_keys = ON;
         title: title,
         openedAtMs: now,
         initialCashFloatCents: Value(initialCashFloatCents),
-        closedBy: Value(openedBy),
+        openedBy: Value(openedBy),
       ),
     );
     return id;
@@ -795,6 +1102,9 @@ PRAGMA foreign_keys = ON;
   }
 
   /// Venda completa: linhas (produto, valor livre ou ficha), pagamento e estoques.
+  ///
+  /// [saleId] e [soldAtMs] permitem preservar a identidade de uma venda criada
+  /// offline num terminal Wi-Fi e reenviada ao host depois.
   Future<String> completeSale({
     required String eventId,
     required String paymentMethod,
@@ -803,6 +1113,8 @@ PRAGMA foreign_keys = ON;
     bool changePending = false,
     String? customerName,
     String? sessionId,
+    String? saleId,
+    int? soldAtMs,
     required List<SaleLineDraft> lines,
   }) {
     if (lines.isEmpty) {
@@ -830,7 +1142,8 @@ PRAGMA foreign_keys = ON;
             if (pid == null) throw ArgumentError('Produto inválido');
             final p = await (select(products)
                   ..where((t) => t.id.equals(pid))
-                  ..where((t) => t.eventId.equals(eventId)))
+                  ..where((t) => t.eventId.equals(eventId))
+                  ..where((t) => t.deletedAtMs.isNull()))
                 .getSingleOrNull();
             if (p == null) throw StateError('Produto não encontrado neste evento');
             if (!p.active) throw StateError('Produto inativo: ${p.name}');
@@ -850,9 +1163,10 @@ PRAGMA foreign_keys = ON;
           case SaleLineKind.ficha:
             final did = l.dotDenominationId;
             if (did == null) throw ArgumentError('Ficha inválida');
-            final d =
-                await (select(eventDotDenominations)..where((t) => t.id.equals(did)))
-                    .getSingleOrNull();
+            final d = await (select(eventDotDenominations)
+                  ..where((t) => t.id.equals(did))
+                  ..where((t) => t.deletedAtMs.isNull()))
+                .getSingleOrNull();
             if (d == null) throw StateError('Denominação não encontrada');
             if (d.eventId != eventId) {
               throw StateError('Ficha não pertence a este evento');
@@ -869,11 +1183,11 @@ PRAGMA foreign_keys = ON;
         }
       }
 
-      final soldAt = DateTime.now().millisecondsSinceEpoch;
-      final saleId = _uuid.v7();
+      final soldAt = soldAtMs ?? DateTime.now().millisecondsSinceEpoch;
+      final newSaleId = saleId ?? _uuid.v7();
       await into(sales).insert(
         SalesCompanion.insert(
-          id: saleId,
+          id: newSaleId,
           eventId: eventId,
           sessionId: Value(activeSessionId),
           soldAtMs: soldAt,
@@ -894,7 +1208,7 @@ PRAGMA foreign_keys = ON;
         await into(saleLines).insert(
           SaleLinesCompanion.insert(
             id: lineId,
-            saleId: saleId,
+            saleId: newSaleId,
             lineKind: Value(l.kind),
             productId: Value(l.productId),
             dotDenominationId: Value(l.dotDenominationId),
@@ -908,18 +1222,14 @@ PRAGMA foreign_keys = ON;
         switch (l.kind) {
           case SaleLineKind.product:
             final pid = l.productId!;
-            await _abateProductStock(pid, l.qty);
+            await _abateProductStock(pid, l.qty, saleId: newSaleId);
             break;
           case SaleLineKind.ficha:
-            final did = l.dotDenominationId!;
-            final d = await (select(eventDotDenominations)
-                  ..where((t) => t.id.equals(did)))
-                .getSingle();
-            await (update(eventDotDenominations)
-                  ..where((t) => t.id.equals(did))).write(
-              EventDotDenominationsCompanion(
-                stockQty: Value(d.stockQty - l.qty),
-              ),
+            await _adjustDotStock(
+              l.dotDenominationId!,
+              -l.qty,
+              reason: StockMovementReason.sale,
+              saleId: newSaleId,
             );
             break;
           case SaleLineKind.valorLivre:
@@ -927,7 +1237,7 @@ PRAGMA foreign_keys = ON;
         }
       }
 
-      return saleId;
+      return newSaleId;
     });
   }
 
@@ -953,34 +1263,7 @@ PRAGMA foreign_keys = ON;
       if (sale == null) throw StateError('Venda não encontrada');
       if (sale.eventId != eventId) throw StateError('Evento da venda inconsistente');
 
-      // 2. Reverter os estoques e deletar linhas antigas e troco
-      final oldLines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
-      for (final l in oldLines) {
-        if (l.lineKind == SaleLineKind.product && l.productId != null) {
-          await _revertProductStock(l.productId!, l.qty);
-        } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
-          final d = await (select(eventDotDenominations)..where((t) => t.id.equals(l.dotDenominationId!))).getSingleOrNull();
-          if (d != null) {
-            await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
-              EventDotDenominationsCompanion(stockQty: Value(d.stockQty + l.qty)),
-            );
-          }
-        }
-      }
-
-      final changeAllocations = await (select(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).get();
-      for (final a in changeAllocations) {
-        final d = await (select(eventDotDenominations)..where((t) => t.id.equals(a.dotDenominationId))).getSingleOrNull();
-        if (d != null) {
-          await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
-            EventDotDenominationsCompanion(stockQty: Value(d.stockQty + a.qty)),
-          );
-        }
-      }
-      await (delete(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).go();
-      await (delete(saleLines)..where((t) => t.saleId.equals(saleId))).go();
-
-      // 3. Validar novos itens e calcular novo total
+      // 2. Novo total (não depende do banco) — decide o destino do troco em fichas
       var totalCents = 0;
       for (final l in lines) {
         if (l.qty <= 0 && l.kind != SaleLineKind.valorLivre) {
@@ -992,6 +1275,64 @@ PRAGMA foreign_keys = ON;
         throw ArgumentError('Valor recebido menor que o total');
       }
 
+      // 3. Troco em fichas: se o troco não mudou, as alocações são mantidas
+      //    intactas; caso contrário, devolvem-se as fichas ao estoque e as
+      //    alocações são removidas (o operador refaz o troco se precisar).
+      final changeAllocations = await (select(saleChangeDotAllocations)
+            ..where((t) => t.saleId.equals(saleId)))
+          .get();
+      if (changeAllocations.isNotEmpty) {
+        var allocatedSum = 0;
+        for (final a in changeAllocations) {
+          final d = await (select(eventDotDenominations)
+                ..where((t) => t.id.equals(a.dotDenominationId)))
+              .getSingleOrNull();
+          if (d == null) {
+            allocatedSum = -1;
+            break;
+          }
+          allocatedSum += a.qty * d.valueCents;
+        }
+        final newChange = amountReceivedCents - totalCents;
+        final keepAllocations = paymentMethod == PaymentMethod.dinheiro &&
+            allocatedSum >= 0 &&
+            newChange == allocatedSum;
+        if (!keepAllocations) {
+          for (final a in changeAllocations) {
+            await _adjustDotStock(
+              a.dotDenominationId,
+              a.qty,
+              reason: StockMovementReason.changeDotsRevert,
+              saleId: saleId,
+              tolerateMissing: true,
+            );
+          }
+          await (delete(saleChangeDotAllocations)
+                ..where((t) => t.saleId.equals(saleId)))
+              .go();
+        }
+      }
+
+      // 4. Reverter os estoques e apagar as linhas antigas. O DELETE físico
+      //    aqui é interno ao agregado da venda: as linhas são recriadas abaixo
+      //    e, na sincronização, a venda vence ou perde como bloco.
+      final oldLines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
+      for (final l in oldLines) {
+        if (l.lineKind == SaleLineKind.product && l.productId != null) {
+          await _revertProductStock(l.productId!, l.qty, saleId: saleId);
+        } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
+          await _adjustDotStock(
+            l.dotDenominationId!,
+            l.qty,
+            reason: StockMovementReason.saleRevert,
+            saleId: saleId,
+            tolerateMissing: true,
+          );
+        }
+      }
+      await (delete(saleLines)..where((t) => t.saleId.equals(saleId))).go();
+
+      // 5. Validar os novos itens
       for (final l in lines) {
         switch (l.kind) {
           case SaleLineKind.product:
@@ -999,7 +1340,8 @@ PRAGMA foreign_keys = ON;
             if (pid == null) throw ArgumentError('Produto inválido');
             final p = await (select(products)
                   ..where((t) => t.id.equals(pid))
-                  ..where((t) => t.eventId.equals(eventId)))
+                  ..where((t) => t.eventId.equals(eventId))
+                  ..where((t) => t.deletedAtMs.isNull()))
                 .getSingleOrNull();
             if (p == null) throw StateError('Produto não encontrado neste evento');
             if (!p.active) throw StateError('Produto inativo: ${p.name}');
@@ -1019,7 +1361,10 @@ PRAGMA foreign_keys = ON;
           case SaleLineKind.ficha:
             final did = l.dotDenominationId;
             if (did == null) throw ArgumentError('Ficha inválida');
-            final d = await (select(eventDotDenominations)..where((t) => t.id.equals(did))).getSingleOrNull();
+            final d = await (select(eventDotDenominations)
+                  ..where((t) => t.id.equals(did))
+                  ..where((t) => t.deletedAtMs.isNull()))
+                .getSingleOrNull();
             if (d == null) throw StateError('Denominação não encontrada');
             if (d.eventId != eventId) {
               throw StateError('Ficha não pertence a este evento');
@@ -1036,7 +1381,7 @@ PRAGMA foreign_keys = ON;
         }
       }
 
-      // 4. Atualizar os dados da venda original
+      // 6. Atualizar os dados da venda original
       await updateSaleDetails(
         saleId: saleId,
         paymentMethod: paymentMethod,
@@ -1049,7 +1394,7 @@ PRAGMA foreign_keys = ON;
         SalesCompanion(totalCents: Value(totalCents)),
       );
 
-      // 5. Inserir novas linhas e abater novos estoques
+      // 7. Inserir novas linhas e abater novos estoques
       for (final l in lines) {
         final lineTotal = l.resolveLineTotalCents();
         final unit = l.resolveUnitPriceCents();
@@ -1072,13 +1417,14 @@ PRAGMA foreign_keys = ON;
         switch (l.kind) {
           case SaleLineKind.product:
             final pid = l.productId!;
-            await _abateProductStock(pid, l.qty);
+            await _abateProductStock(pid, l.qty, saleId: saleId);
             break;
           case SaleLineKind.ficha:
-            final did = l.dotDenominationId!;
-            final d = await (select(eventDotDenominations)..where((t) => t.id.equals(did))).getSingle();
-            await (update(eventDotDenominations)..where((t) => t.id.equals(did))).write(
-              EventDotDenominationsCompanion(stockQty: Value(d.stockQty - l.qty)),
+            await _adjustDotStock(
+              l.dotDenominationId!,
+              -l.qty,
+              reason: StockMovementReason.sale,
+              saleId: saleId,
             );
             break;
           case SaleLineKind.valorLivre:
@@ -1143,9 +1489,6 @@ PRAGMA foreign_keys = ON;
 
       for (final a in allocation) {
         if (a.qty <= 0) continue;
-        final fresh = await (select(eventDotDenominations)
-              ..where((t) => t.id.equals(a.dotDenominationId)))
-            .getSingle();
         final allocId = _uuid.v7();
         await into(saleChangeDotAllocations).insert(
           SaleChangeDotAllocationsCompanion.insert(
@@ -1155,12 +1498,11 @@ PRAGMA foreign_keys = ON;
             qty: a.qty,
           ),
         );
-        await (update(eventDotDenominations)
-              ..where((t) => t.id.equals(a.dotDenominationId)))
-            .write(
-          EventDotDenominationsCompanion(
-            stockQty: Value(fresh.stockQty - a.qty),
-          ),
+        await _adjustDotStock(
+          a.dotDenominationId,
+          -a.qty,
+          reason: StockMovementReason.changeDots,
+          saleId: saleId,
         );
       }
     });
@@ -1296,6 +1638,14 @@ PRAGMA foreign_keys = ON;
 
   /// Sincroniza todos os dados de um evento vindo do Host no banco de dados local do Cliente,
   /// limpando dados antigos e inserindo os novos em uma transação atômica.
+  ///
+  /// Duas garantias importantes:
+  /// - Roda com [runWithSyncBypass]: os valores de `rowVersion`/`updatedAtMs`
+  ///   vindos do host são preservados, não carimbados como alteração local.
+  /// - **Vendas locais que o host não conhece são preservadas** (ex.: venda
+  ///   registrada offline enquanto o terminal estava desconectado). Elas são
+  ///   reenviadas ao host pelo fluxo de push do `SyncNotifier`; até lá, nunca
+  ///   são apagadas em silêncio.
   Future<void> syncEventData({
     required String eventId,
     required ChurchEvent event,
@@ -1306,7 +1656,7 @@ PRAGMA foreign_keys = ON;
     required List<PosSaleLine> saleLinesList,
     required List<ChangeDotRow> changeAllocationsList,
   }) async {
-    await transaction(() async {
+    await runWithSyncBypass(() async {
       // 1. Obter informações de produtos e denominações locais antes de limpar
       final productRows = await (select(products)..where((p) => p.eventId.equals(eventId))).get();
       final productIds = productRows.map((p) => p.id).toList();
@@ -1314,23 +1664,47 @@ PRAGMA foreign_keys = ON;
       final denomRows = await (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).get();
       final denomIds = denomRows.map((d) => d.id).toList();
 
-      // 2. Limpar dados locais antigos associados a esse evento de forma ordenada (chaves estrangeiras)
-      final saleRows = await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
-      final saleIds = saleRows.map((s) => s.id).toList();
-      if (saleIds.isNotEmpty) {
-        await (delete(saleChangeDotAllocations)..where((t) => t.saleId.isIn(saleIds))).go();
-        await (delete(saleLines)..where((t) => t.saleId.isIn(saleIds))).go();
+      // 2. Separar vendas locais que o host não conhece (criadas offline)
+      final incomingSaleIds = salesList.map((s) => s.id).toSet();
+      final localSaleRows =
+          await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
+      final preservedSaleIds = localSaleRows
+          .map((s) => s.id)
+          .where((id) => !incomingSaleIds.contains(id))
+          .toSet();
+      final replacedSaleIds = localSaleRows
+          .map((s) => s.id)
+          .where((id) => !preservedSaleIds.contains(id))
+          .toList();
+
+      // 3. Limpar apenas os dados substituídos pelo snapshot do host
+      if (replacedSaleIds.isNotEmpty) {
+        await (delete(saleChangeDotAllocations)..where((t) => t.saleId.isIn(replacedSaleIds))).go();
+        await (delete(saleLines)..where((t) => t.saleId.isIn(replacedSaleIds))).go();
       }
 
-      // Limpeza de contingência para linhas de venda e troco órfãs vinculadas a produtos/fichas do evento
+      // Limpeza de contingência para linhas órfãs vinculadas a produtos/fichas
+      // do evento, poupando as linhas das vendas preservadas
       if (productIds.isNotEmpty) {
-        await (delete(saleLines)..where((t) => t.productId.isIn(productIds))).go();
+        await (delete(saleLines)
+              ..where((t) =>
+                  t.productId.isIn(productIds) &
+                  t.saleId.isNotIn(preservedSaleIds.toList())))
+            .go();
       }
       if (denomIds.isNotEmpty) {
-        await (delete(saleChangeDotAllocations)..where((t) => t.dotDenominationId.isIn(denomIds))).go();
+        await (delete(saleChangeDotAllocations)
+              ..where((t) =>
+                  t.dotDenominationId.isIn(denomIds) &
+                  t.saleId.isNotIn(preservedSaleIds.toList())))
+            .go();
       }
 
-      await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
+      await (delete(sales)
+            ..where((s) =>
+                s.eventId.equals(eventId) &
+                s.id.isNotIn(preservedSaleIds.toList())))
+          .go();
 
       if (productIds.isNotEmpty) {
         await (delete(productComboItems)
@@ -1341,42 +1715,59 @@ PRAGMA foreign_keys = ON;
       await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
       await (delete(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).go();
 
-      // 2. Atualizar ou inserir o evento
+      // 4. Atualizar ou inserir o evento
       await into(events).insert(event, mode: InsertMode.insertOrReplace);
 
-      // 3. Inserir denominações
+      // 5. Inserir denominações
       for (final d in denoms) {
         await into(eventDotDenominations).insert(d, mode: InsertMode.insertOrReplace);
       }
 
-      // 4. Inserir produtos
+      // 6. Inserir produtos
       for (final p in productsList) {
         await into(products).insert(p, mode: InsertMode.insertOrReplace);
       }
 
-      // 5. Inserir itens de combo
+      // 7. Inserir itens de combo
       for (final ci in comboItems) {
         await into(productComboItems).insert(ci, mode: InsertMode.insertOrReplace);
       }
 
-      // 6. Inserir vendas
+      // 8. Inserir vendas
       for (final s in salesList) {
         await into(sales).insert(s, mode: InsertMode.insertOrReplace);
       }
 
-      // 7. Inserir linhas de vendas
+      // 9. Inserir linhas de vendas
       for (final sl in saleLinesList) {
         await into(saleLines).insert(sl, mode: InsertMode.insertOrReplace);
       }
 
-      // 8. Inserir alocações de troco
+      // 10. Inserir alocações de troco
       for (final ca in changeAllocationsList) {
         await into(saleChangeDotAllocations).insert(ca, mode: InsertMode.insertOrReplace);
       }
     });
   }
 
-  /// Remove o produto se não existir linha de venda referenciando-o.
+  /// Vendas deste evento que existem só localmente (não vieram do host) e não
+  /// estão excluídas — candidatas a reenvio quando a conexão voltar.
+  Future<List<PosSale>> localOnlySalesForEvent(
+    String eventId,
+    Set<String> hostSaleIds,
+  ) async {
+    final localSales = await (select(sales)
+          ..where((s) => s.eventId.equals(eventId) & s.deletedAtMs.isNull()))
+        .get();
+    return localSales.where((s) => !hostSaleIds.contains(s.id)).toList();
+  }
+
+  Future<List<PosSaleLine>> saleLinesRaw(String saleId) {
+    return (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
+  }
+
+  /// Exclusão lógica do produto (tombstone). As vendas que o referenciam são
+  /// preservadas; o produto apenas some do catálogo.
   /// Retorna `null` em caso de sucesso, ou mensagem para o utilizador.
   Future<String?> deleteProduct({
     required String eventId,
@@ -1384,105 +1775,54 @@ PRAGMA foreign_keys = ON;
   }) async {
     final p = await (select(products)
           ..where((t) => t.id.equals(productId))
-          ..where((t) => t.eventId.equals(eventId)))
+          ..where((t) => t.eventId.equals(eventId))
+          ..where((t) => t.deletedAtMs.isNull()))
         .getSingleOrNull();
     if (p == null) return 'Produto não encontrado';
-    final used = await (select(saleLines)
-          ..where((sl) => sl.productId.equals(productId)))
-        .get();
-    if (used.isNotEmpty) {
-      return 'Este produto já entrou em vendas. Inative-o em vez de excluir.';
-    }
     final inCombos = await (select(productComboItems)..where((t) => t.childProductId.equals(productId))).get();
     if (inCombos.isNotEmpty) {
       return 'Este produto faz parte de um combo. Remova-o do combo antes de excluir.';
     }
-    
-    // Deleta os itens se for um combo (ON DELETE cascade não configurado explicitamente)
-    if (p.isCombo) {
-      await (delete(productComboItems)..where((t) => t.comboProductId.equals(productId))).go();
-    }
 
-    await (delete(products)
+    await (update(products)
           ..where((t) => t.id.equals(productId))
           ..where((t) => t.eventId.equals(eventId)))
-        .go();
+        .write(ProductsCompanion(
+      deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+    ));
     return null;
   }
 
-  /// Remove a ficha se não existir venda ou troco referenciando-a.
+  /// Exclusão lógica da ficha (tombstone). Vendas e trocos antigos que a
+  /// referenciam continuam íntegros no histórico.
   Future<String?> deleteDotDenomination({
     required String eventId,
     required String dotDenominationId,
   }) async {
     final d = await (select(eventDotDenominations)
           ..where((t) => t.id.equals(dotDenominationId))
-          ..where((t) => t.eventId.equals(eventId)))
+          ..where((t) => t.eventId.equals(eventId))
+          ..where((t) => t.deletedAtMs.isNull()))
         .getSingleOrNull();
     if (d == null) return 'Ficha não encontrada';
-    final lines = await (select(saleLines)
-          ..where((sl) => sl.dotDenominationId.equals(dotDenominationId)))
-        .get();
-    if (lines.isNotEmpty) {
-      return 'Esta ficha já entrou em vendas e não pode ser excluída.';
-    }
-    final changeRows = await (select(saleChangeDotAllocations)
-          ..where((t) => t.dotDenominationId.equals(dotDenominationId)))
-        .get();
-    if (changeRows.isNotEmpty) {
-      return 'Esta ficha já foi usada no troco de uma venda e não pode ser excluída.';
-    }
-    await (delete(eventDotDenominations)
+    await (update(eventDotDenominations)
           ..where((t) => t.id.equals(dotDenominationId))
           ..where((t) => t.eventId.equals(eventId)))
-        .go();
+        .write(EventDotDenominationsCompanion(
+      deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+    ));
     return null;
   }
 
-  /// Apaga o evento e todos os dados associados (vendas, linhas, produtos, fichas).
+  /// Exclusão lógica do evento (tombstone). Os dados associados (vendas,
+  /// produtos, fichas, sessões) são mantidos para histórico e sincronização;
+  /// o evento apenas deixa de aparecer nas listas.
   Future<void> deleteEventCascade(String eventId) async {
-    await transaction(() async {
-      // 1. Obter informações de produtos e denominações locais antes de limpar
-      final productRows = await (select(products)..where((p) => p.eventId.equals(eventId))).get();
-      final productIds = productRows.map((p) => p.id).toList();
-
-      final denomRows = await (select(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).get();
-      final denomIds = denomRows.map((d) => d.id).toList();
-
-      // 2. Limpar dados de vendas associados a esse evento
-      final saleRows =
-          await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
-      final saleIds = saleRows.map((s) => s.id).toList();
-      if (saleIds.isNotEmpty) {
-        await (delete(saleChangeDotAllocations)
-              ..where((t) => t.saleId.isIn(saleIds)))
-            .go();
-        await (delete(saleLines)..where((t) => t.saleId.isIn(saleIds))).go();
-      }
-
-      // Limpeza de contingência para linhas de venda e troco órfãs vinculadas a produtos/fichas do evento
-      if (productIds.isNotEmpty) {
-        await (delete(saleLines)..where((t) => t.productId.isIn(productIds))).go();
-      }
-      if (denomIds.isNotEmpty) {
-        await (delete(saleChangeDotAllocations)..where((t) => t.dotDenominationId.isIn(denomIds))).go();
-      }
-
-      await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
-
-      // Limpar combo items associados a produtos deste evento
-      if (productIds.isNotEmpty) {
-        await (delete(productComboItems)
-              ..where((t) => t.comboProductId.isIn(productIds) | t.childProductId.isIn(productIds)))
-            .go();
-      }
-
-      await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
-      await (delete(eventDotDenominations)
-            ..where((d) => d.eventId.equals(eventId)))
-          .go();
-      await (delete(events)..where((e) => e.id.equals(eventId))).go();
-    });
+    await (update(events)..where((e) => e.id.equals(eventId))).write(
+      EventsCompanion(
+        deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   /// Atualiza dados básicos de uma venda.
@@ -1505,44 +1845,242 @@ PRAGMA foreign_keys = ON;
     );
   }
 
-  /// Exclui a venda e devolve produtos e fichas ao estoque.
+  /// Exclusão lógica da venda (tombstone) devolvendo produtos e fichas ao
+  /// estoque. As linhas e alocações são mantidas no histórico; as consultas
+  /// filtram pelo tombstone da venda.
   Future<void> deleteSale(String saleId) async {
     await transaction(() async {
       final sale = await (select(sales)..where((s) => s.id.equals(saleId)))
           .getSingleOrNull();
       if (sale == null) return;
+      // Já excluída: não reverter estoque duas vezes.
+      if (sale.deletedAtMs != null) return;
 
       final lines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
 
       for (final l in lines) {
         if (l.lineKind == SaleLineKind.product && l.productId != null) {
-          await _revertProductStock(l.productId!, l.qty);
+          await _revertProductStock(l.productId!, l.qty, saleId: saleId);
         } else if (l.lineKind == SaleLineKind.ficha && l.dotDenominationId != null) {
-          final d = await (select(eventDotDenominations)
-                ..where((t) => t.id.equals(l.dotDenominationId!)))
-              .getSingleOrNull();
-          if (d != null) {
-            await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
-              EventDotDenominationsCompanion(stockQty: Value(d.stockQty + l.qty)),
-            );
-          }
-        }
-      }
-
-      // Deletar as alocações de troco em fichas (caso existam) e reverter estoques dessas fichas de troco
-      final changeAllocations = await (select(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).get();
-      for (final a in changeAllocations) {
-        final d = await (select(eventDotDenominations)..where((t) => t.id.equals(a.dotDenominationId))).getSingleOrNull();
-        if (d != null) {
-          await (update(eventDotDenominations)..where((t) => t.id.equals(d.id))).write(
-            EventDotDenominationsCompanion(stockQty: Value(d.stockQty + a.qty)),
+          await _adjustDotStock(
+            l.dotDenominationId!,
+            l.qty,
+            reason: StockMovementReason.saleRevert,
+            saleId: saleId,
+            tolerateMissing: true,
           );
         }
       }
-      await (delete(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).go();
-      
-      await (delete(saleLines)..where((t) => t.saleId.equals(saleId))).go();
-      await (delete(sales)..where((t) => t.id.equals(saleId))).go();
+
+      // Reverter estoques das fichas dadas de troco (caso existam)
+      final changeAllocations = await (select(saleChangeDotAllocations)..where((t) => t.saleId.equals(saleId))).get();
+      for (final a in changeAllocations) {
+        await _adjustDotStock(
+          a.dotDenominationId,
+          a.qty,
+          reason: StockMovementReason.changeDotsRevert,
+          saleId: saleId,
+          tolerateMissing: true,
+        );
+      }
+
+      await (update(sales)..where((t) => t.id.equals(saleId))).write(
+        SalesCompanion(
+          deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+        ),
+      );
+    });
+  }
+
+  /// Salva (cria ou atualiza) um produto simples registrando a diferença de
+  /// estoque como movimentação. Ponto único de escrita para formulários e
+  /// endpoints do host Wi-Fi.
+  Future<String> saveProduct({
+    String? id,
+    required String eventId,
+    required String name,
+    required int priceCents,
+    String description = '',
+    required bool trackStock,
+    required int stockQty,
+    required bool active,
+  }) {
+    return transaction(() async {
+      if (id == null) {
+        final newId = _uuid.v7();
+        await into(products).insert(
+          ProductsCompanion.insert(
+            id: newId,
+            eventId: eventId,
+            name: name,
+            priceCents: priceCents,
+            description: Value(description),
+            trackStock: Value(trackStock),
+            stockQty: Value(stockQty),
+            active: Value(active),
+            isCombo: const Value(false),
+          ),
+        );
+        if (trackStock && stockQty != 0) {
+          await _recordStockMovement(
+            itemType: kStockItemProduct,
+            itemId: newId,
+            delta: stockQty,
+            reason: StockMovementReason.initial,
+          );
+        }
+        return newId;
+      }
+
+      final old = await (select(products)
+            ..where((t) => t.id.equals(id))
+            ..where((t) => t.eventId.equals(eventId)))
+          .getSingleOrNull();
+      if (old == null) throw StateError('Produto não encontrado');
+      await (update(products)
+            ..where((t) => t.id.equals(id))
+            ..where((t) => t.eventId.equals(eventId)))
+          .write(ProductsCompanion(
+        name: Value(name),
+        description: Value(description),
+        priceCents: Value(priceCents),
+        trackStock: Value(trackStock),
+        stockQty: Value(stockQty),
+        active: Value(active),
+      ));
+      final delta = stockQty - old.stockQty;
+      if (delta != 0) {
+        await _recordStockMovement(
+          itemType: kStockItemProduct,
+          itemId: id,
+          delta: delta,
+          reason: StockMovementReason.manualAdjust,
+        );
+      }
+      return id;
+    });
+  }
+
+  /// Salva (cria ou atualiza) uma ficha registrando a diferença de estoque
+  /// como movimentação. Ponto único de escrita para formulários e host Wi-Fi.
+  Future<String> saveDotDenomination({
+    String? id,
+    required String eventId,
+    required String label,
+    required int valueCents,
+    required int stockQty,
+  }) {
+    return transaction(() async {
+      if (id == null) {
+        final newId = _uuid.v7();
+        await into(eventDotDenominations).insert(
+          EventDotDenominationsCompanion.insert(
+            id: newId,
+            eventId: eventId,
+            label: label,
+            valueCents: valueCents,
+            stockQty: Value(stockQty),
+          ),
+        );
+        if (stockQty != 0) {
+          await _recordStockMovement(
+            itemType: kStockItemDot,
+            itemId: newId,
+            delta: stockQty,
+            reason: StockMovementReason.initial,
+          );
+        }
+        return newId;
+      }
+
+      final old = await (select(eventDotDenominations)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
+      if (old == null) throw StateError('Ficha não encontrada');
+      await (update(eventDotDenominations)..where((t) => t.id.equals(id)))
+          .write(EventDotDenominationsCompanion(
+        label: Value(label),
+        valueCents: Value(valueCents),
+        stockQty: Value(stockQty),
+      ));
+      final delta = stockQty - old.stockQty;
+      if (delta != 0) {
+        await _recordStockMovement(
+          itemType: kStockItemDot,
+          itemId: id,
+          delta: delta,
+          reason: StockMovementReason.manualAdjust,
+        );
+      }
+      return id;
+    });
+  }
+
+  /// Recria o baseline das movimentações a partir dos contadores atuais.
+  /// Usado após o seed de dados de demonstração.
+  Future<void> rebaselineStockMovements() async {
+    await transaction(() async {
+      await delete(stockMovements).go();
+      final trackedProducts = await (select(products)
+            ..where((p) => p.trackStock.equals(true) & p.deletedAtMs.isNull()))
+          .get();
+      for (final p in trackedProducts) {
+        await _recordStockMovement(
+          itemType: kStockItemProduct,
+          itemId: p.id,
+          delta: p.stockQty,
+          reason: StockMovementReason.initial,
+        );
+      }
+      final denoms = await (select(eventDotDenominations)
+            ..where((d) => d.deletedAtMs.isNull()))
+          .get();
+      for (final d in denoms) {
+        await _recordStockMovement(
+          itemType: kStockItemDot,
+          itemId: d.id,
+          delta: d.stockQty,
+          reason: StockMovementReason.initial,
+        );
+      }
+    });
+  }
+
+  /// Soma das movimentações de um item (saldo verdadeiro no modelo E1).
+  Future<int> stockMovementSum(int itemType, String itemId) async {
+    final sum = stockMovements.delta.sum();
+    final q = selectOnly(stockMovements)
+      ..addColumns([sum])
+      ..where(stockMovements.itemType.equals(itemType) &
+          stockMovements.itemId.equals(itemId) &
+          stockMovements.deletedAtMs.isNull());
+    final row = await q.getSingle();
+    return row.read(sum) ?? 0;
+  }
+
+  /// Recalcula os caches `stockQty` a partir das movimentações.
+  /// Usado após junção/restauração de dados de outro aparelho.
+  Future<void> recalcStockFromMovements() async {
+    await runWithSyncBypass(() async {
+      final trackedProducts = await (select(products)
+            ..where((p) => p.trackStock.equals(true)))
+          .get();
+      for (final p in trackedProducts) {
+        final total = await stockMovementSum(kStockItemProduct, p.id);
+        if (total != p.stockQty) {
+          await (update(products)..where((t) => t.id.equals(p.id))).write(
+            ProductsCompanion(stockQty: Value(total)),
+          );
+        }
+      }
+      final denoms = await select(eventDotDenominations).get();
+      for (final d in denoms) {
+        final total = await stockMovementSum(kStockItemDot, d.id);
+        if (total != d.stockQty) {
+          await (update(eventDotDenominations)..where((t) => t.id.equals(d.id)))
+              .write(EventDotDenominationsCompanion(stockQty: Value(total)));
+        }
+      }
     });
   }
 }

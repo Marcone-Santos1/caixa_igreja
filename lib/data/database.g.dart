@@ -8,6 +8,52 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $EventsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -80,6 +126,10 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     title,
     notes,
@@ -100,6 +150,39 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -163,6 +246,22 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
   ChurchEvent map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ChurchEvent(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -201,6 +300,10 @@ class $EventsTable extends Events with TableInfo<$EventsTable, ChurchEvent> {
 }
 
 class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String title;
   final String notes;
@@ -209,6 +312,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   final String? pixMerchantName;
   final String? pixMerchantCity;
   const ChurchEvent({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.title,
     required this.notes,
@@ -220,6 +327,14 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
     map['notes'] = Variable<String>(notes);
@@ -238,6 +353,14 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
 
   EventsCompanion toCompanion(bool nullToAbsent) {
     return EventsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       title: Value(title),
       notes: Value(notes),
@@ -260,6 +383,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChurchEvent(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       title: serializer.fromJson<String>(json['title']),
       notes: serializer.fromJson<String>(json['notes']),
@@ -273,6 +400,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'title': serializer.toJson<String>(title),
       'notes': serializer.toJson<String>(notes),
@@ -284,6 +415,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   }
 
   ChurchEvent copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? title,
     String? notes,
@@ -292,6 +427,12 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
     Value<String?> pixMerchantName = const Value.absent(),
     Value<String?> pixMerchantCity = const Value.absent(),
   }) => ChurchEvent(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     title: title ?? this.title,
     notes: notes ?? this.notes,
@@ -306,6 +447,18 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   );
   ChurchEvent copyWithCompanion(EventsCompanion data) {
     return ChurchEvent(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       title: data.title.present ? data.title.value : this.title,
       notes: data.notes.present ? data.notes.value : this.notes,
@@ -325,6 +478,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   @override
   String toString() {
     return (StringBuffer('ChurchEvent(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('notes: $notes, ')
@@ -338,6 +495,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
 
   @override
   int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     title,
     notes,
@@ -350,6 +511,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChurchEvent &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.title == this.title &&
           other.notes == this.notes &&
@@ -360,6 +525,10 @@ class ChurchEvent extends DataClass implements Insertable<ChurchEvent> {
 }
 
 class EventsCompanion extends UpdateCompanion<ChurchEvent> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> title;
   final Value<String> notes;
@@ -369,6 +538,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
   final Value<String?> pixMerchantCity;
   final Value<int> rowid;
   const EventsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.title = const Value.absent(),
     this.notes = const Value.absent(),
@@ -379,6 +552,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     this.rowid = const Value.absent(),
   });
   EventsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String title,
     this.notes = const Value.absent(),
@@ -391,6 +568,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
        title = Value(title),
        dateEpochMs = Value(dateEpochMs);
   static Insertable<ChurchEvent> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? title,
     Expression<String>? notes,
@@ -401,6 +582,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (title != null) 'title': title,
       if (notes != null) 'notes': notes,
@@ -413,6 +598,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
   }
 
   EventsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? title,
     Value<String>? notes,
@@ -423,6 +612,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
     Value<int>? rowid,
   }) {
     return EventsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       title: title ?? this.title,
       notes: notes ?? this.notes,
@@ -437,6 +630,18 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -467,6 +672,10 @@ class EventsCompanion extends UpdateCompanion<ChurchEvent> {
   @override
   String toString() {
     return (StringBuffer('EventsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('title: $title, ')
           ..write('notes: $notes, ')
@@ -486,6 +695,52 @@ class $EventDotDenominationsTable extends EventDotDenominations
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $EventDotDenominationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -540,6 +795,10 @@ class $EventDotDenominationsTable extends EventDotDenominations
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     label,
@@ -558,6 +817,39 @@ class $EventDotDenominationsTable extends EventDotDenominations
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -602,6 +894,22 @@ class $EventDotDenominationsTable extends EventDotDenominations
   EventDotDenom map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return EventDotDenom(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -632,12 +940,20 @@ class $EventDotDenominationsTable extends EventDotDenominations
 }
 
 class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String eventId;
   final String label;
   final int valueCents;
   final int stockQty;
   const EventDotDenom({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.eventId,
     required this.label,
@@ -647,6 +963,14 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['event_id'] = Variable<String>(eventId);
     map['label'] = Variable<String>(label);
@@ -657,6 +981,14 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
 
   EventDotDenominationsCompanion toCompanion(bool nullToAbsent) {
     return EventDotDenominationsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       eventId: Value(eventId),
       label: Value(label),
@@ -671,6 +1003,10 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return EventDotDenom(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       eventId: serializer.fromJson<String>(json['eventId']),
       label: serializer.fromJson<String>(json['label']),
@@ -682,6 +1018,10 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'eventId': serializer.toJson<String>(eventId),
       'label': serializer.toJson<String>(label),
@@ -691,12 +1031,22 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   }
 
   EventDotDenom copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? eventId,
     String? label,
     int? valueCents,
     int? stockQty,
   }) => EventDotDenom(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
     label: label ?? this.label,
@@ -705,6 +1055,18 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   );
   EventDotDenom copyWithCompanion(EventDotDenominationsCompanion data) {
     return EventDotDenom(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
       label: data.label.present ? data.label.value : this.label,
@@ -718,6 +1080,10 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   @override
   String toString() {
     return (StringBuffer('EventDotDenom(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('label: $label, ')
@@ -728,11 +1094,25 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
   }
 
   @override
-  int get hashCode => Object.hash(id, eventId, label, valueCents, stockQty);
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    eventId,
+    label,
+    valueCents,
+    stockQty,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is EventDotDenom &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.eventId == this.eventId &&
           other.label == this.label &&
@@ -741,6 +1121,10 @@ class EventDotDenom extends DataClass implements Insertable<EventDotDenom> {
 }
 
 class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> eventId;
   final Value<String> label;
@@ -748,6 +1132,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
   final Value<int> stockQty;
   final Value<int> rowid;
   const EventDotDenominationsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
     this.label = const Value.absent(),
@@ -756,6 +1144,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
     this.rowid = const Value.absent(),
   });
   EventDotDenominationsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String eventId,
     required String label,
@@ -767,6 +1159,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
        label = Value(label),
        valueCents = Value(valueCents);
   static Insertable<EventDotDenom> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? eventId,
     Expression<String>? label,
@@ -775,6 +1171,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (eventId != null) 'event_id': eventId,
       if (label != null) 'label': label,
@@ -785,6 +1185,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
   }
 
   EventDotDenominationsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? eventId,
     Value<String>? label,
@@ -793,6 +1197,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
     Value<int>? rowid,
   }) {
     return EventDotDenominationsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       label: label ?? this.label,
@@ -805,6 +1213,18 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -829,6 +1249,10 @@ class EventDotDenominationsCompanion extends UpdateCompanion<EventDotDenom> {
   @override
   String toString() {
     return (StringBuffer('EventDotDenominationsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('label: $label, ')
@@ -846,6 +1270,52 @@ class $ProductsTable extends Products
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ProductsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -955,6 +1425,10 @@ class $ProductsTable extends Products
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     name,
@@ -977,6 +1451,39 @@ class $ProductsTable extends Products
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -1048,6 +1555,22 @@ class $ProductsTable extends Products
   ChurchProduct map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ChurchProduct(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -1094,6 +1617,10 @@ class $ProductsTable extends Products
 }
 
 class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String eventId;
   final String name;
@@ -1104,6 +1631,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   final bool active;
   final bool isCombo;
   const ChurchProduct({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.eventId,
     required this.name,
@@ -1117,6 +1648,14 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['event_id'] = Variable<String>(eventId);
     map['name'] = Variable<String>(name);
@@ -1131,6 +1670,14 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
 
   ProductsCompanion toCompanion(bool nullToAbsent) {
     return ProductsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       eventId: Value(eventId),
       name: Value(name),
@@ -1149,6 +1696,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChurchProduct(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       eventId: serializer.fromJson<String>(json['eventId']),
       name: serializer.fromJson<String>(json['name']),
@@ -1164,6 +1715,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'eventId': serializer.toJson<String>(eventId),
       'name': serializer.toJson<String>(name),
@@ -1177,6 +1732,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   }
 
   ChurchProduct copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? eventId,
     String? name,
@@ -1187,6 +1746,12 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
     bool? active,
     bool? isCombo,
   }) => ChurchProduct(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
     name: name ?? this.name,
@@ -1199,6 +1764,18 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   );
   ChurchProduct copyWithCompanion(ProductsCompanion data) {
     return ChurchProduct(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
       name: data.name.present ? data.name.value : this.name,
@@ -1220,6 +1797,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   @override
   String toString() {
     return (StringBuffer('ChurchProduct(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('name: $name, ')
@@ -1235,6 +1816,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
 
   @override
   int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     name,
@@ -1249,6 +1834,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChurchProduct &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.eventId == this.eventId &&
           other.name == this.name &&
@@ -1261,6 +1850,10 @@ class ChurchProduct extends DataClass implements Insertable<ChurchProduct> {
 }
 
 class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> eventId;
   final Value<String> name;
@@ -1272,6 +1865,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   final Value<bool> isCombo;
   final Value<int> rowid;
   const ProductsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
     this.name = const Value.absent(),
@@ -1284,6 +1881,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     this.rowid = const Value.absent(),
   });
   ProductsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String eventId,
     required String name,
@@ -1299,6 +1900,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
        name = Value(name),
        priceCents = Value(priceCents);
   static Insertable<ChurchProduct> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? eventId,
     Expression<String>? name,
@@ -1311,6 +1916,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (eventId != null) 'event_id': eventId,
       if (name != null) 'name': name,
@@ -1325,6 +1934,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   }
 
   ProductsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? eventId,
     Value<String>? name,
@@ -1337,6 +1950,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
     Value<int>? rowid,
   }) {
     return ProductsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       name: name ?? this.name,
@@ -1353,6 +1970,18 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -1389,6 +2018,10 @@ class ProductsCompanion extends UpdateCompanion<ChurchProduct> {
   @override
   String toString() {
     return (StringBuffer('ProductsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('name: $name, ')
@@ -1410,6 +2043,52 @@ class $ProductComboItemsTable extends ProductComboItems
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $ProductComboItemsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _comboProductIdMeta = const VerificationMeta(
     'comboProductId',
   );
@@ -1442,7 +2121,15 @@ class $ProductComboItemsTable extends ProductComboItems
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [comboProductId, childProductId, qty];
+  List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    comboProductId,
+    childProductId,
+    qty,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1455,6 +2142,39 @@ class $ProductComboItemsTable extends ProductComboItems
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('combo_product_id')) {
       context.handle(
         _comboProductIdMeta,
@@ -1494,6 +2214,22 @@ class $ProductComboItemsTable extends ProductComboItems
   ProductComboItem map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ProductComboItem(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       comboProductId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}combo_product_id'],
@@ -1517,10 +2253,18 @@ class $ProductComboItemsTable extends ProductComboItems
 
 class ProductComboItem extends DataClass
     implements Insertable<ProductComboItem> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String comboProductId;
   final String childProductId;
   final int qty;
   const ProductComboItem({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.comboProductId,
     required this.childProductId,
     required this.qty,
@@ -1528,6 +2272,14 @@ class ProductComboItem extends DataClass
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['combo_product_id'] = Variable<String>(comboProductId);
     map['child_product_id'] = Variable<String>(childProductId);
     map['qty'] = Variable<int>(qty);
@@ -1536,6 +2288,14 @@ class ProductComboItem extends DataClass
 
   ProductComboItemsCompanion toCompanion(bool nullToAbsent) {
     return ProductComboItemsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       comboProductId: Value(comboProductId),
       childProductId: Value(childProductId),
       qty: Value(qty),
@@ -1548,6 +2308,10 @@ class ProductComboItem extends DataClass
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ProductComboItem(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       comboProductId: serializer.fromJson<String>(json['comboProductId']),
       childProductId: serializer.fromJson<String>(json['childProductId']),
       qty: serializer.fromJson<int>(json['qty']),
@@ -1557,6 +2321,10 @@ class ProductComboItem extends DataClass
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'comboProductId': serializer.toJson<String>(comboProductId),
       'childProductId': serializer.toJson<String>(childProductId),
       'qty': serializer.toJson<int>(qty),
@@ -1564,16 +2332,38 @@ class ProductComboItem extends DataClass
   }
 
   ProductComboItem copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? comboProductId,
     String? childProductId,
     int? qty,
   }) => ProductComboItem(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     comboProductId: comboProductId ?? this.comboProductId,
     childProductId: childProductId ?? this.childProductId,
     qty: qty ?? this.qty,
   );
   ProductComboItem copyWithCompanion(ProductComboItemsCompanion data) {
     return ProductComboItem(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       comboProductId: data.comboProductId.present
           ? data.comboProductId.value
           : this.comboProductId,
@@ -1587,6 +2377,10 @@ class ProductComboItem extends DataClass
   @override
   String toString() {
     return (StringBuffer('ProductComboItem(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('comboProductId: $comboProductId, ')
           ..write('childProductId: $childProductId, ')
           ..write('qty: $qty')
@@ -1595,28 +2389,52 @@ class ProductComboItem extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(comboProductId, childProductId, qty);
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    comboProductId,
+    childProductId,
+    qty,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ProductComboItem &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.comboProductId == this.comboProductId &&
           other.childProductId == this.childProductId &&
           other.qty == this.qty);
 }
 
 class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> comboProductId;
   final Value<String> childProductId;
   final Value<int> qty;
   final Value<int> rowid;
   const ProductComboItemsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.comboProductId = const Value.absent(),
     this.childProductId = const Value.absent(),
     this.qty = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ProductComboItemsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String comboProductId,
     required String childProductId,
     required int qty,
@@ -1625,12 +2443,20 @@ class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
        childProductId = Value(childProductId),
        qty = Value(qty);
   static Insertable<ProductComboItem> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? comboProductId,
     Expression<String>? childProductId,
     Expression<int>? qty,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (comboProductId != null) 'combo_product_id': comboProductId,
       if (childProductId != null) 'child_product_id': childProductId,
       if (qty != null) 'qty': qty,
@@ -1639,12 +2465,20 @@ class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
   }
 
   ProductComboItemsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? comboProductId,
     Value<String>? childProductId,
     Value<int>? qty,
     Value<int>? rowid,
   }) {
     return ProductComboItemsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       comboProductId: comboProductId ?? this.comboProductId,
       childProductId: childProductId ?? this.childProductId,
       qty: qty ?? this.qty,
@@ -1655,6 +2489,18 @@ class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (comboProductId.present) {
       map['combo_product_id'] = Variable<String>(comboProductId.value);
     }
@@ -1673,6 +2519,10 @@ class ProductComboItemsCompanion extends UpdateCompanion<ProductComboItem> {
   @override
   String toString() {
     return (StringBuffer('ProductComboItemsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('comboProductId: $comboProductId, ')
           ..write('childProductId: $childProductId, ')
           ..write('qty: $qty, ')
@@ -1688,6 +2538,52 @@ class $CashSessionsTable extends CashSessions
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $CashSessionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -1727,6 +2623,17 @@ class $CashSessionsTable extends CashSessions
     false,
     type: DriftSqlType.int,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _openedByMeta = const VerificationMeta(
+    'openedBy',
+  );
+  @override
+  late final GeneratedColumn<String> openedBy = GeneratedColumn<String>(
+    'opened_by',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _closedAtMsMeta = const VerificationMeta(
     'closedAtMs',
@@ -1784,10 +2691,15 @@ class $CashSessionsTable extends CashSessions
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     title,
     openedAtMs,
+    openedBy,
     closedAtMs,
     initialCashFloatCents,
     closedCashDrawerCents,
@@ -1806,6 +2718,39 @@ class $CashSessionsTable extends CashSessions
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -1837,6 +2782,12 @@ class $CashSessionsTable extends CashSessions
       );
     } else if (isInserting) {
       context.missing(_openedAtMsMeta);
+    }
+    if (data.containsKey('opened_by')) {
+      context.handle(
+        _openedByMeta,
+        openedBy.isAcceptableOrUnknown(data['opened_by']!, _openedByMeta),
+      );
     }
     if (data.containsKey('closed_at_ms')) {
       context.handle(
@@ -1889,6 +2840,22 @@ class $CashSessionsTable extends CashSessions
   CashSession map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return CashSession(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -1905,6 +2872,10 @@ class $CashSessionsTable extends CashSessions
         DriftSqlType.int,
         data['${effectivePrefix}opened_at_ms'],
       )!,
+      openedBy: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}opened_by'],
+      ),
       closedAtMs: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}closed_at_ms'],
@@ -1935,20 +2906,30 @@ class $CashSessionsTable extends CashSessions
 }
 
 class CashSession extends DataClass implements Insertable<CashSession> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String eventId;
   final String title;
   final int openedAtMs;
+  final String? openedBy;
   final int? closedAtMs;
   final int initialCashFloatCents;
   final int? closedCashDrawerCents;
   final String? closedNotes;
   final String? closedBy;
   const CashSession({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.eventId,
     required this.title,
     required this.openedAtMs,
+    this.openedBy,
     this.closedAtMs,
     required this.initialCashFloatCents,
     this.closedCashDrawerCents,
@@ -1958,10 +2939,21 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['event_id'] = Variable<String>(eventId);
     map['title'] = Variable<String>(title);
     map['opened_at_ms'] = Variable<int>(openedAtMs);
+    if (!nullToAbsent || openedBy != null) {
+      map['opened_by'] = Variable<String>(openedBy);
+    }
     if (!nullToAbsent || closedAtMs != null) {
       map['closed_at_ms'] = Variable<int>(closedAtMs);
     }
@@ -1980,10 +2972,21 @@ class CashSession extends DataClass implements Insertable<CashSession> {
 
   CashSessionsCompanion toCompanion(bool nullToAbsent) {
     return CashSessionsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       eventId: Value(eventId),
       title: Value(title),
       openedAtMs: Value(openedAtMs),
+      openedBy: openedBy == null && nullToAbsent
+          ? const Value.absent()
+          : Value(openedBy),
       closedAtMs: closedAtMs == null && nullToAbsent
           ? const Value.absent()
           : Value(closedAtMs),
@@ -2006,10 +3009,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CashSession(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       eventId: serializer.fromJson<String>(json['eventId']),
       title: serializer.fromJson<String>(json['title']),
       openedAtMs: serializer.fromJson<int>(json['openedAtMs']),
+      openedBy: serializer.fromJson<String?>(json['openedBy']),
       closedAtMs: serializer.fromJson<int?>(json['closedAtMs']),
       initialCashFloatCents: serializer.fromJson<int>(
         json['initialCashFloatCents'],
@@ -2025,10 +3033,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'eventId': serializer.toJson<String>(eventId),
       'title': serializer.toJson<String>(title),
       'openedAtMs': serializer.toJson<int>(openedAtMs),
+      'openedBy': serializer.toJson<String?>(openedBy),
       'closedAtMs': serializer.toJson<int?>(closedAtMs),
       'initialCashFloatCents': serializer.toJson<int>(initialCashFloatCents),
       'closedCashDrawerCents': serializer.toJson<int?>(closedCashDrawerCents),
@@ -2038,20 +3051,32 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   }
 
   CashSession copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? eventId,
     String? title,
     int? openedAtMs,
+    Value<String?> openedBy = const Value.absent(),
     Value<int?> closedAtMs = const Value.absent(),
     int? initialCashFloatCents,
     Value<int?> closedCashDrawerCents = const Value.absent(),
     Value<String?> closedNotes = const Value.absent(),
     Value<String?> closedBy = const Value.absent(),
   }) => CashSession(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
     title: title ?? this.title,
     openedAtMs: openedAtMs ?? this.openedAtMs,
+    openedBy: openedBy.present ? openedBy.value : this.openedBy,
     closedAtMs: closedAtMs.present ? closedAtMs.value : this.closedAtMs,
     initialCashFloatCents: initialCashFloatCents ?? this.initialCashFloatCents,
     closedCashDrawerCents: closedCashDrawerCents.present
@@ -2062,12 +3087,25 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   );
   CashSession copyWithCompanion(CashSessionsCompanion data) {
     return CashSession(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
       title: data.title.present ? data.title.value : this.title,
       openedAtMs: data.openedAtMs.present
           ? data.openedAtMs.value
           : this.openedAtMs,
+      openedBy: data.openedBy.present ? data.openedBy.value : this.openedBy,
       closedAtMs: data.closedAtMs.present
           ? data.closedAtMs.value
           : this.closedAtMs,
@@ -2087,10 +3125,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   @override
   String toString() {
     return (StringBuffer('CashSession(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('title: $title, ')
           ..write('openedAtMs: $openedAtMs, ')
+          ..write('openedBy: $openedBy, ')
           ..write('closedAtMs: $closedAtMs, ')
           ..write('initialCashFloatCents: $initialCashFloatCents, ')
           ..write('closedCashDrawerCents: $closedCashDrawerCents, ')
@@ -2102,10 +3145,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
 
   @override
   int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     title,
     openedAtMs,
+    openedBy,
     closedAtMs,
     initialCashFloatCents,
     closedCashDrawerCents,
@@ -2116,10 +3164,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CashSession &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.eventId == this.eventId &&
           other.title == this.title &&
           other.openedAtMs == this.openedAtMs &&
+          other.openedBy == this.openedBy &&
           other.closedAtMs == this.closedAtMs &&
           other.initialCashFloatCents == this.initialCashFloatCents &&
           other.closedCashDrawerCents == this.closedCashDrawerCents &&
@@ -2128,10 +3181,15 @@ class CashSession extends DataClass implements Insertable<CashSession> {
 }
 
 class CashSessionsCompanion extends UpdateCompanion<CashSession> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> eventId;
   final Value<String> title;
   final Value<int> openedAtMs;
+  final Value<String?> openedBy;
   final Value<int?> closedAtMs;
   final Value<int> initialCashFloatCents;
   final Value<int?> closedCashDrawerCents;
@@ -2139,10 +3197,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
   final Value<String?> closedBy;
   final Value<int> rowid;
   const CashSessionsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
     this.title = const Value.absent(),
     this.openedAtMs = const Value.absent(),
+    this.openedBy = const Value.absent(),
     this.closedAtMs = const Value.absent(),
     this.initialCashFloatCents = const Value.absent(),
     this.closedCashDrawerCents = const Value.absent(),
@@ -2151,10 +3214,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
     this.rowid = const Value.absent(),
   });
   CashSessionsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String eventId,
     required String title,
     required int openedAtMs,
+    this.openedBy = const Value.absent(),
     this.closedAtMs = const Value.absent(),
     this.initialCashFloatCents = const Value.absent(),
     this.closedCashDrawerCents = const Value.absent(),
@@ -2166,10 +3234,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
        title = Value(title),
        openedAtMs = Value(openedAtMs);
   static Insertable<CashSession> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? eventId,
     Expression<String>? title,
     Expression<int>? openedAtMs,
+    Expression<String>? openedBy,
     Expression<int>? closedAtMs,
     Expression<int>? initialCashFloatCents,
     Expression<int>? closedCashDrawerCents,
@@ -2178,10 +3251,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (eventId != null) 'event_id': eventId,
       if (title != null) 'title': title,
       if (openedAtMs != null) 'opened_at_ms': openedAtMs,
+      if (openedBy != null) 'opened_by': openedBy,
       if (closedAtMs != null) 'closed_at_ms': closedAtMs,
       if (initialCashFloatCents != null)
         'initial_cash_float_cents': initialCashFloatCents,
@@ -2194,10 +3272,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
   }
 
   CashSessionsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? eventId,
     Value<String>? title,
     Value<int>? openedAtMs,
+    Value<String?>? openedBy,
     Value<int?>? closedAtMs,
     Value<int>? initialCashFloatCents,
     Value<int?>? closedCashDrawerCents,
@@ -2206,10 +3289,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
     Value<int>? rowid,
   }) {
     return CashSessionsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       title: title ?? this.title,
       openedAtMs: openedAtMs ?? this.openedAtMs,
+      openedBy: openedBy ?? this.openedBy,
       closedAtMs: closedAtMs ?? this.closedAtMs,
       initialCashFloatCents:
           initialCashFloatCents ?? this.initialCashFloatCents,
@@ -2224,6 +3312,18 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -2235,6 +3335,9 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
     }
     if (openedAtMs.present) {
       map['opened_at_ms'] = Variable<int>(openedAtMs.value);
+    }
+    if (openedBy.present) {
+      map['opened_by'] = Variable<String>(openedBy.value);
     }
     if (closedAtMs.present) {
       map['closed_at_ms'] = Variable<int>(closedAtMs.value);
@@ -2264,10 +3367,15 @@ class CashSessionsCompanion extends UpdateCompanion<CashSession> {
   @override
   String toString() {
     return (StringBuffer('CashSessionsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('title: $title, ')
           ..write('openedAtMs: $openedAtMs, ')
+          ..write('openedBy: $openedBy, ')
           ..write('closedAtMs: $closedAtMs, ')
           ..write('initialCashFloatCents: $initialCashFloatCents, ')
           ..write('closedCashDrawerCents: $closedCashDrawerCents, ')
@@ -2284,6 +3392,52 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $SalesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -2396,6 +3550,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     sessionId,
@@ -2419,6 +3577,39 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -2507,6 +3698,22 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
   PosSale map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return PosSale(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -2557,6 +3764,10 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
 }
 
 class PosSale extends DataClass implements Insertable<PosSale> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String eventId;
   final String? sessionId;
@@ -2568,6 +3779,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   final bool changePending;
   final String? customerName;
   const PosSale({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.eventId,
     this.sessionId,
@@ -2582,6 +3797,14 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['event_id'] = Variable<String>(eventId);
     if (!nullToAbsent || sessionId != null) {
@@ -2603,6 +3826,14 @@ class PosSale extends DataClass implements Insertable<PosSale> {
 
   SalesCompanion toCompanion(bool nullToAbsent) {
     return SalesCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       eventId: Value(eventId),
       sessionId: sessionId == null && nullToAbsent
@@ -2628,6 +3859,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return PosSale(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       eventId: serializer.fromJson<String>(json['eventId']),
       sessionId: serializer.fromJson<String?>(json['sessionId']),
@@ -2646,6 +3881,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'eventId': serializer.toJson<String>(eventId),
       'sessionId': serializer.toJson<String?>(sessionId),
@@ -2660,6 +3899,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   }
 
   PosSale copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? eventId,
     Value<String?> sessionId = const Value.absent(),
@@ -2671,6 +3914,12 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     bool? changePending,
     Value<String?> customerName = const Value.absent(),
   }) => PosSale(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     eventId: eventId ?? this.eventId,
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
@@ -2684,6 +3933,18 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   );
   PosSale copyWithCompanion(SalesCompanion data) {
     return PosSale(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       eventId: data.eventId.present ? data.eventId.value : this.eventId,
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
@@ -2710,6 +3971,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   @override
   String toString() {
     return (StringBuffer('PosSale(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('sessionId: $sessionId, ')
@@ -2726,6 +3991,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
 
   @override
   int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     eventId,
     sessionId,
@@ -2741,6 +4010,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PosSale &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.eventId == this.eventId &&
           other.sessionId == this.sessionId &&
@@ -2754,6 +4027,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
 }
 
 class SalesCompanion extends UpdateCompanion<PosSale> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> eventId;
   final Value<String?> sessionId;
@@ -2766,6 +4043,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   final Value<String?> customerName;
   final Value<int> rowid;
   const SalesCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.eventId = const Value.absent(),
     this.sessionId = const Value.absent(),
@@ -2779,6 +4060,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String eventId,
     this.sessionId = const Value.absent(),
@@ -2796,6 +4081,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
        totalCents = Value(totalCents),
        amountReceivedCents = Value(amountReceivedCents);
   static Insertable<PosSale> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? eventId,
     Expression<String>? sessionId,
@@ -2809,6 +4098,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (eventId != null) 'event_id': eventId,
       if (sessionId != null) 'session_id': sessionId,
@@ -2825,6 +4118,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   }
 
   SalesCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? eventId,
     Value<String?>? sessionId,
@@ -2838,6 +4135,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Value<int>? rowid,
   }) {
     return SalesCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       eventId: eventId ?? this.eventId,
       sessionId: sessionId ?? this.sessionId,
@@ -2855,6 +4156,18 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -2894,6 +4207,10 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   @override
   String toString() {
     return (StringBuffer('SalesCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('eventId: $eventId, ')
           ..write('sessionId: $sessionId, ')
@@ -2916,6 +4233,52 @@ class $SaleLinesTable extends SaleLines
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $SaleLinesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -3013,6 +4376,10 @@ class $SaleLinesTable extends SaleLines
   );
   @override
   List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     saleId,
     lineKind,
@@ -3035,6 +4402,39 @@ class $SaleLinesTable extends SaleLines
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -3114,6 +4514,22 @@ class $SaleLinesTable extends SaleLines
   PosSaleLine map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return PosSaleLine(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -3160,6 +4576,10 @@ class $SaleLinesTable extends SaleLines
 }
 
 class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String saleId;
   final int lineKind;
@@ -3170,6 +4590,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   final int unitPriceCents;
   final int lineTotalCents;
   const PosSaleLine({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.saleId,
     required this.lineKind,
@@ -3183,6 +4607,14 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['sale_id'] = Variable<String>(saleId);
     map['line_kind'] = Variable<int>(lineKind);
@@ -3203,6 +4635,14 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
 
   SaleLinesCompanion toCompanion(bool nullToAbsent) {
     return SaleLinesCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       saleId: Value(saleId),
       lineKind: Value(lineKind),
@@ -3227,6 +4667,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return PosSaleLine(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       saleId: serializer.fromJson<String>(json['saleId']),
       lineKind: serializer.fromJson<int>(json['lineKind']),
@@ -3244,6 +4688,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'saleId': serializer.toJson<String>(saleId),
       'lineKind': serializer.toJson<int>(lineKind),
@@ -3257,6 +4705,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   }
 
   PosSaleLine copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? saleId,
     int? lineKind,
@@ -3267,6 +4719,12 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
     int? unitPriceCents,
     int? lineTotalCents,
   }) => PosSaleLine(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     saleId: saleId ?? this.saleId,
     lineKind: lineKind ?? this.lineKind,
@@ -3281,6 +4739,18 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   );
   PosSaleLine copyWithCompanion(SaleLinesCompanion data) {
     return PosSaleLine(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       saleId: data.saleId.present ? data.saleId.value : this.saleId,
       lineKind: data.lineKind.present ? data.lineKind.value : this.lineKind,
@@ -3302,6 +4772,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   @override
   String toString() {
     return (StringBuffer('PosSaleLine(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('saleId: $saleId, ')
           ..write('lineKind: $lineKind, ')
@@ -3317,6 +4791,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
 
   @override
   int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
     id,
     saleId,
     lineKind,
@@ -3331,6 +4809,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is PosSaleLine &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.saleId == this.saleId &&
           other.lineKind == this.lineKind &&
@@ -3343,6 +4825,10 @@ class PosSaleLine extends DataClass implements Insertable<PosSaleLine> {
 }
 
 class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> saleId;
   final Value<int> lineKind;
@@ -3354,6 +4840,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
   final Value<int> lineTotalCents;
   final Value<int> rowid;
   const SaleLinesCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.saleId = const Value.absent(),
     this.lineKind = const Value.absent(),
@@ -3366,6 +4856,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
     this.rowid = const Value.absent(),
   });
   SaleLinesCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String saleId,
     this.lineKind = const Value.absent(),
@@ -3382,6 +4876,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
        unitPriceCents = Value(unitPriceCents),
        lineTotalCents = Value(lineTotalCents);
   static Insertable<PosSaleLine> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? saleId,
     Expression<int>? lineKind,
@@ -3394,6 +4892,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (saleId != null) 'sale_id': saleId,
       if (lineKind != null) 'line_kind': lineKind,
@@ -3408,6 +4910,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
   }
 
   SaleLinesCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? saleId,
     Value<int>? lineKind,
@@ -3420,6 +4926,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
     Value<int>? rowid,
   }) {
     return SaleLinesCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       saleId: saleId ?? this.saleId,
       lineKind: lineKind ?? this.lineKind,
@@ -3436,6 +4946,18 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -3472,6 +4994,10 @@ class SaleLinesCompanion extends UpdateCompanion<PosSaleLine> {
   @override
   String toString() {
     return (StringBuffer('SaleLinesCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('saleId: $saleId, ')
           ..write('lineKind: $lineKind, ')
@@ -3493,6 +5019,52 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $SaleChangeDotAllocationsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
@@ -3533,7 +5105,16 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
     requiredDuringInsert: true,
   );
   @override
-  List<GeneratedColumn> get $columns => [id, saleId, dotDenominationId, qty];
+  List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    saleId,
+    dotDenominationId,
+    qty,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -3546,6 +5127,39 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
@@ -3587,6 +5201,22 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
   ChangeDotRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return ChangeDotRow(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}id'],
@@ -3613,11 +5243,19 @@ class $SaleChangeDotAllocationsTable extends SaleChangeDotAllocations
 }
 
 class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
   final String id;
   final String saleId;
   final String dotDenominationId;
   final int qty;
   const ChangeDotRow({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
     required this.id,
     required this.saleId,
     required this.dotDenominationId,
@@ -3626,6 +5264,14 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
     map['id'] = Variable<String>(id);
     map['sale_id'] = Variable<String>(saleId);
     map['dot_denomination_id'] = Variable<String>(dotDenominationId);
@@ -3635,6 +5281,14 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
 
   SaleChangeDotAllocationsCompanion toCompanion(bool nullToAbsent) {
     return SaleChangeDotAllocationsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
       id: Value(id),
       saleId: Value(saleId),
       dotDenominationId: Value(dotDenominationId),
@@ -3648,6 +5302,10 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return ChangeDotRow(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
       id: serializer.fromJson<String>(json['id']),
       saleId: serializer.fromJson<String>(json['saleId']),
       dotDenominationId: serializer.fromJson<String>(json['dotDenominationId']),
@@ -3658,6 +5316,10 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
       'id': serializer.toJson<String>(id),
       'saleId': serializer.toJson<String>(saleId),
       'dotDenominationId': serializer.toJson<String>(dotDenominationId),
@@ -3666,11 +5328,21 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   }
 
   ChangeDotRow copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
     String? id,
     String? saleId,
     String? dotDenominationId,
     int? qty,
   }) => ChangeDotRow(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
     id: id ?? this.id,
     saleId: saleId ?? this.saleId,
     dotDenominationId: dotDenominationId ?? this.dotDenominationId,
@@ -3678,6 +5350,18 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   );
   ChangeDotRow copyWithCompanion(SaleChangeDotAllocationsCompanion data) {
     return ChangeDotRow(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
       id: data.id.present ? data.id.value : this.id,
       saleId: data.saleId.present ? data.saleId.value : this.saleId,
       dotDenominationId: data.dotDenominationId.present
@@ -3690,6 +5374,10 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   @override
   String toString() {
     return (StringBuffer('ChangeDotRow(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('saleId: $saleId, ')
           ..write('dotDenominationId: $dotDenominationId, ')
@@ -3699,11 +5387,24 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
   }
 
   @override
-  int get hashCode => Object.hash(id, saleId, dotDenominationId, qty);
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    saleId,
+    dotDenominationId,
+    qty,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is ChangeDotRow &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
           other.id == this.id &&
           other.saleId == this.saleId &&
           other.dotDenominationId == this.dotDenominationId &&
@@ -3711,12 +5412,20 @@ class ChangeDotRow extends DataClass implements Insertable<ChangeDotRow> {
 }
 
 class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
   final Value<String> id;
   final Value<String> saleId;
   final Value<String> dotDenominationId;
   final Value<int> qty;
   final Value<int> rowid;
   const SaleChangeDotAllocationsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     this.id = const Value.absent(),
     this.saleId = const Value.absent(),
     this.dotDenominationId = const Value.absent(),
@@ -3724,6 +5433,10 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
     this.rowid = const Value.absent(),
   });
   SaleChangeDotAllocationsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
     required String id,
     required String saleId,
     required String dotDenominationId,
@@ -3734,6 +5447,10 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
        dotDenominationId = Value(dotDenominationId),
        qty = Value(qty);
   static Insertable<ChangeDotRow> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
     Expression<String>? id,
     Expression<String>? saleId,
     Expression<String>? dotDenominationId,
@@ -3741,6 +5458,10 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
       if (id != null) 'id': id,
       if (saleId != null) 'sale_id': saleId,
       if (dotDenominationId != null) 'dot_denomination_id': dotDenominationId,
@@ -3750,6 +5471,10 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
   }
 
   SaleChangeDotAllocationsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
     Value<String>? id,
     Value<String>? saleId,
     Value<String>? dotDenominationId,
@@ -3757,6 +5482,10 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
     Value<int>? rowid,
   }) {
     return SaleChangeDotAllocationsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
       id: id ?? this.id,
       saleId: saleId ?? this.saleId,
       dotDenominationId: dotDenominationId ?? this.dotDenominationId,
@@ -3768,6 +5497,18 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
     if (id.present) {
       map['id'] = Variable<String>(id.value);
     }
@@ -3789,10 +5530,730 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
   @override
   String toString() {
     return (StringBuffer('SaleChangeDotAllocationsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
           ..write('id: $id, ')
           ..write('saleId: $saleId, ')
           ..write('dotDenominationId: $dotDenominationId, ')
           ..write('qty: $qty, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $StockMovementsTable extends StockMovements
+    with TableInfo<$StockMovementsTable, StockMovement> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StockMovementsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemTypeMeta = const VerificationMeta(
+    'itemType',
+  );
+  @override
+  late final GeneratedColumn<int> itemType = GeneratedColumn<int>(
+    'item_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _itemIdMeta = const VerificationMeta('itemId');
+  @override
+  late final GeneratedColumn<String> itemId = GeneratedColumn<String>(
+    'item_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deltaMeta = const VerificationMeta('delta');
+  @override
+  late final GeneratedColumn<int> delta = GeneratedColumn<int>(
+    'delta',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _reasonMeta = const VerificationMeta('reason');
+  @override
+  late final GeneratedColumn<int> reason = GeneratedColumn<int>(
+    'reason',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _saleIdMeta = const VerificationMeta('saleId');
+  @override
+  late final GeneratedColumn<String> saleId = GeneratedColumn<String>(
+    'sale_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _atMsMeta = const VerificationMeta('atMs');
+  @override
+  late final GeneratedColumn<int> atMs = GeneratedColumn<int>(
+    'at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    itemType,
+    itemId,
+    delta,
+    reason,
+    saleId,
+    atMs,
+    deviceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'stock_movements';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StockMovement> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('item_type')) {
+      context.handle(
+        _itemTypeMeta,
+        itemType.isAcceptableOrUnknown(data['item_type']!, _itemTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemTypeMeta);
+    }
+    if (data.containsKey('item_id')) {
+      context.handle(
+        _itemIdMeta,
+        itemId.isAcceptableOrUnknown(data['item_id']!, _itemIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_itemIdMeta);
+    }
+    if (data.containsKey('delta')) {
+      context.handle(
+        _deltaMeta,
+        delta.isAcceptableOrUnknown(data['delta']!, _deltaMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deltaMeta);
+    }
+    if (data.containsKey('reason')) {
+      context.handle(
+        _reasonMeta,
+        reason.isAcceptableOrUnknown(data['reason']!, _reasonMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_reasonMeta);
+    }
+    if (data.containsKey('sale_id')) {
+      context.handle(
+        _saleIdMeta,
+        saleId.isAcceptableOrUnknown(data['sale_id']!, _saleIdMeta),
+      );
+    }
+    if (data.containsKey('at_ms')) {
+      context.handle(
+        _atMsMeta,
+        atMs.isAcceptableOrUnknown(data['at_ms']!, _atMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_atMsMeta);
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StockMovement map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StockMovement(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      itemType: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}item_type'],
+      )!,
+      itemId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}item_id'],
+      )!,
+      delta: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delta'],
+      )!,
+      reason: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}reason'],
+      )!,
+      saleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sale_id'],
+      ),
+      atMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}at_ms'],
+      )!,
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+    );
+  }
+
+  @override
+  $StockMovementsTable createAlias(String alias) {
+    return $StockMovementsTable(attachedDatabase, alias);
+  }
+}
+
+class StockMovement extends DataClass implements Insertable<StockMovement> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
+  final String id;
+
+  /// 0 = produto, 1 = ficha.
+  final int itemType;
+  final String itemId;
+  final int delta;
+
+  /// Ver [StockMovementReason].
+  final int reason;
+  final String? saleId;
+  final int atMs;
+  final String deviceId;
+  const StockMovement({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
+    required this.id,
+    required this.itemType,
+    required this.itemId,
+    required this.delta,
+    required this.reason,
+    this.saleId,
+    required this.atMs,
+    required this.deviceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
+    map['id'] = Variable<String>(id);
+    map['item_type'] = Variable<int>(itemType);
+    map['item_id'] = Variable<String>(itemId);
+    map['delta'] = Variable<int>(delta);
+    map['reason'] = Variable<int>(reason);
+    if (!nullToAbsent || saleId != null) {
+      map['sale_id'] = Variable<String>(saleId);
+    }
+    map['at_ms'] = Variable<int>(atMs);
+    map['device_id'] = Variable<String>(deviceId);
+    return map;
+  }
+
+  StockMovementsCompanion toCompanion(bool nullToAbsent) {
+    return StockMovementsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
+      id: Value(id),
+      itemType: Value(itemType),
+      itemId: Value(itemId),
+      delta: Value(delta),
+      reason: Value(reason),
+      saleId: saleId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(saleId),
+      atMs: Value(atMs),
+      deviceId: Value(deviceId),
+    );
+  }
+
+  factory StockMovement.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StockMovement(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
+      id: serializer.fromJson<String>(json['id']),
+      itemType: serializer.fromJson<int>(json['itemType']),
+      itemId: serializer.fromJson<String>(json['itemId']),
+      delta: serializer.fromJson<int>(json['delta']),
+      reason: serializer.fromJson<int>(json['reason']),
+      saleId: serializer.fromJson<String?>(json['saleId']),
+      atMs: serializer.fromJson<int>(json['atMs']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
+      'id': serializer.toJson<String>(id),
+      'itemType': serializer.toJson<int>(itemType),
+      'itemId': serializer.toJson<String>(itemId),
+      'delta': serializer.toJson<int>(delta),
+      'reason': serializer.toJson<int>(reason),
+      'saleId': serializer.toJson<String?>(saleId),
+      'atMs': serializer.toJson<int>(atMs),
+      'deviceId': serializer.toJson<String>(deviceId),
+    };
+  }
+
+  StockMovement copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
+    String? id,
+    int? itemType,
+    String? itemId,
+    int? delta,
+    int? reason,
+    Value<String?> saleId = const Value.absent(),
+    int? atMs,
+    String? deviceId,
+  }) => StockMovement(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
+    id: id ?? this.id,
+    itemType: itemType ?? this.itemType,
+    itemId: itemId ?? this.itemId,
+    delta: delta ?? this.delta,
+    reason: reason ?? this.reason,
+    saleId: saleId.present ? saleId.value : this.saleId,
+    atMs: atMs ?? this.atMs,
+    deviceId: deviceId ?? this.deviceId,
+  );
+  StockMovement copyWithCompanion(StockMovementsCompanion data) {
+    return StockMovement(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+      id: data.id.present ? data.id.value : this.id,
+      itemType: data.itemType.present ? data.itemType.value : this.itemType,
+      itemId: data.itemId.present ? data.itemId.value : this.itemId,
+      delta: data.delta.present ? data.delta.value : this.delta,
+      reason: data.reason.present ? data.reason.value : this.reason,
+      saleId: data.saleId.present ? data.saleId.value : this.saleId,
+      atMs: data.atMs.present ? data.atMs.value : this.atMs,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockMovement(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('itemType: $itemType, ')
+          ..write('itemId: $itemId, ')
+          ..write('delta: $delta, ')
+          ..write('reason: $reason, ')
+          ..write('saleId: $saleId, ')
+          ..write('atMs: $atMs, ')
+          ..write('deviceId: $deviceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    itemType,
+    itemId,
+    delta,
+    reason,
+    saleId,
+    atMs,
+    deviceId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StockMovement &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
+          other.id == this.id &&
+          other.itemType == this.itemType &&
+          other.itemId == this.itemId &&
+          other.delta == this.delta &&
+          other.reason == this.reason &&
+          other.saleId == this.saleId &&
+          other.atMs == this.atMs &&
+          other.deviceId == this.deviceId);
+}
+
+class StockMovementsCompanion extends UpdateCompanion<StockMovement> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
+  final Value<String> id;
+  final Value<int> itemType;
+  final Value<String> itemId;
+  final Value<int> delta;
+  final Value<int> reason;
+  final Value<String?> saleId;
+  final Value<int> atMs;
+  final Value<String> deviceId;
+  final Value<int> rowid;
+  const StockMovementsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.id = const Value.absent(),
+    this.itemType = const Value.absent(),
+    this.itemId = const Value.absent(),
+    this.delta = const Value.absent(),
+    this.reason = const Value.absent(),
+    this.saleId = const Value.absent(),
+    this.atMs = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StockMovementsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    required String id,
+    required int itemType,
+    required String itemId,
+    required int delta,
+    required int reason,
+    this.saleId = const Value.absent(),
+    required int atMs,
+    required String deviceId,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       itemType = Value(itemType),
+       itemId = Value(itemId),
+       delta = Value(delta),
+       reason = Value(reason),
+       atMs = Value(atMs),
+       deviceId = Value(deviceId);
+  static Insertable<StockMovement> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
+    Expression<String>? id,
+    Expression<int>? itemType,
+    Expression<String>? itemId,
+    Expression<int>? delta,
+    Expression<int>? reason,
+    Expression<String>? saleId,
+    Expression<int>? atMs,
+    Expression<String>? deviceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (id != null) 'id': id,
+      if (itemType != null) 'item_type': itemType,
+      if (itemId != null) 'item_id': itemId,
+      if (delta != null) 'delta': delta,
+      if (reason != null) 'reason': reason,
+      if (saleId != null) 'sale_id': saleId,
+      if (atMs != null) 'at_ms': atMs,
+      if (deviceId != null) 'device_id': deviceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StockMovementsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
+    Value<String>? id,
+    Value<int>? itemType,
+    Value<String>? itemId,
+    Value<int>? delta,
+    Value<int>? reason,
+    Value<String?>? saleId,
+    Value<int>? atMs,
+    Value<String>? deviceId,
+    Value<int>? rowid,
+  }) {
+    return StockMovementsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      id: id ?? this.id,
+      itemType: itemType ?? this.itemType,
+      itemId: itemId ?? this.itemId,
+      delta: delta ?? this.delta,
+      reason: reason ?? this.reason,
+      saleId: saleId ?? this.saleId,
+      atMs: atMs ?? this.atMs,
+      deviceId: deviceId ?? this.deviceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (itemType.present) {
+      map['item_type'] = Variable<int>(itemType.value);
+    }
+    if (itemId.present) {
+      map['item_id'] = Variable<String>(itemId.value);
+    }
+    if (delta.present) {
+      map['delta'] = Variable<int>(delta.value);
+    }
+    if (reason.present) {
+      map['reason'] = Variable<int>(reason.value);
+    }
+    if (saleId.present) {
+      map['sale_id'] = Variable<String>(saleId.value);
+    }
+    if (atMs.present) {
+      map['at_ms'] = Variable<int>(atMs.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StockMovementsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('itemType: $itemType, ')
+          ..write('itemId: $itemId, ')
+          ..write('delta: $delta, ')
+          ..write('reason: $reason, ')
+          ..write('saleId: $saleId, ')
+          ..write('atMs: $atMs, ')
+          ..write('deviceId: $deviceId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -3813,6 +6274,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $SaleChangeDotAllocationsTable saleChangeDotAllocations =
       $SaleChangeDotAllocationsTable(this);
+  late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3826,11 +6288,16 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     sales,
     saleLines,
     saleChangeDotAllocations,
+    stockMovements,
   ];
 }
 
 typedef $$EventsTableCreateCompanionBuilder =
     EventsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String title,
       Value<String> notes,
@@ -3842,6 +6309,10 @@ typedef $$EventsTableCreateCompanionBuilder =
     });
 typedef $$EventsTableUpdateCompanionBuilder =
     EventsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> title,
       Value<String> notes,
@@ -3861,6 +6332,26 @@ class $$EventsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -3906,6 +6397,26 @@ class $$EventsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -3951,6 +6462,26 @@ class $$EventsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -4010,6 +6541,10 @@ class $$EventsTableTableManager
               $$EventsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<String> notes = const Value.absent(),
@@ -4019,6 +6554,10 @@ class $$EventsTableTableManager
                 Value<String?> pixMerchantCity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 title: title,
                 notes: notes,
@@ -4030,6 +6569,10 @@ class $$EventsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String title,
                 Value<String> notes = const Value.absent(),
@@ -4039,6 +6582,10 @@ class $$EventsTableTableManager
                 Value<String?> pixMerchantCity = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 title: title,
                 notes: notes,
@@ -4072,6 +6619,10 @@ typedef $$EventsTableProcessedTableManager =
     >;
 typedef $$EventDotDenominationsTableCreateCompanionBuilder =
     EventDotDenominationsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String eventId,
       required String label,
@@ -4081,6 +6632,10 @@ typedef $$EventDotDenominationsTableCreateCompanionBuilder =
     });
 typedef $$EventDotDenominationsTableUpdateCompanionBuilder =
     EventDotDenominationsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> eventId,
       Value<String> label,
@@ -4098,6 +6653,26 @@ class $$EventDotDenominationsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -4133,6 +6708,26 @@ class $$EventDotDenominationsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -4168,6 +6763,26 @@ class $$EventDotDenominationsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -4232,6 +6847,10 @@ class $$EventDotDenominationsTableTableManager
               ),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> eventId = const Value.absent(),
                 Value<String> label = const Value.absent(),
@@ -4239,6 +6858,10 @@ class $$EventDotDenominationsTableTableManager
                 Value<int> stockQty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventDotDenominationsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 label: label,
@@ -4248,6 +6871,10 @@ class $$EventDotDenominationsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String eventId,
                 required String label,
@@ -4255,6 +6882,10 @@ class $$EventDotDenominationsTableTableManager
                 Value<int> stockQty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => EventDotDenominationsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 label: label,
@@ -4293,6 +6924,10 @@ typedef $$EventDotDenominationsTableProcessedTableManager =
     >;
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String eventId,
       required String name,
@@ -4306,6 +6941,10 @@ typedef $$ProductsTableCreateCompanionBuilder =
     });
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> eventId,
       Value<String> name,
@@ -4327,6 +6966,26 @@ class $$ProductsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -4382,6 +7041,26 @@ class $$ProductsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -4437,6 +7116,26 @@ class $$ProductsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -4502,6 +7201,10 @@ class $$ProductsTableTableManager
               $$ProductsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> eventId = const Value.absent(),
                 Value<String> name = const Value.absent(),
@@ -4513,6 +7216,10 @@ class $$ProductsTableTableManager
                 Value<bool> isCombo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 name: name,
@@ -4526,6 +7233,10 @@ class $$ProductsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String eventId,
                 required String name,
@@ -4537,6 +7248,10 @@ class $$ProductsTableTableManager
                 Value<bool> isCombo = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 name: name,
@@ -4575,6 +7290,10 @@ typedef $$ProductsTableProcessedTableManager =
     >;
 typedef $$ProductComboItemsTableCreateCompanionBuilder =
     ProductComboItemsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String comboProductId,
       required String childProductId,
       required int qty,
@@ -4582,6 +7301,10 @@ typedef $$ProductComboItemsTableCreateCompanionBuilder =
     });
 typedef $$ProductComboItemsTableUpdateCompanionBuilder =
     ProductComboItemsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> comboProductId,
       Value<String> childProductId,
       Value<int> qty,
@@ -4597,6 +7320,26 @@ class $$ProductComboItemsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get comboProductId => $composableBuilder(
     column: $table.comboProductId,
     builder: (column) => ColumnFilters(column),
@@ -4622,6 +7365,26 @@ class $$ProductComboItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get comboProductId => $composableBuilder(
     column: $table.comboProductId,
     builder: (column) => ColumnOrderings(column),
@@ -4647,6 +7410,26 @@ class $$ProductComboItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get comboProductId => $composableBuilder(
     column: $table.comboProductId,
     builder: (column) => column,
@@ -4701,11 +7484,19 @@ class $$ProductComboItemsTableTableManager
               ),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> comboProductId = const Value.absent(),
                 Value<String> childProductId = const Value.absent(),
                 Value<int> qty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductComboItemsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 comboProductId: comboProductId,
                 childProductId: childProductId,
                 qty: qty,
@@ -4713,11 +7504,19 @@ class $$ProductComboItemsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String comboProductId,
                 required String childProductId,
                 required int qty,
                 Value<int> rowid = const Value.absent(),
               }) => ProductComboItemsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 comboProductId: comboProductId,
                 childProductId: childProductId,
                 qty: qty,
@@ -4754,10 +7553,15 @@ typedef $$ProductComboItemsTableProcessedTableManager =
     >;
 typedef $$CashSessionsTableCreateCompanionBuilder =
     CashSessionsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String eventId,
       required String title,
       required int openedAtMs,
+      Value<String?> openedBy,
       Value<int?> closedAtMs,
       Value<int> initialCashFloatCents,
       Value<int?> closedCashDrawerCents,
@@ -4767,10 +7571,15 @@ typedef $$CashSessionsTableCreateCompanionBuilder =
     });
 typedef $$CashSessionsTableUpdateCompanionBuilder =
     CashSessionsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> eventId,
       Value<String> title,
       Value<int> openedAtMs,
+      Value<String?> openedBy,
       Value<int?> closedAtMs,
       Value<int> initialCashFloatCents,
       Value<int?> closedCashDrawerCents,
@@ -4788,6 +7597,26 @@ class $$CashSessionsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -4805,6 +7634,11 @@ class $$CashSessionsTableFilterComposer
 
   ColumnFilters<int> get openedAtMs => $composableBuilder(
     column: $table.openedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get openedBy => $composableBuilder(
+    column: $table.openedBy,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4843,6 +7677,26 @@ class $$CashSessionsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -4860,6 +7714,11 @@ class $$CashSessionsTableOrderingComposer
 
   ColumnOrderings<int> get openedAtMs => $composableBuilder(
     column: $table.openedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get openedBy => $composableBuilder(
+    column: $table.openedBy,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4898,6 +7757,26 @@ class $$CashSessionsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -4911,6 +7790,9 @@ class $$CashSessionsTableAnnotationComposer
     column: $table.openedAtMs,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get openedBy =>
+      $composableBuilder(column: $table.openedBy, builder: (column) => column);
 
   GeneratedColumn<int> get closedAtMs => $composableBuilder(
     column: $table.closedAtMs,
@@ -4967,10 +7849,15 @@ class $$CashSessionsTableTableManager
               $$CashSessionsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> eventId = const Value.absent(),
                 Value<String> title = const Value.absent(),
                 Value<int> openedAtMs = const Value.absent(),
+                Value<String?> openedBy = const Value.absent(),
                 Value<int?> closedAtMs = const Value.absent(),
                 Value<int> initialCashFloatCents = const Value.absent(),
                 Value<int?> closedCashDrawerCents = const Value.absent(),
@@ -4978,10 +7865,15 @@ class $$CashSessionsTableTableManager
                 Value<String?> closedBy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CashSessionsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 title: title,
                 openedAtMs: openedAtMs,
+                openedBy: openedBy,
                 closedAtMs: closedAtMs,
                 initialCashFloatCents: initialCashFloatCents,
                 closedCashDrawerCents: closedCashDrawerCents,
@@ -4991,10 +7883,15 @@ class $$CashSessionsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String eventId,
                 required String title,
                 required int openedAtMs,
+                Value<String?> openedBy = const Value.absent(),
                 Value<int?> closedAtMs = const Value.absent(),
                 Value<int> initialCashFloatCents = const Value.absent(),
                 Value<int?> closedCashDrawerCents = const Value.absent(),
@@ -5002,10 +7899,15 @@ class $$CashSessionsTableTableManager
                 Value<String?> closedBy = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CashSessionsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 title: title,
                 openedAtMs: openedAtMs,
+                openedBy: openedBy,
                 closedAtMs: closedAtMs,
                 initialCashFloatCents: initialCashFloatCents,
                 closedCashDrawerCents: closedCashDrawerCents,
@@ -5040,6 +7942,10 @@ typedef $$CashSessionsTableProcessedTableManager =
     >;
 typedef $$SalesTableCreateCompanionBuilder =
     SalesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String eventId,
       Value<String?> sessionId,
@@ -5054,6 +7960,10 @@ typedef $$SalesTableCreateCompanionBuilder =
     });
 typedef $$SalesTableUpdateCompanionBuilder =
     SalesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> eventId,
       Value<String?> sessionId,
@@ -5075,6 +7985,26 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -5135,6 +8065,26 @@ class $$SalesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -5195,6 +8145,26 @@ class $$SalesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -5264,6 +8234,10 @@ class $$SalesTableTableManager
               $$SalesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> eventId = const Value.absent(),
                 Value<String?> sessionId = const Value.absent(),
@@ -5276,6 +8250,10 @@ class $$SalesTableTableManager
                 Value<String?> customerName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 sessionId: sessionId,
@@ -5290,6 +8268,10 @@ class $$SalesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String eventId,
                 Value<String?> sessionId = const Value.absent(),
@@ -5302,6 +8284,10 @@ class $$SalesTableTableManager
                 Value<String?> customerName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 eventId: eventId,
                 sessionId: sessionId,
@@ -5338,6 +8324,10 @@ typedef $$SalesTableProcessedTableManager =
     >;
 typedef $$SaleLinesTableCreateCompanionBuilder =
     SaleLinesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String saleId,
       Value<int> lineKind,
@@ -5351,6 +8341,10 @@ typedef $$SaleLinesTableCreateCompanionBuilder =
     });
 typedef $$SaleLinesTableUpdateCompanionBuilder =
     SaleLinesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> saleId,
       Value<int> lineKind,
@@ -5372,6 +8366,26 @@ class $$SaleLinesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -5427,6 +8441,26 @@ class $$SaleLinesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -5482,6 +8516,26 @@ class $$SaleLinesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -5547,6 +8601,10 @@ class $$SaleLinesTableTableManager
               $$SaleLinesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> saleId = const Value.absent(),
                 Value<int> lineKind = const Value.absent(),
@@ -5558,6 +8616,10 @@ class $$SaleLinesTableTableManager
                 Value<int> lineTotalCents = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SaleLinesCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 saleId: saleId,
                 lineKind: lineKind,
@@ -5571,6 +8633,10 @@ class $$SaleLinesTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String saleId,
                 Value<int> lineKind = const Value.absent(),
@@ -5582,6 +8648,10 @@ class $$SaleLinesTableTableManager
                 required int lineTotalCents,
                 Value<int> rowid = const Value.absent(),
               }) => SaleLinesCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 saleId: saleId,
                 lineKind: lineKind,
@@ -5620,6 +8690,10 @@ typedef $$SaleLinesTableProcessedTableManager =
     >;
 typedef $$SaleChangeDotAllocationsTableCreateCompanionBuilder =
     SaleChangeDotAllocationsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       required String id,
       required String saleId,
       required String dotDenominationId,
@@ -5628,6 +8702,10 @@ typedef $$SaleChangeDotAllocationsTableCreateCompanionBuilder =
     });
 typedef $$SaleChangeDotAllocationsTableUpdateCompanionBuilder =
     SaleChangeDotAllocationsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
       Value<String> id,
       Value<String> saleId,
       Value<String> dotDenominationId,
@@ -5644,6 +8722,26 @@ class $$SaleChangeDotAllocationsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
@@ -5674,6 +8772,26 @@ class $$SaleChangeDotAllocationsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
@@ -5704,6 +8822,26 @@ class $$SaleChangeDotAllocationsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
@@ -5765,12 +8903,20 @@ class $$SaleChangeDotAllocationsTableTableManager
               ),
           updateCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 Value<String> id = const Value.absent(),
                 Value<String> saleId = const Value.absent(),
                 Value<String> dotDenominationId = const Value.absent(),
                 Value<int> qty = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SaleChangeDotAllocationsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 saleId: saleId,
                 dotDenominationId: dotDenominationId,
@@ -5779,12 +8925,20 @@ class $$SaleChangeDotAllocationsTableTableManager
               ),
           createCompanionCallback:
               ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
                 required String id,
                 required String saleId,
                 required String dotDenominationId,
                 required int qty,
                 Value<int> rowid = const Value.absent(),
               }) => SaleChangeDotAllocationsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
                 id: id,
                 saleId: saleId,
                 dotDenominationId: dotDenominationId,
@@ -5820,6 +8974,349 @@ typedef $$SaleChangeDotAllocationsTableProcessedTableManager =
       ChangeDotRow,
       PrefetchHooks Function()
     >;
+typedef $$StockMovementsTableCreateCompanionBuilder =
+    StockMovementsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      required String id,
+      required int itemType,
+      required String itemId,
+      required int delta,
+      required int reason,
+      Value<String?> saleId,
+      required int atMs,
+      required String deviceId,
+      Value<int> rowid,
+    });
+typedef $$StockMovementsTableUpdateCompanionBuilder =
+    StockMovementsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      Value<String> id,
+      Value<int> itemType,
+      Value<String> itemId,
+      Value<int> delta,
+      Value<int> reason,
+      Value<String?> saleId,
+      Value<int> atMs,
+      Value<String> deviceId,
+      Value<int> rowid,
+    });
+
+class $$StockMovementsTableFilterComposer
+    extends Composer<_$AppDatabase, $StockMovementsTable> {
+  $$StockMovementsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get itemType => $composableBuilder(
+    column: $table.itemType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get delta => $composableBuilder(
+    column: $table.delta,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get atMs => $composableBuilder(
+    column: $table.atMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StockMovementsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StockMovementsTable> {
+  $$StockMovementsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get itemType => $composableBuilder(
+    column: $table.itemType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get itemId => $composableBuilder(
+    column: $table.itemId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get delta => $composableBuilder(
+    column: $table.delta,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get reason => $composableBuilder(
+    column: $table.reason,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get atMs => $composableBuilder(
+    column: $table.atMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StockMovementsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StockMovementsTable> {
+  $$StockMovementsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get itemType =>
+      $composableBuilder(column: $table.itemType, builder: (column) => column);
+
+  GeneratedColumn<String> get itemId =>
+      $composableBuilder(column: $table.itemId, builder: (column) => column);
+
+  GeneratedColumn<int> get delta =>
+      $composableBuilder(column: $table.delta, builder: (column) => column);
+
+  GeneratedColumn<int> get reason =>
+      $composableBuilder(column: $table.reason, builder: (column) => column);
+
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
+  GeneratedColumn<int> get atMs =>
+      $composableBuilder(column: $table.atMs, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+}
+
+class $$StockMovementsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StockMovementsTable,
+          StockMovement,
+          $$StockMovementsTableFilterComposer,
+          $$StockMovementsTableOrderingComposer,
+          $$StockMovementsTableAnnotationComposer,
+          $$StockMovementsTableCreateCompanionBuilder,
+          $$StockMovementsTableUpdateCompanionBuilder,
+          (
+            StockMovement,
+            BaseReferences<_$AppDatabase, $StockMovementsTable, StockMovement>,
+          ),
+          StockMovement,
+          PrefetchHooks Function()
+        > {
+  $$StockMovementsTableTableManager(
+    _$AppDatabase db,
+    $StockMovementsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StockMovementsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StockMovementsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StockMovementsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<int> itemType = const Value.absent(),
+                Value<String> itemId = const Value.absent(),
+                Value<int> delta = const Value.absent(),
+                Value<int> reason = const Value.absent(),
+                Value<String?> saleId = const Value.absent(),
+                Value<int> atMs = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StockMovementsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                itemType: itemType,
+                itemId: itemId,
+                delta: delta,
+                reason: reason,
+                saleId: saleId,
+                atMs: atMs,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                required String id,
+                required int itemType,
+                required String itemId,
+                required int delta,
+                required int reason,
+                Value<String?> saleId = const Value.absent(),
+                required int atMs,
+                required String deviceId,
+                Value<int> rowid = const Value.absent(),
+              }) => StockMovementsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                itemType: itemType,
+                itemId: itemId,
+                delta: delta,
+                reason: reason,
+                saleId: saleId,
+                atMs: atMs,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StockMovementsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StockMovementsTable,
+      StockMovement,
+      $$StockMovementsTableFilterComposer,
+      $$StockMovementsTableOrderingComposer,
+      $$StockMovementsTableAnnotationComposer,
+      $$StockMovementsTableCreateCompanionBuilder,
+      $$StockMovementsTableUpdateCompanionBuilder,
+      (
+        StockMovement,
+        BaseReferences<_$AppDatabase, $StockMovementsTable, StockMovement>,
+      ),
+      StockMovement,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5843,4 +9340,6 @@ class $AppDatabaseManager {
         _db,
         _db.saleChangeDotAllocations,
       );
+  $$StockMovementsTableTableManager get stockMovements =>
+      $$StockMovementsTableTableManager(_db, _db.stockMovements);
 }

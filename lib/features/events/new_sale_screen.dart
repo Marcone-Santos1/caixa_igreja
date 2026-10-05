@@ -374,6 +374,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             stockQty: 0,
             active: true,
             isCombo: false,
+            rowVersion: 1,
+            updatedAtMs: 0,
           ),
         );
         name = p.name;
@@ -386,6 +388,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             label: 'Ficha',
             valueCents: 0,
             stockQty: 0,
+            rowVersion: 1,
+            updatedAtMs: 0,
           ),
         );
         name = 'Ficha: ${f.label}';

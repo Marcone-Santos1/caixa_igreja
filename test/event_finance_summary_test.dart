@@ -14,6 +14,8 @@ void main() {
   test('EventFinanceSummary.fromSales agrega métodos e troco em dinheiro', () {
     final sales = [
       const PosSale(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: 'sale_1',
         eventId: 'event_1',
         soldAtMs: 1,
@@ -23,6 +25,8 @@ void main() {
         changePending: false,
       ),
       const PosSale(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: 'sale_2',
         eventId: 'event_1',
         soldAtMs: 2,

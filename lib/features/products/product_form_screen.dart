@@ -1,10 +1,8 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/app_theme.dart';
-import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import '../../utils/money_format.dart';
@@ -109,37 +107,19 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         // Re-sync: puxa os dados atualizados do host imediatamente
         await syncNotifier.refreshAllClientCaches(widget.eventId);
       } else {
-        // Salva localmente (host ou standalone)
+        // Salva localmente (host ou standalone); o saveProduct registra a
+        // diferença de estoque como movimentação (ajuste manual).
         final db = ref.read(appDatabaseProvider);
-        if (id == null) {
-          final idToUse = db.generateUuid();
-          await db.into(db.products).insert(
-            ProductsCompanion.insert(
-              id: idToUse,
-              eventId: widget.eventId,
-              name: _name.text.trim(),
-              description: Value(_description.text.trim()),
-              priceCents: priceCents,
-              trackStock: Value(_trackStock),
-              stockQty: Value(_trackStock ? stock : 0),
-              active: Value(_active),
-            ),
-          );
-        } else {
-          await (db.update(db.products)
-                ..where((t) => t.id.equals(id))
-                ..where((t) => t.eventId.equals(widget.eventId)))
-              .write(
-                ProductsCompanion(
-                  name: Value(_name.text.trim()),
-                  description: Value(_description.text.trim()),
-                  priceCents: Value(priceCents),
-                  trackStock: Value(_trackStock),
-                  stockQty: Value(_trackStock ? stock : 0),
-                  active: Value(_active),
-                ),
-              );
-        }
+        await db.saveProduct(
+          id: id,
+          eventId: widget.eventId,
+          name: _name.text.trim(),
+          description: _description.text.trim(),
+          priceCents: priceCents,
+          trackStock: _trackStock,
+          stockQty: _trackStock ? stock : 0,
+          active: _active,
+        );
         // Se for o host, avisa os clientes conectados
         if (isServer) syncNotifier.broadcastRefresh();
       }

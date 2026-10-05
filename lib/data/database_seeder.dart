@@ -36,9 +36,11 @@ class DatabaseSeeder {
   /// Limpa todas as tabelas em ordem de dependência (sem quebrar integridade referencial).
   Future<void> clearAll() async {
     await db.transaction(() async {
+      await db.delete(db.stockMovements).go();
       await db.delete(db.saleChangeDotAllocations).go();
       await db.delete(db.saleLines).go();
       await db.delete(db.sales).go();
+      await db.delete(db.cashSessions).go();
       await db.delete(db.productComboItems).go();
       await db.delete(db.products).go();
       await db.delete(db.eventDotDenominations).go();
@@ -63,6 +65,10 @@ class DatabaseSeeder {
     final r3 = await seedAlmocoComunitario(
       baseDate: now.add(const Duration(days: 4)),
     );
+
+    // Os cenários inserem contadores de estoque diretamente; recria o baseline
+    // de movimentações para manter soma(movimentações) == stockQty.
+    await db.rebaselineStockMovements();
 
     return SeederResult(
       eventsCount: r1.eventsCount + r2.eventsCount + r3.eventsCount,

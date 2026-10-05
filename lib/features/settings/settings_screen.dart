@@ -59,6 +59,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 ListTile(
+                  leading: const Icon(Icons.cloud_outlined),
+                  title: const Text('Backup na nuvem'),
+                  subtitle: const Text('Passagem de caixa entre celulares'),
+                  onTap: () => context.push('/settings/cloud'),
+                ),
+                const Divider(height: 1),
+                ListTile(
                   leading: const Icon(Icons.print_outlined),
                   title: const Text('Impressora Térmica'),
                   subtitle: const Text('Bluetooth 58mm (ESC/POS)'),
@@ -111,7 +118,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         : () async {
                             setState(() => _backupBusy = true);
                             try {
-                              final r = await exportDatabaseBackup();
+                              final r = await exportDatabaseBackup(
+                                ref.read(appDatabaseProvider),
+                              );
                               if (!context.mounted) return;
                               if (r.userCancelled) return;
                               if (r.errorMessage != null) {

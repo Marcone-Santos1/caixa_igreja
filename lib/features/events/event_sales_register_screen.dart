@@ -547,10 +547,10 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                         if (l.lineKind == SaleLineKind.valorLivre) {
                           label = 'Valor: ${l.freeLabel ?? ''}';
                         } else if (l.lineKind == SaleLineKind.ficha) {
-                          final denom = denomsList.firstWhere((d) => d.id == l.dotDenominationId, orElse: () => EventDotDenom(id: '', eventId: '', label: 'Ficha', valueCents: 0, stockQty: 0));
+                          final denom = denomsList.firstWhere((d) => d.id == l.dotDenominationId, orElse: () => EventDotDenom(id: '', eventId: '', label: 'Ficha', valueCents: 0, stockQty: 0, rowVersion: 1, updatedAtMs: 0));
                           label = 'Ficha: ${denom.label}';
                         } else if (l.lineKind == SaleLineKind.product) {
-                          final prod = productsList.firstWhere((p) => p.id == l.productId, orElse: () => ChurchProduct(id: '', eventId: '', name: 'Produto', description: '', priceCents: 0, trackStock: false, stockQty: 0, active: true, isCombo: false));
+                          final prod = productsList.firstWhere((p) => p.id == l.productId, orElse: () => ChurchProduct(id: '', eventId: '', name: 'Produto', description: '', priceCents: 0, trackStock: false, stockQty: 0, active: true, isCombo: false, rowVersion: 1, updatedAtMs: 0));
                           label = prod.name;
                         }
                         return EventSaleLineRow(

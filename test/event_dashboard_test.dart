@@ -19,6 +19,8 @@ void main() {
   test('EventDashboardData.compute com dados populados simples', () {
     final sales = [
       const PosSale(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: 'sale_1',
         eventId: 'event_1',
         soldAtMs: 1716500000000, //algum timestamp
@@ -30,6 +32,8 @@ void main() {
     ];
     final products = [
       const ChurchProduct(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: 'product_1',
         eventId: 'event_1',
         name: 'Produto 1',
@@ -43,6 +47,8 @@ void main() {
     ];
     final lines = [
       const PosSaleLine(
+        rowVersion: 1,
+        updatedAtMs: 0,
         id: 'line_1',
         saleId: 'sale_1',
         lineKind: SaleLineKind.product,

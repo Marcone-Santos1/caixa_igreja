@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -107,28 +106,14 @@ class DotManagementScreen extends ConsumerWidget {
     }
 
     final db = ref.read(appDatabaseProvider);
-    if (existing == null) {
-      final idToUse = db.generateUuid();
-      await db.into(db.eventDotDenominations).insert(
-            EventDotDenominationsCompanion.insert(
-              id: idToUse,
-              eventId: eventId,
-              label: labelCtrl.text.trim(),
-              valueCents: vc,
-              stockQty: Value(stock),
-            ),
-          );
-    } else {
-      await (db.update(db.eventDotDenominations)
-            ..where((t) => t.id.equals(existing.id)))
-          .write(
-        EventDotDenominationsCompanion(
-          label: Value(labelCtrl.text.trim()),
-          valueCents: Value(vc),
-          stockQty: Value(stock),
-        ),
-      );
-    }
+    // saveDotDenomination registra a diferença de estoque como movimentação.
+    await db.saveDotDenomination(
+      id: existing?.id,
+      eventId: eventId,
+      label: labelCtrl.text.trim(),
+      valueCents: vc,
+      stockQty: stock,
+    );
   }
 
   @override
