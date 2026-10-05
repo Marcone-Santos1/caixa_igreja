@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../domain/payment_method.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/printer_provider.dart';
 import '../../utils/money_format.dart';
@@ -221,7 +222,8 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
   @override
   void initState() {
     super.initState();
-    _closedByController.text = widget.session.closedBy ?? '';
+    _closedByController.text =
+        widget.session.closedBy ?? widget.session.openedBy ?? '';
   }
 
   @override
@@ -567,6 +569,11 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
         closedNotes: closedNotes,
         closedBy: closedBy,
       );
+
+      // Fechamento de caixa é o gatilho principal do backup na nuvem
+      ref
+          .read(cloudSyncControllerProvider.notifier)
+          .onCashSessionClosed(widget.session.eventId);
 
       // 3. Tentar imprimir comprovante
       final isPrinterReady = await printerService.isConnected();

@@ -13,6 +13,7 @@ import '../../providers/event_detail_provider.dart';
 import '../../providers/event_finance_provider.dart';
 import '../../providers/event_low_stock_provider.dart';
 import '../../utils/money_format.dart';
+import '../settings/cloud_status_icon.dart';
 import 'event_delete_dialog.dart';
 import 'event_form_screen.dart';
 
@@ -43,6 +44,7 @@ class EventHubScreen extends ConsumerWidget {
           ),
           title: const Text('Evento'),
           actions: [
+            CloudStatusIcon(eventId: eventId),
             IconButton(
               tooltip: 'Sincronização',
               icon: const Icon(Icons.sync),

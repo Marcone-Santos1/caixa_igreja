@@ -1,0 +1,14 @@
+name = "cantina-padroeira-sync"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+
+# Bucket R2 com os snapshots versionados.
+# Criar antes do deploy:  npx wrangler r2 bucket create cantina-padroeira-sync
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "cantina-padroeira-sync"
+
+# Segredos (NÃO ficam neste arquivo):
+#   npx wrangler secret put CHURCH_SECRETS
+# Valor: JSON mapeando código da igreja -> segredo, ex.:
+#   {"padroeira":"um-segredo-longo-e-aleatorio"}

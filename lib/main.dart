@@ -6,7 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app_theme.dart';
 import 'app/router.dart';
+import 'data/device_identity.dart';
 import 'features/security/lock_screen.dart';
+import 'providers/cloud_sync_provider.dart';
 import 'providers/pin_lock_provider.dart';
 import 'providers/shared_preferences_provider.dart';
 import 'providers/theme_mode_provider.dart';
@@ -14,6 +16,9 @@ import 'providers/theme_mode_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  // Identidade do aparelho antes de abrir o banco: os triggers de
+  // sincronização gravam o device_id em cada escrita.
+  await DeviceIdentity.ensureLoaded(prefs);
   await initializeDateFormatting('pt_BR');
   runApp(
     ProviderScope(
@@ -33,6 +38,9 @@ class CaixaIgrejaApp extends ConsumerWidget {
     final needsLock = ref.watch(needsAppLockProvider);
     final router = ref.watch(goRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // Mantém o controlador de backup na nuvem vivo desde a abertura do app
+    // (gatilhos: abrir/retomar o app, debounce de escrita, fechar sessão).
+    ref.watch(cloudSyncControllerProvider.notifier);
     final light = caixaIgrejaTheme();
     final dark = caixaIgrejaThemeDark();
 

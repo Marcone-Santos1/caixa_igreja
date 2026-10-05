@@ -13,6 +13,7 @@ import '../features/export/export_screen.dart';
 import '../features/products/products_list_screen.dart';
 import '../features/events/sync_settings_screen.dart';
 import '../features/settings/appearance_screen.dart';
+import '../features/settings/cloud_backup_screen.dart';
 import '../features/settings/printer_setup_screen.dart';
 import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -127,6 +128,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/settings/printer',
         builder: (context, state) => const PrinterSetupScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/settings/cloud',
+        builder: (context, state) => const CloudBackupScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

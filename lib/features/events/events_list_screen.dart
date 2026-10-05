@@ -8,8 +8,10 @@ import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../data/database_seeder.dart';
+import '../../providers/cloud_sync_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
+import 'event_cloud_sheet.dart';
 import 'event_delete_dialog.dart';
 import 'event_form_screen.dart';
 import 'qr_scanner_dialog.dart';
@@ -179,8 +181,12 @@ class EventsListScreen extends ConsumerWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (list.isEmpty) {
-            return Center(
-              child: SingleChildScrollView(
+            return Column(
+              children: [
+                const _CloudEventsBanner(),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -210,12 +216,19 @@ class EventsListScreen extends ConsumerWidget {
                       icon: const Icon(Icons.dataset_outlined),
                       label: const Text('Carregar dados de exemplo (Seeder)'),
                     ),
-                  ],
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             );
           }
-          return ListView.separated(
+          return Column(
+            children: [
+              const _CloudEventsBanner(),
+              Expanded(
+                child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             itemCount: list.length,
             separatorBuilder: (context, index) => const SizedBox(height: 10),
@@ -338,6 +351,9 @@ class EventsListScreen extends ConsumerWidget {
                 ),
               );
             },
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -349,6 +365,79 @@ class EventsListScreen extends ConsumerWidget {
           );
         },
         child: const Icon(Icons.add_rounded),
+      ),
+    );
+  }
+}
+
+/// Banner "eventos disponíveis na nuvem": aparece quando existem eventos na
+/// nuvem da igreja que ainda não estão neste celular (ex.: o caixa da semana
+/// passada foi operado em outro aparelho).
+class _CloudEventsBanner extends ConsumerWidget {
+  const _CloudEventsBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(cloudSyncControllerProvider);
+    final cloudOnly = state.cloudOnlyEvents;
+    if (!state.configured || cloudOnly.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final dateFmt = DateFormat('dd/MM');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.cloud_download_outlined,
+                      size: 18, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    cloudOnly.length == 1
+                        ? '1 evento na nuvem para baixar'
+                        : '${cloudOnly.length} eventos na nuvem para baixar',
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              for (final s in cloudOnly.take(3))
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  visualDensity: VisualDensity.compact,
+                  title: Text(s.title),
+                  subtitle: Text(
+                    '${s.eventDateMs != null ? dateFmt.format(DateTime.fromMillisecondsSinceEpoch(s.eventDateMs!)) : ''}'
+                    '${s.remote?.deviceName != null ? ' · ${s.remote!.deviceName}' : ''}'
+                    '${s.remote?.salesCount != null ? ' · ${s.remote!.salesCount} vendas' : ''}',
+                  ),
+                  trailing: FilledButton.tonal(
+                    onPressed: state.busy
+                        ? null
+                        : () => ref
+                            .read(cloudSyncControllerProvider.notifier)
+                            .downloadEvent(s.eventId),
+                    child: const Text('Baixar'),
+                  ),
+                  onTap: () => showEventCloudSheet(context, s.eventId),
+                ),
+              if (cloudOnly.length > 3)
+                TextButton(
+                  onPressed: () => context.push('/settings/cloud'),
+                  child: Text('Ver todos (${cloudOnly.length})'),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
