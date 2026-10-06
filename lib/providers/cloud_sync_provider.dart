@@ -111,6 +111,16 @@ class CloudEventStatus {
       phase == CloudEventPhase.blockedSchema ||
       phase == CloudEventPhase.error;
 
+  /// O evento foi COMPARTILHADO com este aparelho (ou é dele)?
+  /// Administradores enxergam todos os eventos da igreja, inclusive backups
+  /// privados dos outros celulares — esses não devem virar aviso na home.
+  bool get sharedWithMe {
+    final r = remote;
+    if (r == null) return existsLocally;
+    return r.ownerDeviceId == DeviceIdentity.deviceId ||
+        r.sharedWith.contains(DeviceIdentity.deviceId);
+  }
+
   CloudEventStatus copyWith({
     CloudEventPhase? phase,
     CloudEventManifest? remote,
@@ -148,6 +158,7 @@ class CloudSyncState {
     this.events = const {},
     this.devices = const [],
     this.accessRevoked = false,
+    this.dismissedEventIds = const {},
   });
 
   final String endpoint;
@@ -170,6 +181,10 @@ class CloudSyncState {
   /// Este celular foi revogado no servidor (precisa de novo convite).
   final bool accessRevoked;
 
+  /// Eventos da nuvem dispensados do banner da home (continuam na tela da
+  /// nuvem).
+  final Set<String> dismissedEventIds;
+
   bool get configured =>
       endpoint.isNotEmpty && churchCode.isNotEmpty && credentialConfigured;
 
@@ -181,6 +196,12 @@ class CloudSyncState {
       .where((e) => e.phase == CloudEventPhase.cloudOnly)
       .toList()
     ..sort((a, b) => (b.eventDateMs ?? 0).compareTo(a.eventDateMs ?? 0));
+
+  /// O que o banner da home mostra: eventos da nuvem COMPARTILHADOS com este
+  /// aparelho e não dispensados. O resto fica só na tela Backup na nuvem.
+  List<CloudEventStatus> get homeBannerEvents => cloudOnlyEvents
+      .where((e) => e.sharedWithMe && !dismissedEventIds.contains(e.eventId))
+      .toList();
 
   bool get anyAttention =>
       accessRevoked || events.values.any((e) => e.needsAttention);
@@ -197,6 +218,7 @@ class CloudSyncState {
     Map<String, CloudEventStatus>? events,
     List<CloudDeviceInfo>? devices,
     bool? accessRevoked,
+    Set<String>? dismissedEventIds,
   }) {
     return CloudSyncState(
       endpoint: endpoint ?? this.endpoint,
@@ -210,6 +232,7 @@ class CloudSyncState {
       events: events ?? this.events,
       devices: devices ?? this.devices,
       accessRevoked: accessRevoked ?? this.accessRevoked,
+      dismissedEventIds: dismissedEventIds ?? this.dismissedEventIds,
     );
   }
 }
@@ -230,8 +253,9 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
   CloudSyncController(this._ref) : super(const CloudSyncState()) {
     _loadPersisted();
     WidgetsBinding.instance.addObserver(this);
-    // Gatilho de abertura do app (sem Timer: testes de widget checam timers
-    // pendentes). Quando não configurado, refreshAll retorna imediatamente.
+    // Gatilho de abertura do app (sem Timer aqui: testes de widget checam
+    // timers pendentes — o polling só liga quando a nuvem está configurada,
+    // ao fim do primeiro ciclo). Sem configuração, refreshAll retorna logo.
     Future<void>.microtask(() {
       if (mounted) refreshAll();
     });
@@ -247,13 +271,28 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
   /// pareamento.
   static const _kLegacySecret = 'cloud.secret';
 
-  /// Espera após a última escrita antes do envio automático (RFC 6.5).
-  static const uploadDebounce = Duration(minutes: 3);
+  /// Espera após a última escrita antes do envio automático. Curto: o
+  /// snapshot por evento tem poucos KB e o usuário espera ver a sincronização
+  /// acontecer, não "daqui a 3 minutos".
+  static const uploadDebounce = Duration(seconds: 20);
+
+  /// Verificação periódica em primeiro plano: é o que faz o OUTRO celular
+  /// receber novidades sem precisar fechar e reabrir o app.
+  static const pollInterval = Duration(seconds: 60);
 
   final Ref _ref;
   StreamSubscription<void>? _dbSub;
   Timer? _debounce;
+  Timer? _poll;
   bool _busy = false;
+
+  /// Alguém pediu refresh durante um ciclo: roda de novo ao terminar, em vez
+  /// de descartar silenciosamente (era a sensação de "travado").
+  bool _refreshQueued = false;
+
+  /// Houve escrita local desde o último ciclo? Sem escrita, eventos já em dia
+  /// nem recalculam o fingerprint — o polling fica barato.
+  bool _writesSinceRefresh = true;
 
   /// Ligado enquanto aplicamos um agregado remoto, para as escritas
   /// resultantes não dispararem o debounce de envio.
@@ -265,6 +304,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
 
   void _loadPersisted() {
     final prefs = _ref.read(sharedPreferencesProvider);
+    final dismissed =
+        (prefs.getStringList('cloud.dismissed') ?? const []).toSet();
     final hasToken = (prefs.getString(_kDeviceToken) ?? '').isNotEmpty;
     final hasLegacy = (prefs.getString(_kLegacySecret) ?? '').isNotEmpty;
     state = state.copyWith(
@@ -272,6 +313,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
       churchCode: prefs.getString(_kChurchCode) ?? '',
       credentialConfigured: hasToken,
       role: prefs.getString(_kRole) ?? 'member',
+      dismissedEventIds: dismissed,
       globalMessage: !hasToken && hasLegacy
           ? 'O modelo de acesso mudou (credencial por celular). Ative de novo ou peça um convite.'
           : null,
@@ -456,14 +498,28 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     WidgetsBinding.instance.removeObserver(this);
     _dbSub?.cancel();
     _debounce?.cancel();
+    _poll?.cancel();
     super.dispose();
+  }
+
+  /// Liga o polling de primeiro plano (só quando configurado — assim testes
+  /// de widget sem nuvem não criam timer nenhum).
+  void _ensurePolling() {
+    if (_poll != null || !state.configured) return;
+    _poll = Timer.periodic(pollInterval, (_) {
+      if (mounted) refreshAll();
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _ensurePolling();
       refreshAll();
     } else if (state == AppLifecycleState.paused) {
+      // Em segundo plano não gastamos bateria/rede com polling.
+      _poll?.cancel();
+      _poll = null;
       // Saindo do app: tenta enviar o que estiver pendente.
       refreshAll(allowApply: false);
     }
@@ -473,7 +529,9 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
       _ref.read(syncProvider).mode == SyncMode.client;
 
   void _onLocalWrite() {
-    if (_applying || !state.configured || _isWifiClientMode) return;
+    if (_applying) return;
+    _writesSinceRefresh = true;
+    if (!state.configured || _isWifiClientMode) return;
     _debounce?.cancel();
     _debounce = Timer(uploadDebounce, () {
       if (mounted) refreshAll(allowApply: false);
@@ -493,7 +551,12 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
   /// no meio do uso); [onlyEventId] restringe a um evento.
   Future<void> refreshAll({bool allowApply = true, String? onlyEventId}) async {
     final service = _service();
-    if (service == null || _busy || !mounted) return;
+    if (service == null || !mounted) return;
+    if (_busy) {
+      // Ciclo em andamento: enfileira mais um em vez de ignorar o pedido.
+      _refreshQueued = true;
+      return;
+    }
     if (_isWifiClientMode) {
       state = state.copyWith(
         globalMessage:
@@ -503,6 +566,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     }
 
     _busy = true;
+    final hadWrites = _writesSinceRefresh;
+    _writesSinceRefresh = false;
     state = state.copyWith(busy: true, clearGlobalMessage: true);
     final db = _ref.read(appDatabaseProvider);
     try {
@@ -529,6 +594,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
           local: localById[id],
           remote: remoteById[id],
           allowApply: allowApply,
+          hadWrites: hadWrites,
+          previous: state.forEvent(id),
         );
         if (!mounted) return;
         state = state.copyWith(events: Map.of(statuses));
@@ -559,8 +626,25 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
       }
     } finally {
       _busy = false;
-      if (mounted) state = state.copyWith(busy: false);
+      if (mounted) {
+        state = state.copyWith(busy: false);
+        _ensurePolling();
+        if (_refreshQueued) {
+          _refreshQueued = false;
+          // Alguém pediu durante o ciclo: atende agora.
+          unawaited(refreshAll(allowApply: allowApply));
+        }
+      }
     }
+  }
+
+  /// Tira um evento da nuvem do banner da home (continua na tela da nuvem).
+  Future<void> dismissCloudEvent(String eventId) async {
+    final dismissed = {...state.dismissedEventIds, eventId};
+    await _ref
+        .read(sharedPreferencesProvider)
+        .setStringList('cloud.dismissed', dismissed.toList());
+    if (mounted) state = state.copyWith(dismissedEventIds: dismissed);
   }
 
   // ─── Compartilhamento e administração (RFC v3) ─────────────────────────
@@ -638,6 +722,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     required ChurchEvent? local,
     required CloudEventManifest? remote,
     required bool allowApply,
+    bool hadWrites = true,
+    CloudEventStatus? previous,
   }) async {
     final title = local?.title ?? remote?.eventTitle ?? 'Evento';
     final dateMs = local?.dateEpochMs ?? remote?.eventDateMs;
@@ -667,6 +753,16 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     if (isEventSyncPaused(eventId)) {
       return status(CloudEventPhase.paused,
           message: 'Sincronização pausada neste aparelho.');
+    }
+
+    // Atalho do polling: sem escrita local desde o último ciclo e com a nuvem
+    // na mesma versão, o evento continua em dia — sem recalcular fingerprint.
+    final remoteVersionNow = remote?.version ?? 0;
+    if (!hadWrites &&
+        previous?.phase == CloudEventPhase.upToDate &&
+        remoteVersionNow == storedV &&
+        previous?.lastSyncedVersion == storedV) {
+      return previous!.copyWith(remote: remote);
     }
 
     final fp = await db.eventCloudFingerprint(eventId);

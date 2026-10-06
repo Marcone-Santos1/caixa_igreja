@@ -32,7 +32,10 @@ class _FakeWorker {
 
   /// Pré-carrega um evento como se outro celular o tivesse enviado.
   void seed(String eventId, Uint8List gz,
-      {String? title, int? dateMs, String deviceName = 'Celular do Diogo'}) {
+      {String? title,
+      int? dateMs,
+      String deviceName = 'Celular do Diogo',
+      List<String> sharedWith = const ['local']}) {
     final version = (manifests[eventId]?['version'] as int? ?? 0) + 1;
     snapshots.putIfAbsent(eventId, () => {})[version] = gz;
     manifests[eventId] = {
@@ -49,7 +52,7 @@ class _FakeWorker {
       'baseVersion': version - 1,
       'summary': null,
       'ownerDeviceId': 'outro-device',
-      'sharedWith': ['local'],
+      'sharedWith': sharedWith,
       'history': const [],
     };
   }
@@ -436,6 +439,35 @@ void main() {
     // Desligar remove da lista.
     await controller.toggleEventShare(eventId, 'outro-device', false);
     expect(worker.manifests[eventId]!['sharedWith'], isEmpty);
+  });
+
+  test('banner da home: só compartilhados comigo e não dispensados',
+      () async {
+    final (evA, gzA) = await buildRemoteEvent();
+    worker.seed(evA, gzA, title: 'Compartilhado comigo');
+    final (evB, gzB) = await buildRemoteEvent();
+    // Backup privado de outro aparelho: o admin VÊ, mas a home não avisa.
+    worker.seed(evB, gzB, title: 'Privado do Diogo', sharedWith: const []);
+
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    var state = container.read(cloudSyncControllerProvider);
+    expect(state.cloudOnlyEvents.map((e) => e.eventId).toSet(),
+        {evA, evB},
+        reason: 'a tela da nuvem lista os dois');
+    expect(state.homeBannerEvents.map((e) => e.eventId), [evA],
+        reason: 'a home só avisa o que foi compartilhado com este aparelho');
+
+    await controller.dismissCloudEvent(evA);
+    state = container.read(cloudSyncControllerProvider);
+    expect(state.homeBannerEvents, isEmpty,
+        reason: 'dispensado some do banner');
+    expect(state.cloudOnlyEvents, hasLength(2),
+        reason: 'mas continua na tela da nuvem');
   });
 
   test('download não sobrescreve evento local com alterações pendentes',

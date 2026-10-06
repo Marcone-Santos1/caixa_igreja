@@ -481,7 +481,7 @@ class _CloudEventsBanner extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(cloudSyncControllerProvider);
-    final cloudOnly = state.cloudOnlyEvents;
+    final cloudOnly = state.homeBannerEvents;
     if (!state.configured || cloudOnly.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -522,13 +522,26 @@ class _CloudEventsBanner extends ConsumerWidget {
                     '${s.remote?.deviceName != null ? ' · ${s.remote!.deviceName}' : ''}'
                     '${s.remote?.salesCount != null ? ' · ${s.remote!.salesCount} vendas' : ''}',
                   ),
-                  trailing: FilledButton.tonal(
-                    onPressed: state.busy
-                        ? null
-                        : () => ref
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FilledButton.tonal(
+                        onPressed: state.busy
+                            ? null
+                            : () => ref
+                                .read(cloudSyncControllerProvider.notifier)
+                                .downloadEvent(s.eventId),
+                        child: const Text('Baixar'),
+                      ),
+                      IconButton(
+                        tooltip: 'Dispensar (fica na tela da nuvem)',
+                        icon: const Icon(Icons.close, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => ref
                             .read(cloudSyncControllerProvider.notifier)
-                            .downloadEvent(s.eventId),
-                    child: const Text('Baixar'),
+                            .dismissCloudEvent(s.eventId),
+                      ),
+                    ],
                   ),
                   onTap: () => showEventCloudSheet(context, s.eventId),
                 ),

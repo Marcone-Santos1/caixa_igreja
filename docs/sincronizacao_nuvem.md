@@ -69,9 +69,10 @@ sozinho.
 | Gatilho | Comportamento |
 |---|---|
 | Fechar sessão de caixa | Envia o evento imediatamente |
-| ~3 min após a última escrita | Envia os eventos alterados (debounce) |
+| ~20 s após a última escrita | Envia os eventos alterados (debounce) |
+| **A cada 60 s com o app aberto** | Verifica a nuvem e aplica fast-forwards (é o que faz o outro celular receber sem reabrir o app) |
 | Abrir / retomar o app | Verifica tudo; aplica fast-forwards; envia pendências |
-| Sair do app (pausar) | Tenta enviar pendências |
+| Sair do app (pausar) | Tenta enviar pendências; o polling para (bateria) |
 | ☁️ no hub → "Enviar agora" | Envia o evento na hora |
 
 "Pendente" não é uma flag frágil: é derivado dos dados — a impressão
@@ -99,7 +100,9 @@ avançou no meio tempo, o fluxo de divergência decide.
   versão da nuvem fica no histórico) ou *usar o da nuvem* (o estado local é
   arquivado antes).
 - **Evento que só existe na nuvem** → aparece num banner na lista de
-  eventos, com botão **Baixar**.
+  eventos, com botão **Baixar** — apenas eventos **compartilhados com este
+  aparelho**; dá para dispensar o aviso (X). Backups privados de outros
+  celulares (visíveis ao administrador) ficam só na tela Backup na nuvem.
 - **Nuvem gravada por app mais novo** (schema/formato maior) → bloqueia com
   "atualize o app", nos dois sentidos (nunca rebaixa a nuvem).
 

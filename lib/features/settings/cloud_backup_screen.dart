@@ -421,7 +421,9 @@ class _EventsCard extends StatelessWidget {
         ? 'nunca enviado'
         : 'v${remote.version} · ${remote.deviceName ?? '?'} · ${fmtWhen(remote.uploadedAt)}';
     return switch (s.phase) {
-      CloudEventPhase.cloudOnly => 'Na nuvem: $remoteTxt — toque para baixar',
+      CloudEventPhase.cloudOnly => s.sharedWithMe
+          ? 'Na nuvem: $remoteTxt — toque para baixar'
+          : 'Backup privado de outro aparelho · $remoteTxt',
       CloudEventPhase.divergence => 'Divergência — toque para resolver',
       CloudEventPhase.paused => 'Sincronização pausada neste aparelho',
       CloudEventPhase.blockedSchema => 'Atualize o app para sincronizar',
