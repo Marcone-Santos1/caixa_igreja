@@ -4,8 +4,9 @@ import 'database.dart';
 
 /// Versão do formato do agregado de evento enviado à nuvem.
 /// Independente do schema Drift: muda quando a ESTRUTURA do JSON muda.
-// v2: + fiadoPayments (venda fiada).
-const kEventAggregateFormatVersion = 2;
+// v2: + fiadoPayments (venda fiada). v3: + eventExpenses (custos) e
+// colunas de desconto na venda.
+const kEventAggregateFormatVersion = 3;
 
 /// Linhas brutas de um evento (INCLUINDO tombstones — diferente do snapshot
 /// Wi-Fi, a nuvem precisa propagar exclusões lógicas).
@@ -20,6 +21,7 @@ class EventAggregateRows {
     required this.saleLines,
     required this.changeAllocations,
     required this.fiadoPayments,
+    required this.eventExpenses,
     required this.stockMovements,
   });
 
@@ -32,6 +34,7 @@ class EventAggregateRows {
   final List<PosSaleLine> saleLines;
   final List<ChangeDotRow> changeAllocations;
   final List<FiadoPayment> fiadoPayments;
+  final List<EventExpense> eventExpenses;
   final List<StockMovement> stockMovements;
 
   int get rowCount =>
@@ -44,6 +47,7 @@ class EventAggregateRows {
       saleLines.length +
       changeAllocations.length +
       fiadoPayments.length +
+      eventExpenses.length +
       stockMovements.length;
 }
 
@@ -87,6 +91,9 @@ extension EventCloudAggregate on AppDatabase {
         ? <FiadoPayment>[]
         : await (select(fiadoPayments)..where((f) => f.saleId.isIn(saleIds)))
             .get();
+    final expenses = await (select(eventExpenses)
+          ..where((x) => x.eventId.equals(eventId)))
+        .get();
     final movements = await (select(stockMovements)
           ..where((m) =>
               (m.itemType.equals(AppDatabase.kStockItemProduct) &
@@ -105,6 +112,7 @@ extension EventCloudAggregate on AppDatabase {
       saleLines: lines,
       changeAllocations: allocations,
       fiadoPayments: fiado,
+      eventExpenses: expenses,
       stockMovements: movements,
     );
   }
@@ -127,6 +135,7 @@ extension EventCloudAggregate on AppDatabase {
       'changeAllocations':
           rows.changeAllocations.map((e) => e.toJson()).toList(),
       'fiadoPayments': rows.fiadoPayments.map((e) => e.toJson()).toList(),
+      'eventExpenses': rows.eventExpenses.map((e) => e.toJson()).toList(),
       'stockMovements': rows.stockMovements.map((e) => e.toJson()).toList(),
     };
   }
@@ -170,6 +179,9 @@ extension EventCloudAggregate on AppDatabase {
     for (final r in rows.fiadoPayments) {
       fold(r.rowVersion, r.updatedAtMs);
     }
+    for (final r in rows.eventExpenses) {
+      fold(r.rowVersion, r.updatedAtMs);
+    }
     for (final r in rows.stockMovements) {
       fold(r.rowVersion, r.updatedAtMs);
     }
@@ -209,6 +221,7 @@ extension EventCloudAggregate on AppDatabase {
     final lines = parse('saleLines', PosSaleLine.fromJson);
     final allocations = parse('changeAllocations', ChangeDotRow.fromJson);
     final fiado = parse('fiadoPayments', FiadoPayment.fromJson);
+    final expenses = parse('eventExpenses', EventExpense.fromJson);
     final movements = parse('stockMovements', StockMovement.fromJson);
 
     await runWithSyncBypass(() async {
@@ -245,6 +258,8 @@ extension EventCloudAggregate on AppDatabase {
       }
       await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
       await (delete(cashSessions)..where((s) => s.eventId.equals(eventId)))
+          .go();
+      await (delete(eventExpenses)..where((x) => x.eventId.equals(eventId)))
           .go();
       if (localProductIds.isNotEmpty) {
         await (delete(productComboItems)
@@ -286,6 +301,9 @@ extension EventCloudAggregate on AppDatabase {
       }
       for (final r in fiado) {
         await into(fiadoPayments).insert(r, mode: InsertMode.insertOrReplace);
+      }
+      for (final r in expenses) {
+        await into(eventExpenses).insert(r, mode: InsertMode.insertOrReplace);
       }
       for (final r in movements) {
         await into(stockMovements).insert(r, mode: InsertMode.insertOrReplace);

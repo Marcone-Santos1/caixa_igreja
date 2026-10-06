@@ -23,6 +23,7 @@ void main() {
         amountReceivedCents: 1500,
         paymentMethod: PaymentMethod.dinheiro,
         changePending: false,
+        discountCents: 0,
       ),
       const PosSale(
         rowVersion: 1,
@@ -34,6 +35,7 @@ void main() {
         amountReceivedCents: 200,
         paymentMethod: PaymentMethod.pix,
         changePending: false,
+        discountCents: 0,
       ),
     ];
     final s = EventFinanceSummary.fromSales(sales);

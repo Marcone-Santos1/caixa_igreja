@@ -786,6 +786,36 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                     ),
                                   ),
                                 const Divider(height: 20),
+                                if (s.discountCents > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            s.totalCents == 0
+                                                ? 'Cortesia · ${s.discountReason ?? ''}'
+                                                : 'Desconto · ${s.discountReason ?? ''}',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 13,
+                                              color: Colors.orange.shade800,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          '-${formatCents(s.discountCents)}',
+                                          style: GoogleFonts.outfit(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange.shade800,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [

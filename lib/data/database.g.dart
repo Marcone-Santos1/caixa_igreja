@@ -3548,6 +3548,29 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _discountCentsMeta = const VerificationMeta(
+    'discountCents',
+  );
+  @override
+  late final GeneratedColumn<int> discountCents = GeneratedColumn<int>(
+    'discount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _discountReasonMeta = const VerificationMeta(
+    'discountReason',
+  );
+  @override
+  late final GeneratedColumn<String> discountReason = GeneratedColumn<String>(
+    'discount_reason',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     rowVersion,
@@ -3564,6 +3587,8 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
     notes,
     changePending,
     customerName,
+    discountCents,
+    discountReason,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3689,6 +3714,24 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
         ),
       );
     }
+    if (data.containsKey('discount_cents')) {
+      context.handle(
+        _discountCentsMeta,
+        discountCents.isAcceptableOrUnknown(
+          data['discount_cents']!,
+          _discountCentsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('discount_reason')) {
+      context.handle(
+        _discountReasonMeta,
+        discountReason.isAcceptableOrUnknown(
+          data['discount_reason']!,
+          _discountReasonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3754,6 +3797,14 @@ class $SalesTable extends Sales with TableInfo<$SalesTable, PosSale> {
         DriftSqlType.string,
         data['${effectivePrefix}customer_name'],
       ),
+      discountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}discount_cents'],
+      )!,
+      discountReason: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}discount_reason'],
+      ),
     );
   }
 
@@ -3778,6 +3829,12 @@ class PosSale extends DataClass implements Insertable<PosSale> {
   final String? notes;
   final bool changePending;
   final String? customerName;
+
+  /// Desconto aplicado no total (v11). `totalCents` já é o valor FINAL
+  /// (soma das linhas − desconto); o desconto fica separado para auditoria
+  /// e relatórios. Cortesia = desconto igual à soma das linhas (total 0).
+  final int discountCents;
+  final String? discountReason;
   const PosSale({
     required this.rowVersion,
     required this.updatedAtMs,
@@ -3793,6 +3850,8 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     this.notes,
     required this.changePending,
     this.customerName,
+    required this.discountCents,
+    this.discountReason,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3820,6 +3879,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     map['change_pending'] = Variable<bool>(changePending);
     if (!nullToAbsent || customerName != null) {
       map['customer_name'] = Variable<String>(customerName);
+    }
+    map['discount_cents'] = Variable<int>(discountCents);
+    if (!nullToAbsent || discountReason != null) {
+      map['discount_reason'] = Variable<String>(discountReason);
     }
     return map;
   }
@@ -3850,6 +3913,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       customerName: customerName == null && nullToAbsent
           ? const Value.absent()
           : Value(customerName),
+      discountCents: Value(discountCents),
+      discountReason: discountReason == null && nullToAbsent
+          ? const Value.absent()
+          : Value(discountReason),
     );
   }
 
@@ -3875,6 +3942,8 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       notes: serializer.fromJson<String?>(json['notes']),
       changePending: serializer.fromJson<bool>(json['changePending']),
       customerName: serializer.fromJson<String?>(json['customerName']),
+      discountCents: serializer.fromJson<int>(json['discountCents']),
+      discountReason: serializer.fromJson<String?>(json['discountReason']),
     );
   }
   @override
@@ -3895,6 +3964,8 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       'notes': serializer.toJson<String?>(notes),
       'changePending': serializer.toJson<bool>(changePending),
       'customerName': serializer.toJson<String?>(customerName),
+      'discountCents': serializer.toJson<int>(discountCents),
+      'discountReason': serializer.toJson<String?>(discountReason),
     };
   }
 
@@ -3913,6 +3984,8 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     Value<String?> notes = const Value.absent(),
     bool? changePending,
     Value<String?> customerName = const Value.absent(),
+    int? discountCents,
+    Value<String?> discountReason = const Value.absent(),
   }) => PosSale(
     rowVersion: rowVersion ?? this.rowVersion,
     updatedAtMs: updatedAtMs ?? this.updatedAtMs,
@@ -3930,6 +4003,10 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     notes: notes.present ? notes.value : this.notes,
     changePending: changePending ?? this.changePending,
     customerName: customerName.present ? customerName.value : this.customerName,
+    discountCents: discountCents ?? this.discountCents,
+    discountReason: discountReason.present
+        ? discountReason.value
+        : this.discountReason,
   );
   PosSale copyWithCompanion(SalesCompanion data) {
     return PosSale(
@@ -3965,6 +4042,12 @@ class PosSale extends DataClass implements Insertable<PosSale> {
       customerName: data.customerName.present
           ? data.customerName.value
           : this.customerName,
+      discountCents: data.discountCents.present
+          ? data.discountCents.value
+          : this.discountCents,
+      discountReason: data.discountReason.present
+          ? data.discountReason.value
+          : this.discountReason,
     );
   }
 
@@ -3984,7 +4067,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
           ..write('paymentMethod: $paymentMethod, ')
           ..write('notes: $notes, ')
           ..write('changePending: $changePending, ')
-          ..write('customerName: $customerName')
+          ..write('customerName: $customerName, ')
+          ..write('discountCents: $discountCents, ')
+          ..write('discountReason: $discountReason')
           ..write(')'))
         .toString();
   }
@@ -4005,6 +4090,8 @@ class PosSale extends DataClass implements Insertable<PosSale> {
     notes,
     changePending,
     customerName,
+    discountCents,
+    discountReason,
   );
   @override
   bool operator ==(Object other) =>
@@ -4023,7 +4110,9 @@ class PosSale extends DataClass implements Insertable<PosSale> {
           other.paymentMethod == this.paymentMethod &&
           other.notes == this.notes &&
           other.changePending == this.changePending &&
-          other.customerName == this.customerName);
+          other.customerName == this.customerName &&
+          other.discountCents == this.discountCents &&
+          other.discountReason == this.discountReason);
 }
 
 class SalesCompanion extends UpdateCompanion<PosSale> {
@@ -4041,6 +4130,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
   final Value<String?> notes;
   final Value<bool> changePending;
   final Value<String?> customerName;
+  final Value<int> discountCents;
+  final Value<String?> discountReason;
   final Value<int> rowid;
   const SalesCompanion({
     this.rowVersion = const Value.absent(),
@@ -4057,6 +4148,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     this.notes = const Value.absent(),
     this.changePending = const Value.absent(),
     this.customerName = const Value.absent(),
+    this.discountCents = const Value.absent(),
+    this.discountReason = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SalesCompanion.insert({
@@ -4074,6 +4167,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     this.notes = const Value.absent(),
     this.changePending = const Value.absent(),
     this.customerName = const Value.absent(),
+    this.discountCents = const Value.absent(),
+    this.discountReason = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        eventId = Value(eventId),
@@ -4095,6 +4190,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Expression<String>? notes,
     Expression<bool>? changePending,
     Expression<String>? customerName,
+    Expression<int>? discountCents,
+    Expression<String>? discountReason,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4113,6 +4210,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
       if (notes != null) 'notes': notes,
       if (changePending != null) 'change_pending': changePending,
       if (customerName != null) 'customer_name': customerName,
+      if (discountCents != null) 'discount_cents': discountCents,
+      if (discountReason != null) 'discount_reason': discountReason,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4132,6 +4231,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     Value<String?>? notes,
     Value<bool>? changePending,
     Value<String?>? customerName,
+    Value<int>? discountCents,
+    Value<String?>? discountReason,
     Value<int>? rowid,
   }) {
     return SalesCompanion(
@@ -4149,6 +4250,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
       notes: notes ?? this.notes,
       changePending: changePending ?? this.changePending,
       customerName: customerName ?? this.customerName,
+      discountCents: discountCents ?? this.discountCents,
+      discountReason: discountReason ?? this.discountReason,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4198,6 +4301,12 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
     if (customerName.present) {
       map['customer_name'] = Variable<String>(customerName.value);
     }
+    if (discountCents.present) {
+      map['discount_cents'] = Variable<int>(discountCents.value);
+    }
+    if (discountReason.present) {
+      map['discount_reason'] = Variable<String>(discountReason.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4221,6 +4330,8 @@ class SalesCompanion extends UpdateCompanion<PosSale> {
           ..write('notes: $notes, ')
           ..write('changePending: $changePending, ')
           ..write('customerName: $customerName, ')
+          ..write('discountCents: $discountCents, ')
+          ..write('discountReason: $discountReason, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6271,6 +6382,734 @@ class FiadoPaymentsCompanion extends UpdateCompanion<FiadoPayment> {
   }
 }
 
+class $EventExpensesTable extends EventExpenses
+    with TableInfo<$EventExpensesTable, EventExpense> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $EventExpensesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _eventIdMeta = const VerificationMeta(
+    'eventId',
+  );
+  @override
+  late final GeneratedColumn<String> eventId = GeneratedColumn<String>(
+    'event_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountCentsMeta = const VerificationMeta(
+    'amountCents',
+  );
+  @override
+  late final GeneratedColumn<int> amountCents = GeneratedColumn<int>(
+    'amount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _categoryMeta = const VerificationMeta(
+    'category',
+  );
+  @override
+  late final GeneratedColumn<String> category = GeneratedColumn<String>(
+    'category',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('Outros'),
+  );
+  static const VerificationMeta _paidAtMsMeta = const VerificationMeta(
+    'paidAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> paidAtMs = GeneratedColumn<int>(
+    'paid_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    eventId,
+    description,
+    amountCents,
+    category,
+    paidAtMs,
+    notes,
+    deviceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'event_expenses';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<EventExpense> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('event_id')) {
+      context.handle(
+        _eventIdMeta,
+        eventId.isAcceptableOrUnknown(data['event_id']!, _eventIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_eventIdMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_descriptionMeta);
+    }
+    if (data.containsKey('amount_cents')) {
+      context.handle(
+        _amountCentsMeta,
+        amountCents.isAcceptableOrUnknown(
+          data['amount_cents']!,
+          _amountCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('category')) {
+      context.handle(
+        _categoryMeta,
+        category.isAcceptableOrUnknown(data['category']!, _categoryMeta),
+      );
+    }
+    if (data.containsKey('paid_at_ms')) {
+      context.handle(
+        _paidAtMsMeta,
+        paidAtMs.isAcceptableOrUnknown(data['paid_at_ms']!, _paidAtMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paidAtMsMeta);
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  EventExpense map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return EventExpense(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      eventId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}event_id'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      )!,
+      amountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_cents'],
+      )!,
+      category: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category'],
+      )!,
+      paidAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paid_at_ms'],
+      )!,
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+    );
+  }
+
+  @override
+  $EventExpensesTable createAlias(String alias) {
+    return $EventExpensesTable(attachedDatabase, alias);
+  }
+}
+
+class EventExpense extends DataClass implements Insertable<EventExpense> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
+  final String id;
+  final String eventId;
+  final String description;
+  final int amountCents;
+  final String category;
+  final int paidAtMs;
+  final String? notes;
+  final String deviceId;
+  const EventExpense({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
+    required this.id,
+    required this.eventId,
+    required this.description,
+    required this.amountCents,
+    required this.category,
+    required this.paidAtMs,
+    this.notes,
+    required this.deviceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
+    map['id'] = Variable<String>(id);
+    map['event_id'] = Variable<String>(eventId);
+    map['description'] = Variable<String>(description);
+    map['amount_cents'] = Variable<int>(amountCents);
+    map['category'] = Variable<String>(category);
+    map['paid_at_ms'] = Variable<int>(paidAtMs);
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    return map;
+  }
+
+  EventExpensesCompanion toCompanion(bool nullToAbsent) {
+    return EventExpensesCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
+      id: Value(id),
+      eventId: Value(eventId),
+      description: Value(description),
+      amountCents: Value(amountCents),
+      category: Value(category),
+      paidAtMs: Value(paidAtMs),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      deviceId: Value(deviceId),
+    );
+  }
+
+  factory EventExpense.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return EventExpense(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
+      id: serializer.fromJson<String>(json['id']),
+      eventId: serializer.fromJson<String>(json['eventId']),
+      description: serializer.fromJson<String>(json['description']),
+      amountCents: serializer.fromJson<int>(json['amountCents']),
+      category: serializer.fromJson<String>(json['category']),
+      paidAtMs: serializer.fromJson<int>(json['paidAtMs']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
+      'id': serializer.toJson<String>(id),
+      'eventId': serializer.toJson<String>(eventId),
+      'description': serializer.toJson<String>(description),
+      'amountCents': serializer.toJson<int>(amountCents),
+      'category': serializer.toJson<String>(category),
+      'paidAtMs': serializer.toJson<int>(paidAtMs),
+      'notes': serializer.toJson<String?>(notes),
+      'deviceId': serializer.toJson<String>(deviceId),
+    };
+  }
+
+  EventExpense copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
+    String? id,
+    String? eventId,
+    String? description,
+    int? amountCents,
+    String? category,
+    int? paidAtMs,
+    Value<String?> notes = const Value.absent(),
+    String? deviceId,
+  }) => EventExpense(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
+    id: id ?? this.id,
+    eventId: eventId ?? this.eventId,
+    description: description ?? this.description,
+    amountCents: amountCents ?? this.amountCents,
+    category: category ?? this.category,
+    paidAtMs: paidAtMs ?? this.paidAtMs,
+    notes: notes.present ? notes.value : this.notes,
+    deviceId: deviceId ?? this.deviceId,
+  );
+  EventExpense copyWithCompanion(EventExpensesCompanion data) {
+    return EventExpense(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+      id: data.id.present ? data.id.value : this.id,
+      eventId: data.eventId.present ? data.eventId.value : this.eventId,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      amountCents: data.amountCents.present
+          ? data.amountCents.value
+          : this.amountCents,
+      category: data.category.present ? data.category.value : this.category,
+      paidAtMs: data.paidAtMs.present ? data.paidAtMs.value : this.paidAtMs,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventExpense(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('description: $description, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('category: $category, ')
+          ..write('paidAtMs: $paidAtMs, ')
+          ..write('notes: $notes, ')
+          ..write('deviceId: $deviceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    eventId,
+    description,
+    amountCents,
+    category,
+    paidAtMs,
+    notes,
+    deviceId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is EventExpense &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
+          other.id == this.id &&
+          other.eventId == this.eventId &&
+          other.description == this.description &&
+          other.amountCents == this.amountCents &&
+          other.category == this.category &&
+          other.paidAtMs == this.paidAtMs &&
+          other.notes == this.notes &&
+          other.deviceId == this.deviceId);
+}
+
+class EventExpensesCompanion extends UpdateCompanion<EventExpense> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
+  final Value<String> id;
+  final Value<String> eventId;
+  final Value<String> description;
+  final Value<int> amountCents;
+  final Value<String> category;
+  final Value<int> paidAtMs;
+  final Value<String?> notes;
+  final Value<String> deviceId;
+  final Value<int> rowid;
+  const EventExpensesCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.id = const Value.absent(),
+    this.eventId = const Value.absent(),
+    this.description = const Value.absent(),
+    this.amountCents = const Value.absent(),
+    this.category = const Value.absent(),
+    this.paidAtMs = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  EventExpensesCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    required String id,
+    required String eventId,
+    required String description,
+    required int amountCents,
+    this.category = const Value.absent(),
+    required int paidAtMs,
+    this.notes = const Value.absent(),
+    required String deviceId,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       eventId = Value(eventId),
+       description = Value(description),
+       amountCents = Value(amountCents),
+       paidAtMs = Value(paidAtMs),
+       deviceId = Value(deviceId);
+  static Insertable<EventExpense> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
+    Expression<String>? id,
+    Expression<String>? eventId,
+    Expression<String>? description,
+    Expression<int>? amountCents,
+    Expression<String>? category,
+    Expression<int>? paidAtMs,
+    Expression<String>? notes,
+    Expression<String>? deviceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (id != null) 'id': id,
+      if (eventId != null) 'event_id': eventId,
+      if (description != null) 'description': description,
+      if (amountCents != null) 'amount_cents': amountCents,
+      if (category != null) 'category': category,
+      if (paidAtMs != null) 'paid_at_ms': paidAtMs,
+      if (notes != null) 'notes': notes,
+      if (deviceId != null) 'device_id': deviceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  EventExpensesCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
+    Value<String>? id,
+    Value<String>? eventId,
+    Value<String>? description,
+    Value<int>? amountCents,
+    Value<String>? category,
+    Value<int>? paidAtMs,
+    Value<String?>? notes,
+    Value<String>? deviceId,
+    Value<int>? rowid,
+  }) {
+    return EventExpensesCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      id: id ?? this.id,
+      eventId: eventId ?? this.eventId,
+      description: description ?? this.description,
+      amountCents: amountCents ?? this.amountCents,
+      category: category ?? this.category,
+      paidAtMs: paidAtMs ?? this.paidAtMs,
+      notes: notes ?? this.notes,
+      deviceId: deviceId ?? this.deviceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (eventId.present) {
+      map['event_id'] = Variable<String>(eventId.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (amountCents.present) {
+      map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (category.present) {
+      map['category'] = Variable<String>(category.value);
+    }
+    if (paidAtMs.present) {
+      map['paid_at_ms'] = Variable<int>(paidAtMs.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('EventExpensesCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('eventId: $eventId, ')
+          ..write('description: $description, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('category: $category, ')
+          ..write('paidAtMs: $paidAtMs, ')
+          ..write('notes: $notes, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StockMovementsTable extends StockMovements
     with TableInfo<$StockMovementsTable, StockMovement> {
   @override
@@ -7002,6 +7841,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SaleChangeDotAllocationsTable saleChangeDotAllocations =
       $SaleChangeDotAllocationsTable(this);
   late final $FiadoPaymentsTable fiadoPayments = $FiadoPaymentsTable(this);
+  late final $EventExpensesTable eventExpenses = $EventExpensesTable(this);
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -7017,6 +7857,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     saleLines,
     saleChangeDotAllocations,
     fiadoPayments,
+    eventExpenses,
     stockMovements,
   ];
 }
@@ -8685,6 +9526,8 @@ typedef $$SalesTableCreateCompanionBuilder =
       Value<String?> notes,
       Value<bool> changePending,
       Value<String?> customerName,
+      Value<int> discountCents,
+      Value<String?> discountReason,
       Value<int> rowid,
     });
 typedef $$SalesTableUpdateCompanionBuilder =
@@ -8703,6 +9546,8 @@ typedef $$SalesTableUpdateCompanionBuilder =
       Value<String?> notes,
       Value<bool> changePending,
       Value<String?> customerName,
+      Value<int> discountCents,
+      Value<String?> discountReason,
       Value<int> rowid,
     });
 
@@ -8781,6 +9626,16 @@ class $$SalesTableFilterComposer extends Composer<_$AppDatabase, $SalesTable> {
 
   ColumnFilters<String> get customerName => $composableBuilder(
     column: $table.customerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get discountCents => $composableBuilder(
+    column: $table.discountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -8863,6 +9718,16 @@ class $$SalesTableOrderingComposer
     column: $table.customerName,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get discountCents => $composableBuilder(
+    column: $table.discountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SalesTableAnnotationComposer
@@ -8933,6 +9798,16 @@ class $$SalesTableAnnotationComposer
     column: $table.customerName,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get discountCents => $composableBuilder(
+    column: $table.discountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get discountReason => $composableBuilder(
+    column: $table.discountReason,
+    builder: (column) => column,
+  );
 }
 
 class $$SalesTableTableManager
@@ -8977,6 +9852,8 @@ class $$SalesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<bool> changePending = const Value.absent(),
                 Value<String?> customerName = const Value.absent(),
+                Value<int> discountCents = const Value.absent(),
+                Value<String?> discountReason = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion(
                 rowVersion: rowVersion,
@@ -8993,6 +9870,8 @@ class $$SalesTableTableManager
                 notes: notes,
                 changePending: changePending,
                 customerName: customerName,
+                discountCents: discountCents,
+                discountReason: discountReason,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9011,6 +9890,8 @@ class $$SalesTableTableManager
                 Value<String?> notes = const Value.absent(),
                 Value<bool> changePending = const Value.absent(),
                 Value<String?> customerName = const Value.absent(),
+                Value<int> discountCents = const Value.absent(),
+                Value<String?> discountReason = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SalesCompanion.insert(
                 rowVersion: rowVersion,
@@ -9027,6 +9908,8 @@ class $$SalesTableTableManager
                 notes: notes,
                 changePending: changePending,
                 customerName: customerName,
+                discountCents: discountCents,
+                discountReason: discountReason,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10046,6 +10929,351 @@ typedef $$FiadoPaymentsTableProcessedTableManager =
       FiadoPayment,
       PrefetchHooks Function()
     >;
+typedef $$EventExpensesTableCreateCompanionBuilder =
+    EventExpensesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      required String id,
+      required String eventId,
+      required String description,
+      required int amountCents,
+      Value<String> category,
+      required int paidAtMs,
+      Value<String?> notes,
+      required String deviceId,
+      Value<int> rowid,
+    });
+typedef $$EventExpensesTableUpdateCompanionBuilder =
+    EventExpensesCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      Value<String> id,
+      Value<String> eventId,
+      Value<String> description,
+      Value<int> amountCents,
+      Value<String> category,
+      Value<int> paidAtMs,
+      Value<String?> notes,
+      Value<String> deviceId,
+      Value<int> rowid,
+    });
+
+class $$EventExpensesTableFilterComposer
+    extends Composer<_$AppDatabase, $EventExpensesTable> {
+  $$EventExpensesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paidAtMs => $composableBuilder(
+    column: $table.paidAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$EventExpensesTableOrderingComposer
+    extends Composer<_$AppDatabase, $EventExpensesTable> {
+  $$EventExpensesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get eventId => $composableBuilder(
+    column: $table.eventId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get category => $composableBuilder(
+    column: $table.category,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paidAtMs => $composableBuilder(
+    column: $table.paidAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$EventExpensesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $EventExpensesTable> {
+  $$EventExpensesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get eventId =>
+      $composableBuilder(column: $table.eventId, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get category =>
+      $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<int> get paidAtMs =>
+      $composableBuilder(column: $table.paidAtMs, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+}
+
+class $$EventExpensesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $EventExpensesTable,
+          EventExpense,
+          $$EventExpensesTableFilterComposer,
+          $$EventExpensesTableOrderingComposer,
+          $$EventExpensesTableAnnotationComposer,
+          $$EventExpensesTableCreateCompanionBuilder,
+          $$EventExpensesTableUpdateCompanionBuilder,
+          (
+            EventExpense,
+            BaseReferences<_$AppDatabase, $EventExpensesTable, EventExpense>,
+          ),
+          EventExpense,
+          PrefetchHooks Function()
+        > {
+  $$EventExpensesTableTableManager(_$AppDatabase db, $EventExpensesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$EventExpensesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$EventExpensesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$EventExpensesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> eventId = const Value.absent(),
+                Value<String> description = const Value.absent(),
+                Value<int> amountCents = const Value.absent(),
+                Value<String> category = const Value.absent(),
+                Value<int> paidAtMs = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => EventExpensesCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                eventId: eventId,
+                description: description,
+                amountCents: amountCents,
+                category: category,
+                paidAtMs: paidAtMs,
+                notes: notes,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                required String id,
+                required String eventId,
+                required String description,
+                required int amountCents,
+                Value<String> category = const Value.absent(),
+                required int paidAtMs,
+                Value<String?> notes = const Value.absent(),
+                required String deviceId,
+                Value<int> rowid = const Value.absent(),
+              }) => EventExpensesCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                eventId: eventId,
+                description: description,
+                amountCents: amountCents,
+                category: category,
+                paidAtMs: paidAtMs,
+                notes: notes,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$EventExpensesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $EventExpensesTable,
+      EventExpense,
+      $$EventExpensesTableFilterComposer,
+      $$EventExpensesTableOrderingComposer,
+      $$EventExpensesTableAnnotationComposer,
+      $$EventExpensesTableCreateCompanionBuilder,
+      $$EventExpensesTableUpdateCompanionBuilder,
+      (
+        EventExpense,
+        BaseReferences<_$AppDatabase, $EventExpensesTable, EventExpense>,
+      ),
+      EventExpense,
+      PrefetchHooks Function()
+    >;
 typedef $$StockMovementsTableCreateCompanionBuilder =
     StockMovementsCompanion Function({
       Value<int> rowVersion,
@@ -10414,6 +11642,8 @@ class $AppDatabaseManager {
       );
   $$FiadoPaymentsTableTableManager get fiadoPayments =>
       $$FiadoPaymentsTableTableManager(_db, _db.fiadoPayments);
+  $$EventExpensesTableTableManager get eventExpenses =>
+      $$EventExpensesTableTableManager(_db, _db.eventExpenses);
   $$StockMovementsTableTableManager get stockMovements =>
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
 }

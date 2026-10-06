@@ -28,6 +28,7 @@ void main() {
         amountReceivedCents: 1000,
         paymentMethod: 'pix',
         changePending: false,
+        discountCents: 0,
       ),
     ];
     final products = [

@@ -173,6 +173,7 @@ class EventDashboardData {
         amountReceivedCents: amountReceivedCents,
         paymentMethod: paymentMethod,
         changePending: changePending,
+        discountCents: 0,
         customerName: customerName,
         notes: notes,
       );

@@ -313,6 +313,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
             request.response.write(
               jsonEncode(list.map((e) => e.toJson()).toList()),
             );
+          } else if (endpoint == 'expenses') {
+            final list = await _db.watchEventExpenses(eventId).first;
+            request.response.write(
+              jsonEncode(list.map((e) => e.toJson()).toList()),
+            );
           } else if (endpoint == 'fiado-payments') {
             final list = await _db.fiadoPaymentsForEvent(eventId);
             request.response.write(
@@ -344,6 +349,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
           // Venda criada offline no terminal: preserva id e horário originais.
           final requestedSaleId = body['saleId'] as String?;
           final requestedSoldAtMs = body['soldAtMs'] as int?;
+          final discountCents = body['discountCents'] as int? ?? 0;
+          final discountReason = body['discountReason'] as String?;
           final linesJson = body['lines'] as List;
 
           final drafts = linesJson.map((l) {
@@ -385,6 +392,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
               customerName: customerName,
               saleId: requestedSaleId,
               soldAtMs: requestedSoldAtMs,
+              discountCents: discountCents,
+              discountReason: discountReason,
               lines: drafts,
             );
 
@@ -571,6 +580,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
           final notes = body['notes'] as String?;
           final changePending = body['changePending'] as bool? ?? false;
           final customerName = body['customerName'] as String?;
+          final discountCents = body['discountCents'] as int? ?? 0;
+          final discountReason = body['discountReason'] as String?;
           final linesJson = body['lines'] as List;
 
           final drafts = linesJson.map((l) {
@@ -611,6 +622,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
               notes: notes,
               changePending: changePending,
               customerName: customerName,
+              discountCents: discountCents,
+              discountReason: discountReason,
               lines: drafts,
             );
 
@@ -884,6 +897,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
         ip, port, eventId, 'fiado-payments', (json) => FiadoPayment.fromJson(json),
       );
 
+      // 7c. Obter custos do evento
+      final expensesList = await _pullDataListFromServer<EventExpense>(
+        ip, port, eventId, 'expenses', (json) => EventExpense.fromJson(json),
+      );
+
       // 8. Gravar os dados atômicos no banco de dados local do cliente
       await _db.syncEventData(
         eventId: eventId,
@@ -895,6 +913,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         saleLinesList: saleLinesList,
         changeAllocationsList: changeAllocations,
         fiadoPaymentsList: fiadoPaymentsList,
+        eventExpensesList: expensesList,
       );
 
       // 9. Atualizar os controllers antigos por compatibilidade temporária
@@ -1050,6 +1069,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
     List<SaleLineDraft> lines, {
     String? saleId,
     int? soldAtMs,
+    int discountCents = 0,
+    String? discountReason,
   }) async {
     final ip = state.serverIp;
     final port = state.serverPort;
@@ -1083,6 +1104,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       'terminalName': Platform.localHostname,
       'saleId': ?saleId,
       'soldAtMs': ?soldAtMs,
+      'discountCents': discountCents,
+      'discountReason': ?discountReason,
     };
 
     request.write(jsonEncode(body));
@@ -1407,6 +1430,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
     String? notes,
     required bool changePending,
     String? customerName,
+    int discountCents = 0,
+    String? discountReason,
     required List<SaleLineDraft> lines,
   }) async {
     final ip = state.serverIp;
@@ -1438,6 +1463,8 @@ class SyncNotifier extends StateNotifier<SyncState> {
       'notes': notes,
       'changePending': changePending,
       'customerName': customerName,
+      'discountCents': discountCents,
+      'discountReason': ?discountReason,
       'lines': linesJson,
     };
 

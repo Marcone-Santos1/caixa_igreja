@@ -76,6 +76,8 @@ class PrinterService {
     String? customerName,
     String? notes,
     String? terminalTag,
+    double? discount,
+    String? discountReason,
   }) async {
     final connected = await isConnected();
     if (!connected) {
@@ -177,6 +179,27 @@ class PrinterService {
       );
     }
     bytes.addAll(generator.hr());
+
+    // 4b. Desconto (se houver)
+    if (discount != null && discount > 0) {
+      final discountStr =
+          currencyFmt.format(discount).replaceAll('R\$', 'R\$ ');
+      bytes.addAll(
+        generator.row([
+          PosColumn(text: 'DESCONTO', width: 6),
+          PosColumn(
+            text: _removeAccents('-$discountStr'),
+            width: 6,
+            styles: const PosStyles(align: PosAlign.right),
+          ),
+        ]),
+      );
+      if (discountReason != null && discountReason.trim().isNotEmpty) {
+        bytes.addAll(
+          generator.text('Motivo: ${_removeAccents(discountReason)}'),
+        );
+      }
+    }
 
     // 5. Total
     final totalFormatted = currencyFmt.format(total).replaceAll('R\$', 'R\$ ');

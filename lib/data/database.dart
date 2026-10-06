@@ -19,7 +19,7 @@ const _uuid = Uuid();
 
 /// Versão atual do schema. Deve coincidir com [AppDatabase.schemaVersion].
 /// Usada pelo backup/nuvem para bloquear restauração de bases mais novas.
-const kAppSchemaVersion = 10;
+const kAppSchemaVersion = 11;
 
 /// Colunas de sincronização presentes em todas as tabelas (schema v9).
 ///
@@ -125,6 +125,12 @@ class Sales extends Table with SyncColumns {
   BoolColumn get changePending => boolean().withDefault(const Constant(false))();
   TextColumn get customerName => text().nullable()();
 
+  /// Desconto aplicado no total (v11). `totalCents` já é o valor FINAL
+  /// (soma das linhas − desconto); o desconto fica separado para auditoria
+  /// e relatórios. Cortesia = desconto igual à soma das linhas (total 0).
+  IntColumn get discountCents => integer().withDefault(const Constant(0))();
+  TextColumn get discountReason => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -154,6 +160,25 @@ class SaleChangeDotAllocations extends Table with SyncColumns {
   TextColumn get dotDenominationId =>
       text().references(EventDotDenominations, #id)();
   IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Custos/despesas de um evento (v11): compras de insumos, gás, embalagem…
+/// Lucro = faturamento − custos. Exclusão é lógica (tombstone) e as linhas
+/// viajam no agregado do evento e no snapshot Wi-Fi (edição só no caixa
+/// central/modo normal).
+@DataClassName('EventExpense')
+class EventExpenses extends Table with SyncColumns {
+  TextColumn get id => text()();
+  TextColumn get eventId => text().references(Events, #id)();
+  TextColumn get description => text()();
+  IntColumn get amountCents => integer()();
+  TextColumn get category => text().withDefault(const Constant('Outros'))();
+  IntColumn get paidAtMs => integer()();
+  TextColumn get notes => text().nullable()();
+  TextColumn get deviceId => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -385,6 +410,7 @@ class EventLowStockCounts {
     SaleLines,
     SaleChangeDotAllocations,
     FiadoPayments,
+    EventExpenses,
     StockMovements,
   ],
 )
@@ -567,6 +593,12 @@ FROM event_dot_denominations WHERE stock_qty != 0;
             // Venda fiada: lançamentos de recebimento (append-only).
             await m.createTable(fiadoPayments);
           }
+          if (from < 11) {
+            // Descontos/cortesias e custos do evento.
+            await m.addColumn(sales, sales.discountCents);
+            await m.addColumn(sales, sales.discountReason);
+            await m.createTable(eventExpenses);
+          }
         },
       );
 
@@ -611,6 +643,7 @@ FROM event_dot_denominations WHERE stock_qty != 0;
       'sale_lines': 'id = NEW.id',
       'sale_change_dot_allocations': 'id = NEW.id',
       'fiado_payments': 'id = NEW.id',
+      'event_expenses': 'id = NEW.id',
       'stock_movements': 'id = NEW.id',
     };
     const bypassOff =
@@ -1176,6 +1209,8 @@ END''');
     String? sessionId,
     String? saleId,
     int? soldAtMs,
+    int discountCents = 0,
+    String? discountReason,
     required List<SaleLineDraft> lines,
   }) {
     if (lines.isEmpty) {
@@ -1185,14 +1220,24 @@ END''');
     return transaction(() async {
       final activeSessionId = sessionId ?? await ensureActiveSession(eventId);
 
-      var totalCents = 0;
+      var grossCents = 0;
       for (final l in lines) {
         if (l.qty <= 0 && l.kind != SaleLineKind.valorLivre) {
           throw ArgumentError('Quantidade inválida');
         }
-        totalCents += l.resolveLineTotalCents();
+        grossCents += l.resolveLineTotalCents();
       }
+      if (discountCents < 0 || discountCents > grossCents) {
+        throw ArgumentError('Desconto inválido');
+      }
+      if (discountCents > 0 && (discountReason ?? '').trim().isEmpty) {
+        throw ArgumentError('Desconto exige um motivo (auditoria)');
+      }
+      final totalCents = grossCents - discountCents;
       final isFiado = paymentMethod == PaymentMethod.fiado;
+      if (isFiado && totalCents <= 0) {
+        throw ArgumentError('Cortesia não pode ser fiada');
+      }
       if (isFiado) {
         // Fiado: itens entregues, pagamento em aberto em nome do cliente.
         // amountReceivedCents aqui é a ENTRADA paga na hora (vira o primeiro
@@ -1270,6 +1315,9 @@ END''');
           soldAtMs: soldAt,
           totalCents: totalCents,
           amountReceivedCents: isFiado ? 0 : amountReceivedCents,
+          discountCents: Value(discountCents),
+          discountReason:
+              Value(discountCents > 0 ? discountReason?.trim() : null),
           paymentMethod: Value(paymentMethod),
           notes: Value(notes),
           changePending: Value(changePending),
@@ -1344,6 +1392,8 @@ END''');
     String? notes,
     bool changePending = false,
     String? customerName,
+    int discountCents = 0,
+    String? discountReason,
     required List<SaleLineDraft> lines,
   }) {
     if (lines.isEmpty) {
@@ -1357,14 +1407,24 @@ END''');
       if (sale.eventId != eventId) throw StateError('Evento da venda inconsistente');
 
       // 2. Novo total (não depende do banco) — decide o destino do troco em fichas
-      var totalCents = 0;
+      var grossCents = 0;
       for (final l in lines) {
         if (l.qty <= 0 && l.kind != SaleLineKind.valorLivre) {
           throw ArgumentError('Quantidade inválida');
         }
-        totalCents += l.resolveLineTotalCents();
+        grossCents += l.resolveLineTotalCents();
       }
+      if (discountCents < 0 || discountCents > grossCents) {
+        throw ArgumentError('Desconto inválido');
+      }
+      if (discountCents > 0 && (discountReason ?? '').trim().isEmpty) {
+        throw ArgumentError('Desconto exige um motivo (auditoria)');
+      }
+      final totalCents = grossCents - discountCents;
       final isFiado = paymentMethod == PaymentMethod.fiado;
+      if (isFiado && totalCents <= 0) {
+        throw ArgumentError('Cortesia não pode ser fiada');
+      }
       final paidFiadoCents = await fiadoPaidCents(saleId);
       if (isFiado) {
         if ((customerName ?? '').trim().isEmpty) {
@@ -1506,7 +1566,12 @@ END''');
         customerName: customerName,
       );
       await (update(sales)..where((s) => s.id.equals(saleId))).write(
-        SalesCompanion(totalCents: Value(totalCents)),
+        SalesCompanion(
+          totalCents: Value(totalCents),
+          discountCents: Value(discountCents),
+          discountReason:
+              Value(discountCents > 0 ? discountReason?.trim() : null),
+        ),
       );
 
       // 7. Inserir novas linhas e abater novos estoques
@@ -1771,6 +1836,7 @@ END''');
     required List<PosSaleLine> saleLinesList,
     required List<ChangeDotRow> changeAllocationsList,
     List<FiadoPayment> fiadoPaymentsList = const [],
+    List<EventExpense> eventExpensesList = const [],
   }) async {
     await runWithSyncBypass(() async {
       // 1. Obter informações de produtos e denominações locais antes de limpar
@@ -1831,6 +1897,7 @@ END''');
 
       await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
       await (delete(eventDotDenominations)..where((d) => d.eventId.equals(eventId))).go();
+      await (delete(eventExpenses)..where((x) => x.eventId.equals(eventId))).go();
 
       // 4. Atualizar ou inserir o evento
       await into(events).insert(event, mode: InsertMode.insertOrReplace);
@@ -1868,6 +1935,11 @@ END''');
       // 11. Inserir recebimentos de fiado
       for (final fp in fiadoPaymentsList) {
         await into(fiadoPayments).insert(fp, mode: InsertMode.insertOrReplace);
+      }
+
+      // 12. Inserir custos do evento
+      for (final x in eventExpensesList) {
+        await into(eventExpenses).insert(x, mode: InsertMode.insertOrReplace);
       }
     });
   }
@@ -2220,6 +2292,172 @@ END''');
           fiadoPayments.deletedAtMs.isNull());
     final row = await q.getSingle();
     return row.read(sum) ?? 0;
+  }
+
+  // ─── Duplicar evento ─────────────────────────────────────────────────────
+
+  /// Cria um novo evento copiando catálogo (produtos, combos, fichas) e a
+  /// configuração de PIX de [sourceEventId]. NUNCA copia vendas, sessões,
+  /// fiados ou custos. Com [copyStock], os estoques atuais viram a carga
+  /// inicial do novo evento (baseline em stock_movements, invariante E1).
+  Future<String> duplicateEvent({
+    required String sourceEventId,
+    required String title,
+    required int dateEpochMs,
+    bool copyStock = true,
+  }) {
+    return transaction(() async {
+      final source = await (select(events)
+            ..where((e) => e.id.equals(sourceEventId)))
+          .getSingleOrNull();
+      if (source == null) throw StateError('Evento de origem não encontrado');
+
+      final newEventId = _uuid.v7();
+      await into(events).insert(EventsCompanion.insert(
+        id: newEventId,
+        title: title,
+        notes: Value(source.notes),
+        dateEpochMs: dateEpochMs,
+        pixKey: Value(source.pixKey),
+        pixMerchantName: Value(source.pixMerchantName),
+        pixMerchantCity: Value(source.pixMerchantCity),
+      ));
+
+      // Fichas
+      final denoms = await (select(eventDotDenominations)
+            ..where((d) =>
+                d.eventId.equals(sourceEventId) & d.deletedAtMs.isNull()))
+          .get();
+      for (final d in denoms) {
+        final qty = copyStock ? d.stockQty : 0;
+        final newId = _uuid.v7();
+        await into(eventDotDenominations).insert(
+          EventDotDenominationsCompanion.insert(
+            id: newId,
+            eventId: newEventId,
+            label: d.label,
+            valueCents: d.valueCents,
+            stockQty: Value(qty),
+          ),
+        );
+        if (qty != 0) {
+          await _recordStockMovement(
+            itemType: kStockItemDot,
+            itemId: newId,
+            delta: qty,
+            reason: StockMovementReason.initial,
+          );
+        }
+      }
+
+      // Produtos (combos com os ids dos filhos remapeados)
+      final sourceProducts = await (select(products)
+            ..where((p) =>
+                p.eventId.equals(sourceEventId) & p.deletedAtMs.isNull()))
+          .get();
+      final idMap = <String, String>{};
+      for (final prod in sourceProducts) {
+        final newId = _uuid.v7();
+        idMap[prod.id] = newId;
+        final qty = copyStock && prod.trackStock ? prod.stockQty : 0;
+        await into(products).insert(ProductsCompanion.insert(
+          id: newId,
+          eventId: newEventId,
+          name: prod.name,
+          description: Value(prod.description),
+          priceCents: prod.priceCents,
+          trackStock: Value(prod.trackStock),
+          stockQty: Value(qty),
+          active: Value(prod.active),
+          isCombo: Value(prod.isCombo),
+        ));
+        if (qty != 0) {
+          await _recordStockMovement(
+            itemType: kStockItemProduct,
+            itemId: newId,
+            delta: qty,
+            reason: StockMovementReason.initial,
+          );
+        }
+      }
+      final sourceIds = sourceProducts.map((p) => p.id).toList();
+      if (sourceIds.isNotEmpty) {
+        final comboItems = await (select(productComboItems)
+              ..where((c) => c.comboProductId.isIn(sourceIds)))
+            .get();
+        for (final item in comboItems) {
+          final combo = idMap[item.comboProductId];
+          final child = idMap[item.childProductId];
+          // Filho excluído do catálogo de origem: o combo segue sem ele.
+          if (combo == null || child == null) continue;
+          await into(productComboItems).insert(
+            ProductComboItemsCompanion.insert(
+              comboProductId: combo,
+              childProductId: child,
+              qty: item.qty,
+            ),
+          );
+        }
+      }
+
+      return newEventId;
+    });
+  }
+
+  // ─── Custos do evento ────────────────────────────────────────────────────
+
+  Stream<List<EventExpense>> watchEventExpenses(String eventId) {
+    return (select(eventExpenses)
+          ..where((x) => x.eventId.equals(eventId) & x.deletedAtMs.isNull())
+          ..orderBy([(x) => OrderingTerm.desc(x.paidAtMs)]))
+        .watch();
+  }
+
+  Future<String> saveEventExpense({
+    String? id,
+    required String eventId,
+    required String description,
+    required int amountCents,
+    String category = 'Outros',
+    int? paidAtMs,
+    String? notes,
+  }) async {
+    if (description.trim().isEmpty) {
+      throw ArgumentError('Descreva o custo');
+    }
+    if (amountCents <= 0) throw ArgumentError('Valor inválido');
+    if (id == null) {
+      final newId = _uuid.v7();
+      await into(eventExpenses).insert(EventExpensesCompanion.insert(
+        id: newId,
+        eventId: eventId,
+        description: description.trim(),
+        amountCents: amountCents,
+        category: Value(category),
+        paidAtMs: paidAtMs ?? DateTime.now().millisecondsSinceEpoch,
+        notes: Value(notes),
+        deviceId: DeviceIdentity.deviceId,
+      ));
+      return newId;
+    }
+    await (update(eventExpenses)..where((x) => x.id.equals(id))).write(
+      EventExpensesCompanion(
+        description: Value(description.trim()),
+        amountCents: Value(amountCents),
+        category: Value(category),
+        paidAtMs: Value(paidAtMs ?? DateTime.now().millisecondsSinceEpoch),
+        notes: Value(notes),
+      ),
+    );
+    return id;
+  }
+
+  Future<void> deleteEventExpense(String id) async {
+    await (update(eventExpenses)..where((x) => x.id.equals(id))).write(
+      EventExpensesCompanion(
+        deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 
   /// Salva (cria ou atualiza) um produto simples registrando a diferença de

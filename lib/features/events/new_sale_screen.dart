@@ -408,11 +408,16 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
     // 1. Imprime o comprovante geral da venda (se habilitado)
     if (autoPrint) {
-      final changeCents = result.amountReceivedCents - totalCents;
+      final effectiveCents = totalCents - result.discountCents;
+      final changeCents = result.amountReceivedCents - effectiveCents;
       final ok = await printerService.printTicket(
         orderNumber: orderNumber,
         items: items,
-        total: totalCents / 100.0,
+        total: effectiveCents / 100.0,
+        discount: result.discountCents > 0
+            ? result.discountCents / 100.0
+            : null,
+        discountReason: result.discountReason,
         headerTitle: headerTitle,
         paymentMethod: PaymentMethod.label(result.paymentMethod),
         amountReceived: result.amountReceivedCents > 0
@@ -561,6 +566,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
           result.changePending,
           result.customerName,
           drafts,
+          discountCents: result.discountCents,
+          discountReason: result.discountReason,
         );
       } else {
         if (_isEditing) {
@@ -572,6 +579,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             notes: result.notes,
             changePending: result.changePending,
             customerName: result.customerName,
+            discountCents: result.discountCents,
+            discountReason: result.discountReason,
             lines: drafts,
           );
         } else {
@@ -584,6 +593,8 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
             changePending: result.changePending,
             customerName: result.customerName,
             sessionId: activeSession?.id,
+            discountCents: result.discountCents,
+            discountReason: result.discountReason,
             lines: drafts,
           );
         }
@@ -604,7 +615,7 @@ class _NewSaleScreenState extends ConsumerState<NewSaleScreen> {
 
       if (!context.mounted) return;
       
-      final change = result.amountReceivedCents - total;
+      final change = result.amountReceivedCents - (total - result.discountCents);
 
       if (!mounted) return;
       
@@ -1822,12 +1833,16 @@ class _CheckoutResult {
     this.notes,
     this.changePending = false,
     this.customerName,
+    this.discountCents = 0,
+    this.discountReason,
   });
   final String paymentMethod;
   final int amountReceivedCents;
   final String? notes;
   final bool changePending;
   final String? customerName;
+  final int discountCents;
+  final String? discountReason;
 }
 
 class _SaleCheckoutBottomSheet extends ConsumerStatefulWidget {
@@ -1853,6 +1868,14 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
   final _notesController = TextEditingController();
   bool _changePending = false;
   final _customerNameController = TextEditingController();
+  int _discountCents = 0;
+  final _discountReasonController = TextEditingController();
+
+  /// Total efetivo da venda: soma das linhas − desconto.
+  int get _effectiveTotal =>
+      (widget.totalCents - _discountCents) < 0
+          ? 0
+          : widget.totalCents - _discountCents;
 
   @override
   void initState() {
@@ -1863,6 +1886,8 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
       _notesController.text = s.notes ?? '';
       _changePending = s.changePending;
       _customerNameController.text = s.customerName ?? '';
+      _discountCents = s.discountCents;
+      _discountReasonController.text = s.discountReason ?? '';
       _controller.text = (s.amountReceivedCents / 100).toStringAsFixed(2).replaceAll('.', ',');
     } else {
       _syncReceivedField();
@@ -1875,7 +1900,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
       _controller.text = '0,00';
       return;
     }
-    final t = widget.totalCents;
+    final t = _effectiveTotal;
     _controller.text = (t / 100).toStringAsFixed(2).replaceAll('.', ',');
   }
 
@@ -1884,6 +1909,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
     _controller.dispose();
     _notesController.dispose();
     _customerNameController.dispose();
+    _discountReasonController.dispose();
     super.dispose();
   }
 
@@ -1916,7 +1942,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
     final isCash = _payment == PaymentMethod.dinheiro;
     final isFiado = _payment == PaymentMethod.fiado;
     final rec = _received ?? 0;
-    final change = rec - widget.totalCents;
+    final change = rec - _effectiveTotal;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
@@ -2002,13 +2028,21 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    formatCents(widget.totalCents),
+                                    formatCents(_effectiveTotal),
                                     style: GoogleFonts.outfit(
                                       color: Colors.white,
                                       fontSize: 30,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
+                                  if (_discountCents > 0)
+                                    Text(
+                                      '${formatCents(widget.totalCents)} − ${formatCents(_discountCents)} de desconto',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white70,
+                                        fontSize: 12,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),
@@ -2157,6 +2191,11 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                         },
                       ),
 
+                      const SizedBox(height: 12),
+
+                      // Desconto / cortesia (motivo obrigatório — auditoria)
+                      _buildDiscountSection(context, isDark),
+
                       const SizedBox(height: 16),
 
                       // Painel de QR Code PIX Dinâmico (se a forma for PIX)
@@ -2237,7 +2276,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                         const SizedBox(height: 14),
 
                         // Assistente de Troco
-                        if (_received != null && _received! >= widget.totalCents) ...[
+                        if (_received != null && _received! >= _effectiveTotal) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             decoration: BoxDecoration(
@@ -2275,7 +2314,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                               ],
                             ),
                           ),
-                        ] else if (_received != null && _received! < widget.totalCents) ...[
+                        ] else if (_received != null && _received! < _effectiveTotal) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
@@ -2288,7 +2327,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                                 const Icon(Icons.error_outline, color: Colors.red, size: 20),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Faltam ${formatCents(widget.totalCents - _received!)}',
+                                  'Faltam ${formatCents(_effectiveTotal - _received!)}',
                                   style: GoogleFonts.inter(
                                     color: Colors.red.shade900,
                                     fontWeight: FontWeight.bold,
@@ -2382,9 +2421,22 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                         child: FilledButton.icon(
                           onPressed: () {
                             final r = _received;
+                            if (_discountCents > 0 &&
+                                _discountReasonController.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Informe o motivo do desconto')),
+                              );
+                              return;
+                            }
                             if (_payment == PaymentMethod.fiado) {
+                              if (_effectiveTotal <= 0) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Cortesia não pode ser fiada')),
+                                );
+                                return;
+                              }
                               final entrada = r ?? 0;
-                              if (entrada < 0 || entrada >= widget.totalCents) {
+                              if (entrada < 0 || entrada >= _effectiveTotal) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(content: Text('A entrada do fiado deve ser menor que o total (ou zero)')),
                                 );
@@ -2403,11 +2455,13 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                                   amountReceivedCents: entrada,
                                   notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
                                   customerName: _customerNameController.text.trim(),
+                                  discountCents: _discountCents,
+                                  discountReason: _discountReasonController.text.trim(),
                                 ),
                               );
                               return;
                             }
-                            if (r == null || r < widget.totalCents) {
+                            if (r == null || r < _effectiveTotal) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Valor recebido é menor que o total da venda')),
                               );
@@ -2431,6 +2485,10 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                                 customerName: _customerNameController.text.trim().isEmpty
                                     ? null
                                     : _customerNameController.text.trim(),
+                                discountCents: _discountCents,
+                                discountReason: _discountCents > 0
+                                    ? _discountReasonController.text.trim()
+                                    : null,
                               ),
                             );
                           },
@@ -2460,6 +2518,131 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDiscountSection(BuildContext context, bool isDark) {
+    final hasDiscount = _discountCents > 0;
+    final isCourtesy = hasDiscount && _effectiveTotal == 0;
+    void setDiscount(int cents) {
+      setState(() {
+        _discountCents = cents.clamp(0, widget.totalCents);
+        _syncReceivedField();
+      });
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey.shade900 : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasDiscount
+              ? CaixaAppTheme.warmGold
+              : (isDark ? Colors.white12 : Colors.grey.shade300),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.percent,
+                  size: 18,
+                  color: hasDiscount ? CaixaAppTheme.warmGold : Colors.grey),
+              const SizedBox(width: 8),
+              Text(
+                hasDiscount
+                    ? (isCourtesy
+                        ? 'Cortesia (100%)'
+                        : 'Desconto: ${formatCents(_discountCents)}')
+                    : 'Desconto / cortesia',
+                style: GoogleFonts.inter(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (hasDiscount)
+                TextButton(
+                  onPressed: () => setDiscount(0),
+                  child: const Text('Remover'),
+                ),
+            ],
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final pct in const [5, 10, 20])
+                ActionChip(
+                  label: Text('$pct%', style: GoogleFonts.inter(fontSize: 12)),
+                  onPressed: () =>
+                      setDiscount((widget.totalCents * pct / 100).round()),
+                ),
+              ActionChip(
+                label: Text('Cortesia',
+                    style: GoogleFonts.inter(
+                        fontSize: 12, fontWeight: FontWeight.w600)),
+                onPressed: () => setDiscount(widget.totalCents),
+              ),
+              ActionChip(
+                label: Text('Valor…', style: GoogleFonts.inter(fontSize: 12)),
+                onPressed: () async {
+                  final ctrl = TextEditingController(
+                    text: hasDiscount
+                        ? (_discountCents / 100)
+                            .toStringAsFixed(2)
+                            .replaceAll('.', ',')
+                        : '',
+                  );
+                  final v = await showDialog<int>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Desconto em R\$'),
+                      content: TextField(
+                        controller: ctrl,
+                        autofocus: true,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        decoration:
+                            const InputDecoration(prefixText: 'R\$ '),
+                      ),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Cancelar')),
+                        FilledButton(
+                            onPressed: () => Navigator.pop(
+                                ctx, parseMoneyToCents(ctrl.text) ?? 0),
+                            child: const Text('Aplicar')),
+                      ],
+                    ),
+                  );
+                  if (v != null) setDiscount(v);
+                },
+              ),
+            ],
+          ),
+          if (hasDiscount)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextField(
+                controller: _discountReasonController,
+                decoration: InputDecoration(
+                  labelText: 'Motivo do desconto *',
+                  hintText: isCourtesy
+                      ? 'Ex: cortesia para o padre'
+                      : 'Ex: voluntário da cozinha',
+                  filled: true,
+                  fillColor:
+                      isDark ? Colors.black26 : CaixaAppTheme.ivoryCanvas,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                textCapitalization: TextCapitalization.sentences,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -2584,7 +2767,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
       pixKey: key,
       merchantName: merchantName,
       merchantCity: merchantCity,
-      amount: widget.totalCents / 100.0,
+      amount: _effectiveTotal / 100.0,
       description: 'Venda',
     );
     final pixCode = payload.generateCode();
