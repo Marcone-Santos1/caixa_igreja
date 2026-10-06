@@ -8,6 +8,7 @@ import '../features/events/event_dashboard_screen.dart';
 import '../features/events/event_hub_screen.dart';
 import '../features/events/event_sales_register_screen.dart';
 import '../features/events/events_list_screen.dart';
+import '../features/events/fiado_screen.dart';
 import '../features/events/new_sale_screen.dart';
 import '../features/export/export_screen.dart';
 import '../features/products/products_list_screen.dart';
@@ -80,6 +81,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final id = state.pathParameters['eventId']!;
           return DotManagementScreen(eventId: id);
         },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/event/:eventId/fiados',
+        builder: (context, state) {
+          final id = state.pathParameters['eventId']!;
+          return FiadoScreen(eventId: id);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/fiados',
+        builder: (context, state) => const FiadoScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

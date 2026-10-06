@@ -239,8 +239,17 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
     final s = widget.session;
     final db = ref.watch(appDatabaseProvider);
 
-    return StreamBuilder<List<PosSale>>(
-      stream: (db.select(db.sales)..where((tbl) => tbl.eventId.equals(s.eventId))).watch(),
+    return StreamBuilder<List<FiadoPayment>>(
+      stream: (db.select(db.fiadoPayments)
+            ..where((p) => p.deletedAtMs.isNull()))
+          .watch(),
+      builder: (context, fiadoSnap) {
+        final allFiadoPayments = fiadoSnap.data ?? const <FiadoPayment>[];
+        return StreamBuilder<List<PosSale>>(
+      stream: (db.select(db.sales)
+            ..where((tbl) => tbl.eventId.equals(s.eventId))
+            ..where((tbl) => tbl.deletedAtMs.isNull()))
+          .watch(),
       builder: (context, snapshot) {
         final allSales = snapshot.data ?? widget.sales ?? [];
         final sales = allSales.where((sale) {
@@ -283,8 +292,36 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
           }
         }
 
+        // Fiado: dinheiro recebido NESTA sessão entra na gaveta; o saldo em
+        // aberto do evento sai listado no comprovante.
+        final fiadoCashReceivedCents = allFiadoPayments
+            .where((pay) =>
+                pay.sessionId == s.id &&
+                pay.method == PaymentMethod.dinheiro)
+            .fold<int>(0, (acc, pay) => acc + pay.amountCents);
+        final fiadoPaidBySale = <String, int>{};
+        for (final pay in allFiadoPayments) {
+          fiadoPaidBySale[pay.saleId] =
+              (fiadoPaidBySale[pay.saleId] ?? 0) + pay.amountCents;
+        }
+        final pendingFiadosList = <Map<String, dynamic>>[];
+        var pendingFiadosCents = 0;
+        for (final sale in allSales) {
+          if (sale.paymentMethod != PaymentMethod.fiado) continue;
+          final open = sale.totalCents - (fiadoPaidBySale[sale.id] ?? 0);
+          if (open <= 0) continue;
+          pendingFiadosCents += open;
+          pendingFiadosList.add({
+            'customerName': sale.customerName ?? 'Cliente',
+            'open': open / 100.0,
+          });
+        }
+
         final initialFloatCents = s.initialCashFloatCents;
-        final expectedDrawerCents = initialFloatCents + cashRevenueCents - cashChangeGivenCents;
+        final expectedDrawerCents = initialFloatCents +
+            cashRevenueCents +
+            fiadoCashReceivedCents -
+            cashChangeGivenCents;
         final diffCents = _hasTypedCount ? _countedCents - expectedDrawerCents : null;
 
         final openDate = DateTime.fromMillisecondsSinceEpoch(s.openedAtMs);
@@ -388,6 +425,14 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
                   const SizedBox(height: 8),
                   _drawerRow('(+) Fundo Inicial de Troco', formatCents(initialFloatCents)),
                   _drawerRow('(+) Vendas em Dinheiro', formatCents(cashRevenueCents)),
+                  if (fiadoCashReceivedCents > 0)
+                    _drawerRow('(+) Fiados Recebidos (dinheiro)',
+                        formatCents(fiadoCashReceivedCents)),
+                  if (pendingFiadosCents > 0)
+                    _drawerRow(
+                        '(i) Fiados em aberto (${pendingFiadosList.length})',
+                        formatCents(pendingFiadosCents),
+                        color: Colors.red),
                   if (cashChangeGivenCents > 0)
                     _drawerRow('(-) Trocos Pagos em Dinheiro', formatCents(cashChangeGivenCents)),
                   const Divider(height: 16),
@@ -491,6 +536,8 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
                         expectedDrawerCents: expectedDrawerCents,
                         methodTotalsCents: methodTotalsCents,
                         pendingChangesList: pendingChangesList,
+                        fiadoCashReceivedCents: fiadoCashReceivedCents,
+                        pendingFiadosList: pendingFiadosList,
                       ),
               icon: const Icon(Icons.print_outlined, size: 18),
               label: _isSubmitting
@@ -502,6 +549,8 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
               ),
             ),
           ],
+        );
+      },
         );
       },
     );
@@ -543,6 +592,8 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
     required int expectedDrawerCents,
     required Map<String, int> methodTotalsCents,
     required List<Map<String, dynamic>> pendingChangesList,
+    int fiadoCashReceivedCents = 0,
+    List<Map<String, dynamic>> pendingFiadosList = const [],
   }) async {
     setState(() => _isSubmitting = true);
     final db = ref.read(appDatabaseProvider);
@@ -595,6 +646,8 @@ class _CloseCashSessionDialogState extends ConsumerState<CloseCashSessionDialog>
           totalSalesCount: sales.length,
           revenueByPaymentMethod: revenueByMethod,
           pendingChanges: pendingChangesList,
+          fiadoCashReceived: fiadoCashReceivedCents / 100.0,
+          pendingFiados: pendingFiadosList,
           closedBy: closedBy,
           closedNotes: closedNotes,
         );

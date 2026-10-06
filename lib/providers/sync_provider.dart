@@ -313,6 +313,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
             request.response.write(
               jsonEncode(list.map((e) => e.toJson()).toList()),
             );
+          } else if (endpoint == 'fiado-payments') {
+            final list = await _db.fiadoPaymentsForEvent(eventId);
+            request.response.write(
+              jsonEncode(list.map((e) => e.toJson()).toList()),
+            );
           } else if (endpoint == 'combo-items') {
             final list = await _db.getComboItemsForEvent(eventId);
             request.response.write(
@@ -641,6 +646,27 @@ class SyncNotifier extends StateNotifier<SyncState> {
           return;
         }
 
+        if (request.method == 'POST' && endpoint == 'fiado-payment') {
+          final content = await utf8.decoder.bind(request).join();
+          final Map<String, dynamic> body = jsonDecode(content);
+          try {
+            await _db.registerFiadoPayment(
+              saleId: body['saleId'] as String,
+              amountCents: body['amountCents'] as int,
+              method: body['method'] as String,
+              notes: body['notes'] as String?,
+            );
+            _broadcastServerRefresh();
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(jsonEncode({'success': true}));
+          } catch (e) {
+            request.response.statusCode = HttpStatus.badRequest;
+            request.response.write(jsonEncode({'success': false, 'error': e.toString()}));
+          }
+          await request.response.close();
+          return;
+        }
+
         if (request.method == 'POST' && endpoint == 'resolve-change') {
           final content = await utf8.decoder.bind(request).join();
           final Map<String, dynamic> body = jsonDecode(content);
@@ -853,6 +879,11 @@ class SyncNotifier extends StateNotifier<SyncState> {
         ip, port, eventId, 'change-allocations', (json) => ChangeDotRow.fromJson(json),
       );
 
+      // 7b. Obter recebimentos de fiado
+      final fiadoPaymentsList = await _pullDataListFromServer<FiadoPayment>(
+        ip, port, eventId, 'fiado-payments', (json) => FiadoPayment.fromJson(json),
+      );
+
       // 8. Gravar os dados atômicos no banco de dados local do cliente
       await _db.syncEventData(
         eventId: eventId,
@@ -863,6 +894,7 @@ class SyncNotifier extends StateNotifier<SyncState> {
         salesList: salesList,
         saleLinesList: saleLinesList,
         changeAllocationsList: changeAllocations,
+        fiadoPaymentsList: fiadoPaymentsList,
       );
 
       // 9. Atualizar os controllers antigos por compatibilidade temporária
@@ -947,6 +979,39 @@ class SyncNotifier extends StateNotifier<SyncState> {
       );
     }
     return pushed;
+  }
+
+  /// Registra um recebimento de fiado no host (modo terminal Wi-Fi).
+  Future<void> submitFiadoPaymentToHost({
+    required String eventId,
+    required String saleId,
+    required int amountCents,
+    required String method,
+    String? notes,
+  }) async {
+    final ip = state.serverIp;
+    final port = state.serverPort;
+    if (ip == null) throw StateError('Não conectado ao servidor host.');
+
+    final client = HttpClient();
+    final request = await client.postUrl(
+      Uri.parse('http://$ip:$port/events/$eventId/fiado-payment'),
+    );
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({
+      'saleId': saleId,
+      'amountCents': amountCents,
+      'method': method,
+      'notes': notes,
+    }));
+    final response = await request.close();
+    final responseContent = await utf8.decoder.bind(response).join();
+    final Map<String, dynamic> data = jsonDecode(responseContent);
+    if (response.statusCode != HttpStatus.ok || data['success'] != true) {
+      throw StateError(
+        data['error'] as String? ?? 'Erro ao registrar recebimento no servidor.',
+      );
+    }
   }
 
   Future<ChurchEvent?> fetchEventDetailsFromServer(String eventId) async {

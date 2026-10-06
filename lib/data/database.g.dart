@@ -5544,6 +5544,733 @@ class SaleChangeDotAllocationsCompanion extends UpdateCompanion<ChangeDotRow> {
   }
 }
 
+class $FiadoPaymentsTable extends FiadoPayments
+    with TableInfo<$FiadoPaymentsTable, FiadoPayment> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FiadoPaymentsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _rowVersionMeta = const VerificationMeta(
+    'rowVersion',
+  );
+  @override
+  late final GeneratedColumn<int> rowVersion = GeneratedColumn<int>(
+    'row_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedByDeviceMeta = const VerificationMeta(
+    'updatedByDevice',
+  );
+  @override
+  late final GeneratedColumn<String> updatedByDevice = GeneratedColumn<String>(
+    'updated_by_device',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _saleIdMeta = const VerificationMeta('saleId');
+  @override
+  late final GeneratedColumn<String> saleId = GeneratedColumn<String>(
+    'sale_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountCentsMeta = const VerificationMeta(
+    'amountCents',
+  );
+  @override
+  late final GeneratedColumn<int> amountCents = GeneratedColumn<int>(
+    'amount_cents',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _methodMeta = const VerificationMeta('method');
+  @override
+  late final GeneratedColumn<String> method = GeneratedColumn<String>(
+    'method',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _paidAtMsMeta = const VerificationMeta(
+    'paidAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> paidAtMs = GeneratedColumn<int>(
+    'paid_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<String> sessionId = GeneratedColumn<String>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deviceIdMeta = const VerificationMeta(
+    'deviceId',
+  );
+  @override
+  late final GeneratedColumn<String> deviceId = GeneratedColumn<String>(
+    'device_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    saleId,
+    amountCents,
+    method,
+    paidAtMs,
+    sessionId,
+    notes,
+    deviceId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'fiado_payments';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FiadoPayment> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('row_version')) {
+      context.handle(
+        _rowVersionMeta,
+        rowVersion.isAcceptableOrUnknown(data['row_version']!, _rowVersionMeta),
+      );
+    }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_by_device')) {
+      context.handle(
+        _updatedByDeviceMeta,
+        updatedByDevice.isAcceptableOrUnknown(
+          data['updated_by_device']!,
+          _updatedByDeviceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sale_id')) {
+      context.handle(
+        _saleIdMeta,
+        saleId.isAcceptableOrUnknown(data['sale_id']!, _saleIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_saleIdMeta);
+    }
+    if (data.containsKey('amount_cents')) {
+      context.handle(
+        _amountCentsMeta,
+        amountCents.isAcceptableOrUnknown(
+          data['amount_cents']!,
+          _amountCentsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_amountCentsMeta);
+    }
+    if (data.containsKey('method')) {
+      context.handle(
+        _methodMeta,
+        method.isAcceptableOrUnknown(data['method']!, _methodMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_methodMeta);
+    }
+    if (data.containsKey('paid_at_ms')) {
+      context.handle(
+        _paidAtMsMeta,
+        paidAtMs.isAcceptableOrUnknown(data['paid_at_ms']!, _paidAtMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_paidAtMsMeta);
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('device_id')) {
+      context.handle(
+        _deviceIdMeta,
+        deviceId.isAcceptableOrUnknown(data['device_id']!, _deviceIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_deviceIdMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FiadoPayment map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FiadoPayment(
+      rowVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}row_version'],
+      )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
+      updatedByDevice: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}updated_by_device'],
+      ),
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      ),
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      saleId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sale_id'],
+      )!,
+      amountCents: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}amount_cents'],
+      )!,
+      method: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}method'],
+      )!,
+      paidAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}paid_at_ms'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}session_id'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      deviceId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}device_id'],
+      )!,
+    );
+  }
+
+  @override
+  $FiadoPaymentsTable createAlias(String alias) {
+    return $FiadoPaymentsTable(attachedDatabase, alias);
+  }
+}
+
+class FiadoPayment extends DataClass implements Insertable<FiadoPayment> {
+  final int rowVersion;
+  final int updatedAtMs;
+  final String? updatedByDevice;
+  final int? deletedAtMs;
+  final String id;
+  final String saleId;
+  final int amountCents;
+
+  /// [PaymentMethod.settlementMethods] (nunca 'fiado').
+  final String method;
+  final int paidAtMs;
+
+  /// Sessão de caixa em que o dinheiro entrou (a da venda NÃO vale: fiado
+  /// pode ser recebido semanas depois). Nulo = recebido fora de caixa.
+  final String? sessionId;
+  final String? notes;
+  final String deviceId;
+  const FiadoPayment({
+    required this.rowVersion,
+    required this.updatedAtMs,
+    this.updatedByDevice,
+    this.deletedAtMs,
+    required this.id,
+    required this.saleId,
+    required this.amountCents,
+    required this.method,
+    required this.paidAtMs,
+    this.sessionId,
+    this.notes,
+    required this.deviceId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['row_version'] = Variable<int>(rowVersion);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
+    if (!nullToAbsent || updatedByDevice != null) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice);
+    }
+    if (!nullToAbsent || deletedAtMs != null) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    }
+    map['id'] = Variable<String>(id);
+    map['sale_id'] = Variable<String>(saleId);
+    map['amount_cents'] = Variable<int>(amountCents);
+    map['method'] = Variable<String>(method);
+    map['paid_at_ms'] = Variable<int>(paidAtMs);
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<String>(sessionId);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['device_id'] = Variable<String>(deviceId);
+    return map;
+  }
+
+  FiadoPaymentsCompanion toCompanion(bool nullToAbsent) {
+    return FiadoPaymentsCompanion(
+      rowVersion: Value(rowVersion),
+      updatedAtMs: Value(updatedAtMs),
+      updatedByDevice: updatedByDevice == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedByDevice),
+      deletedAtMs: deletedAtMs == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAtMs),
+      id: Value(id),
+      saleId: Value(saleId),
+      amountCents: Value(amountCents),
+      method: Value(method),
+      paidAtMs: Value(paidAtMs),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      deviceId: Value(deviceId),
+    );
+  }
+
+  factory FiadoPayment.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FiadoPayment(
+      rowVersion: serializer.fromJson<int>(json['rowVersion']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
+      updatedByDevice: serializer.fromJson<String?>(json['updatedByDevice']),
+      deletedAtMs: serializer.fromJson<int?>(json['deletedAtMs']),
+      id: serializer.fromJson<String>(json['id']),
+      saleId: serializer.fromJson<String>(json['saleId']),
+      amountCents: serializer.fromJson<int>(json['amountCents']),
+      method: serializer.fromJson<String>(json['method']),
+      paidAtMs: serializer.fromJson<int>(json['paidAtMs']),
+      sessionId: serializer.fromJson<String?>(json['sessionId']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      deviceId: serializer.fromJson<String>(json['deviceId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'rowVersion': serializer.toJson<int>(rowVersion),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
+      'updatedByDevice': serializer.toJson<String?>(updatedByDevice),
+      'deletedAtMs': serializer.toJson<int?>(deletedAtMs),
+      'id': serializer.toJson<String>(id),
+      'saleId': serializer.toJson<String>(saleId),
+      'amountCents': serializer.toJson<int>(amountCents),
+      'method': serializer.toJson<String>(method),
+      'paidAtMs': serializer.toJson<int>(paidAtMs),
+      'sessionId': serializer.toJson<String?>(sessionId),
+      'notes': serializer.toJson<String?>(notes),
+      'deviceId': serializer.toJson<String>(deviceId),
+    };
+  }
+
+  FiadoPayment copyWith({
+    int? rowVersion,
+    int? updatedAtMs,
+    Value<String?> updatedByDevice = const Value.absent(),
+    Value<int?> deletedAtMs = const Value.absent(),
+    String? id,
+    String? saleId,
+    int? amountCents,
+    String? method,
+    int? paidAtMs,
+    Value<String?> sessionId = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    String? deviceId,
+  }) => FiadoPayment(
+    rowVersion: rowVersion ?? this.rowVersion,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+    updatedByDevice: updatedByDevice.present
+        ? updatedByDevice.value
+        : this.updatedByDevice,
+    deletedAtMs: deletedAtMs.present ? deletedAtMs.value : this.deletedAtMs,
+    id: id ?? this.id,
+    saleId: saleId ?? this.saleId,
+    amountCents: amountCents ?? this.amountCents,
+    method: method ?? this.method,
+    paidAtMs: paidAtMs ?? this.paidAtMs,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    notes: notes.present ? notes.value : this.notes,
+    deviceId: deviceId ?? this.deviceId,
+  );
+  FiadoPayment copyWithCompanion(FiadoPaymentsCompanion data) {
+    return FiadoPayment(
+      rowVersion: data.rowVersion.present
+          ? data.rowVersion.value
+          : this.rowVersion,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
+      updatedByDevice: data.updatedByDevice.present
+          ? data.updatedByDevice.value
+          : this.updatedByDevice,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+      id: data.id.present ? data.id.value : this.id,
+      saleId: data.saleId.present ? data.saleId.value : this.saleId,
+      amountCents: data.amountCents.present
+          ? data.amountCents.value
+          : this.amountCents,
+      method: data.method.present ? data.method.value : this.method,
+      paidAtMs: data.paidAtMs.present ? data.paidAtMs.value : this.paidAtMs,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FiadoPayment(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('saleId: $saleId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('method: $method, ')
+          ..write('paidAtMs: $paidAtMs, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('notes: $notes, ')
+          ..write('deviceId: $deviceId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    rowVersion,
+    updatedAtMs,
+    updatedByDevice,
+    deletedAtMs,
+    id,
+    saleId,
+    amountCents,
+    method,
+    paidAtMs,
+    sessionId,
+    notes,
+    deviceId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FiadoPayment &&
+          other.rowVersion == this.rowVersion &&
+          other.updatedAtMs == this.updatedAtMs &&
+          other.updatedByDevice == this.updatedByDevice &&
+          other.deletedAtMs == this.deletedAtMs &&
+          other.id == this.id &&
+          other.saleId == this.saleId &&
+          other.amountCents == this.amountCents &&
+          other.method == this.method &&
+          other.paidAtMs == this.paidAtMs &&
+          other.sessionId == this.sessionId &&
+          other.notes == this.notes &&
+          other.deviceId == this.deviceId);
+}
+
+class FiadoPaymentsCompanion extends UpdateCompanion<FiadoPayment> {
+  final Value<int> rowVersion;
+  final Value<int> updatedAtMs;
+  final Value<String?> updatedByDevice;
+  final Value<int?> deletedAtMs;
+  final Value<String> id;
+  final Value<String> saleId;
+  final Value<int> amountCents;
+  final Value<String> method;
+  final Value<int> paidAtMs;
+  final Value<String?> sessionId;
+  final Value<String?> notes;
+  final Value<String> deviceId;
+  final Value<int> rowid;
+  const FiadoPaymentsCompanion({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.id = const Value.absent(),
+    this.saleId = const Value.absent(),
+    this.amountCents = const Value.absent(),
+    this.method = const Value.absent(),
+    this.paidAtMs = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.deviceId = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  FiadoPaymentsCompanion.insert({
+    this.rowVersion = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
+    this.updatedByDevice = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    required String id,
+    required String saleId,
+    required int amountCents,
+    required String method,
+    required int paidAtMs,
+    this.sessionId = const Value.absent(),
+    this.notes = const Value.absent(),
+    required String deviceId,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       saleId = Value(saleId),
+       amountCents = Value(amountCents),
+       method = Value(method),
+       paidAtMs = Value(paidAtMs),
+       deviceId = Value(deviceId);
+  static Insertable<FiadoPayment> custom({
+    Expression<int>? rowVersion,
+    Expression<int>? updatedAtMs,
+    Expression<String>? updatedByDevice,
+    Expression<int>? deletedAtMs,
+    Expression<String>? id,
+    Expression<String>? saleId,
+    Expression<int>? amountCents,
+    Expression<String>? method,
+    Expression<int>? paidAtMs,
+    Expression<String>? sessionId,
+    Expression<String>? notes,
+    Expression<String>? deviceId,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (rowVersion != null) 'row_version': rowVersion,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
+      if (updatedByDevice != null) 'updated_by_device': updatedByDevice,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (id != null) 'id': id,
+      if (saleId != null) 'sale_id': saleId,
+      if (amountCents != null) 'amount_cents': amountCents,
+      if (method != null) 'method': method,
+      if (paidAtMs != null) 'paid_at_ms': paidAtMs,
+      if (sessionId != null) 'session_id': sessionId,
+      if (notes != null) 'notes': notes,
+      if (deviceId != null) 'device_id': deviceId,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  FiadoPaymentsCompanion copyWith({
+    Value<int>? rowVersion,
+    Value<int>? updatedAtMs,
+    Value<String?>? updatedByDevice,
+    Value<int?>? deletedAtMs,
+    Value<String>? id,
+    Value<String>? saleId,
+    Value<int>? amountCents,
+    Value<String>? method,
+    Value<int>? paidAtMs,
+    Value<String?>? sessionId,
+    Value<String?>? notes,
+    Value<String>? deviceId,
+    Value<int>? rowid,
+  }) {
+    return FiadoPaymentsCompanion(
+      rowVersion: rowVersion ?? this.rowVersion,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+      updatedByDevice: updatedByDevice ?? this.updatedByDevice,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      id: id ?? this.id,
+      saleId: saleId ?? this.saleId,
+      amountCents: amountCents ?? this.amountCents,
+      method: method ?? this.method,
+      paidAtMs: paidAtMs ?? this.paidAtMs,
+      sessionId: sessionId ?? this.sessionId,
+      notes: notes ?? this.notes,
+      deviceId: deviceId ?? this.deviceId,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (rowVersion.present) {
+      map['row_version'] = Variable<int>(rowVersion.value);
+    }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
+    if (updatedByDevice.present) {
+      map['updated_by_device'] = Variable<String>(updatedByDevice.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (saleId.present) {
+      map['sale_id'] = Variable<String>(saleId.value);
+    }
+    if (amountCents.present) {
+      map['amount_cents'] = Variable<int>(amountCents.value);
+    }
+    if (method.present) {
+      map['method'] = Variable<String>(method.value);
+    }
+    if (paidAtMs.present) {
+      map['paid_at_ms'] = Variable<int>(paidAtMs.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<String>(sessionId.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (deviceId.present) {
+      map['device_id'] = Variable<String>(deviceId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FiadoPaymentsCompanion(')
+          ..write('rowVersion: $rowVersion, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('updatedByDevice: $updatedByDevice, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('id: $id, ')
+          ..write('saleId: $saleId, ')
+          ..write('amountCents: $amountCents, ')
+          ..write('method: $method, ')
+          ..write('paidAtMs: $paidAtMs, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('notes: $notes, ')
+          ..write('deviceId: $deviceId, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $StockMovementsTable extends StockMovements
     with TableInfo<$StockMovementsTable, StockMovement> {
   @override
@@ -6274,6 +7001,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SaleLinesTable saleLines = $SaleLinesTable(this);
   late final $SaleChangeDotAllocationsTable saleChangeDotAllocations =
       $SaleChangeDotAllocationsTable(this);
+  late final $FiadoPaymentsTable fiadoPayments = $FiadoPaymentsTable(this);
   late final $StockMovementsTable stockMovements = $StockMovementsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -6288,6 +7016,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     sales,
     saleLines,
     saleChangeDotAllocations,
+    fiadoPayments,
     stockMovements,
   ];
 }
@@ -8974,6 +9703,349 @@ typedef $$SaleChangeDotAllocationsTableProcessedTableManager =
       ChangeDotRow,
       PrefetchHooks Function()
     >;
+typedef $$FiadoPaymentsTableCreateCompanionBuilder =
+    FiadoPaymentsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      required String id,
+      required String saleId,
+      required int amountCents,
+      required String method,
+      required int paidAtMs,
+      Value<String?> sessionId,
+      Value<String?> notes,
+      required String deviceId,
+      Value<int> rowid,
+    });
+typedef $$FiadoPaymentsTableUpdateCompanionBuilder =
+    FiadoPaymentsCompanion Function({
+      Value<int> rowVersion,
+      Value<int> updatedAtMs,
+      Value<String?> updatedByDevice,
+      Value<int?> deletedAtMs,
+      Value<String> id,
+      Value<String> saleId,
+      Value<int> amountCents,
+      Value<String> method,
+      Value<int> paidAtMs,
+      Value<String?> sessionId,
+      Value<String?> notes,
+      Value<String> deviceId,
+      Value<int> rowid,
+    });
+
+class $$FiadoPaymentsTableFilterComposer
+    extends Composer<_$AppDatabase, $FiadoPaymentsTable> {
+  $$FiadoPaymentsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get method => $composableBuilder(
+    column: $table.method,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get paidAtMs => $composableBuilder(
+    column: $table.paidAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$FiadoPaymentsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FiadoPaymentsTable> {
+  $$FiadoPaymentsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get saleId => $composableBuilder(
+    column: $table.saleId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get method => $composableBuilder(
+    column: $table.method,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get paidAtMs => $composableBuilder(
+    column: $table.paidAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sessionId => $composableBuilder(
+    column: $table.sessionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get deviceId => $composableBuilder(
+    column: $table.deviceId,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FiadoPaymentsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FiadoPaymentsTable> {
+  $$FiadoPaymentsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get rowVersion => $composableBuilder(
+    column: $table.rowVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get updatedByDevice => $composableBuilder(
+    column: $table.updatedByDevice,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get saleId =>
+      $composableBuilder(column: $table.saleId, builder: (column) => column);
+
+  GeneratedColumn<int> get amountCents => $composableBuilder(
+    column: $table.amountCents,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get method =>
+      $composableBuilder(column: $table.method, builder: (column) => column);
+
+  GeneratedColumn<int> get paidAtMs =>
+      $composableBuilder(column: $table.paidAtMs, builder: (column) => column);
+
+  GeneratedColumn<String> get sessionId =>
+      $composableBuilder(column: $table.sessionId, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<String> get deviceId =>
+      $composableBuilder(column: $table.deviceId, builder: (column) => column);
+}
+
+class $$FiadoPaymentsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FiadoPaymentsTable,
+          FiadoPayment,
+          $$FiadoPaymentsTableFilterComposer,
+          $$FiadoPaymentsTableOrderingComposer,
+          $$FiadoPaymentsTableAnnotationComposer,
+          $$FiadoPaymentsTableCreateCompanionBuilder,
+          $$FiadoPaymentsTableUpdateCompanionBuilder,
+          (
+            FiadoPayment,
+            BaseReferences<_$AppDatabase, $FiadoPaymentsTable, FiadoPayment>,
+          ),
+          FiadoPayment,
+          PrefetchHooks Function()
+        > {
+  $$FiadoPaymentsTableTableManager(_$AppDatabase db, $FiadoPaymentsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FiadoPaymentsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FiadoPaymentsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FiadoPaymentsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> saleId = const Value.absent(),
+                Value<int> amountCents = const Value.absent(),
+                Value<String> method = const Value.absent(),
+                Value<int> paidAtMs = const Value.absent(),
+                Value<String?> sessionId = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<String> deviceId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => FiadoPaymentsCompanion(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                saleId: saleId,
+                amountCents: amountCents,
+                method: method,
+                paidAtMs: paidAtMs,
+                sessionId: sessionId,
+                notes: notes,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> rowVersion = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
+                Value<String?> updatedByDevice = const Value.absent(),
+                Value<int?> deletedAtMs = const Value.absent(),
+                required String id,
+                required String saleId,
+                required int amountCents,
+                required String method,
+                required int paidAtMs,
+                Value<String?> sessionId = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                required String deviceId,
+                Value<int> rowid = const Value.absent(),
+              }) => FiadoPaymentsCompanion.insert(
+                rowVersion: rowVersion,
+                updatedAtMs: updatedAtMs,
+                updatedByDevice: updatedByDevice,
+                deletedAtMs: deletedAtMs,
+                id: id,
+                saleId: saleId,
+                amountCents: amountCents,
+                method: method,
+                paidAtMs: paidAtMs,
+                sessionId: sessionId,
+                notes: notes,
+                deviceId: deviceId,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$FiadoPaymentsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FiadoPaymentsTable,
+      FiadoPayment,
+      $$FiadoPaymentsTableFilterComposer,
+      $$FiadoPaymentsTableOrderingComposer,
+      $$FiadoPaymentsTableAnnotationComposer,
+      $$FiadoPaymentsTableCreateCompanionBuilder,
+      $$FiadoPaymentsTableUpdateCompanionBuilder,
+      (
+        FiadoPayment,
+        BaseReferences<_$AppDatabase, $FiadoPaymentsTable, FiadoPayment>,
+      ),
+      FiadoPayment,
+      PrefetchHooks Function()
+    >;
 typedef $$StockMovementsTableCreateCompanionBuilder =
     StockMovementsCompanion Function({
       Value<int> rowVersion,
@@ -9340,6 +10412,8 @@ class $AppDatabaseManager {
         _db,
         _db.saleChangeDotAllocations,
       );
+  $$FiadoPaymentsTableTableManager get fiadoPayments =>
+      $$FiadoPaymentsTableTableManager(_db, _db.fiadoPayments);
   $$StockMovementsTableTableManager get stockMovements =>
       $$StockMovementsTableTableManager(_db, _db.stockMovements);
 }

@@ -8,6 +8,7 @@ import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
 import '../../domain/payment_method.dart';
 import '../../domain/stock_constants.dart';
+import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../providers/event_finance_provider.dart';
@@ -286,6 +287,8 @@ class EventHubScreen extends ConsumerWidget {
                     minimumSize: const Size.fromHeight(50),
                   ),
                 ),
+                const SizedBox(height: 10),
+                _FiadoHubButton(eventId: eventId),
               ],
             );
           },
@@ -506,6 +509,40 @@ class _FinanceSummaryCard extends ConsumerWidget {
                 ],
               ],
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Botão "Fiados" do hub, com o total em aberto do evento no rótulo.
+class _FiadoHubButton extends ConsumerWidget {
+  const _FiadoHubButton({required this.eventId});
+
+  final String eventId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(appDatabaseProvider);
+    return StreamBuilder<List<FiadoSaleInfo>>(
+      stream: db.watchFiadoSales(eventId: eventId, onlyOpen: true),
+      builder: (context, snap) {
+        final open = snap.data ?? const <FiadoSaleInfo>[];
+        final totalOpen = open.fold<int>(0, (a, f) => a + f.openCents);
+        return OutlinedButton.icon(
+          onPressed: () => context.push('/event/$eventId/fiados'),
+          icon: const Icon(Icons.handshake_outlined),
+          label: Text(
+            totalOpen > 0
+                ? 'Fiados · ${formatCents(totalOpen)} em aberto'
+                : 'Fiados',
+          ),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            foregroundColor: totalOpen > 0
+                ? Theme.of(context).colorScheme.error
+                : null,
           ),
         );
       },

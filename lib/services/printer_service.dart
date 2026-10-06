@@ -722,6 +722,8 @@ class PrinterService {
     required int totalSalesCount,
     required Map<String, double> revenueByPaymentMethod,
     List<Map<String, dynamic>> pendingChanges = const [],
+    double fiadoCashReceived = 0,
+    List<Map<String, dynamic>> pendingFiados = const [],
     String? closedBy,
     String? closedNotes,
   }) async {
@@ -818,6 +820,14 @@ class PrinterService {
         PosColumn(text: _removeAccents(fmt(cashRevenue)), width: 5, styles: const PosStyles(align: PosAlign.right)),
       ]),
     );
+    if (fiadoCashReceived > 0) {
+      bytes.addAll(
+        generator.row([
+          PosColumn(text: '(+) Fiados Recebidos', width: 7),
+          PosColumn(text: _removeAccents(fmt(fiadoCashReceived)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+        ]),
+      );
+    }
     if (cashChangeGiven > 0) {
       bytes.addAll(
         generator.row([
@@ -866,6 +876,22 @@ class PrinterService {
           generator.row([
             PosColumn(text: _removeAccents(name), width: 7),
             PosColumn(text: _removeAccents(fmt(changeVal)), width: 5, styles: const PosStyles(align: PosAlign.right)),
+          ]),
+        );
+      }
+    }
+
+    // 6b. Fiados em aberto (do evento)
+    if (pendingFiados.isNotEmpty) {
+      bytes.addAll(generator.hr(ch: '-'));
+      bytes.addAll(generator.text('FIADOS EM ABERTO:', styles: const PosStyles(bold: true)));
+      for (final f in pendingFiados) {
+        final name = (f['customerName'] ?? 'Cliente').toString();
+        final owed = (f['open'] ?? 0.0) as double;
+        bytes.addAll(
+          generator.row([
+            PosColumn(text: _removeAccents(name), width: 7),
+            PosColumn(text: _removeAccents(fmt(owed)), width: 5, styles: const PosStyles(align: PosAlign.right)),
           ]),
         );
       }

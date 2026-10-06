@@ -1870,6 +1870,11 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
   }
 
   void _syncReceivedField() {
+    if (_payment == PaymentMethod.fiado) {
+      // Fiado: o campo vira a ENTRADA opcional paga na hora.
+      _controller.text = '0,00';
+      return;
+    }
     final t = widget.totalCents;
     _controller.text = (t / 100).toStringAsFixed(2).replaceAll('.', ',');
   }
@@ -1909,6 +1914,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
     final event = eventAsync.valueOrNull;
 
     final isCash = _payment == PaymentMethod.dinheiro;
+    final isFiado = _payment == PaymentMethod.fiado;
     final rec = _received ?? 0;
     final change = rec - widget.totalCents;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
@@ -2080,6 +2086,7 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                             {'id': PaymentMethod.pix, 'label': 'PIX', 'icon': Icons.qr_code_2_rounded},
                             {'id': PaymentMethod.cartaoDebito, 'label': 'Débito', 'icon': Icons.credit_card_outlined},
                             {'id': PaymentMethod.cartaoCredito, 'label': 'Crédito', 'icon': Icons.credit_score_outlined},
+                            {'id': PaymentMethod.fiado, 'label': 'Fiado', 'icon': Icons.handshake_outlined},
                           ];
 
                           return GridView.count(
@@ -2168,7 +2175,11 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                             fontWeight: FontWeight.bold,
                           ),
                           decoration: InputDecoration(
-                            labelText: isCash ? 'Valor recebido em dinheiro' : 'Valor cobrado',
+                            labelText: isFiado
+                                ? 'Entrada paga agora (opcional)'
+                                : isCash
+                                    ? 'Valor recebido em dinheiro'
+                                    : 'Valor cobrado',
                             prefixText: 'R\$ ',
                             prefixStyle: GoogleFonts.outfit(
                               fontSize: 18,
@@ -2340,6 +2351,12 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                         ],
                       ],
 
+                      // Fiado: nome do cliente obrigatório + saldo devedor atual
+                      if (isFiado) ...[
+                        const SizedBox(height: 12),
+                        _buildFiadoSection(context, isDark),
+                      ],
+
                       const SizedBox(height: 12),
 
                       // Campo de Observações
@@ -2365,6 +2382,31 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
                         child: FilledButton.icon(
                           onPressed: () {
                             final r = _received;
+                            if (_payment == PaymentMethod.fiado) {
+                              final entrada = r ?? 0;
+                              if (entrada < 0 || entrada >= widget.totalCents) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('A entrada do fiado deve ser menor que o total (ou zero)')),
+                                );
+                                return;
+                              }
+                              if (_customerNameController.text.trim().isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Venda fiada exige o nome do cliente')),
+                                );
+                                return;
+                              }
+                              Navigator.pop(
+                                context,
+                                _CheckoutResult(
+                                  paymentMethod: _payment,
+                                  amountReceivedCents: entrada,
+                                  notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+                                  customerName: _customerNameController.text.trim(),
+                                ),
+                              );
+                              return;
+                            }
                             if (r == null || r < widget.totalCents) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text('Valor recebido é menor que o total da venda')),
@@ -2418,6 +2460,106 @@ class _SaleCheckoutBottomSheetState extends ConsumerState<_SaleCheckoutBottomShe
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildFiadoSection(BuildContext context, bool isDark) {
+    final db = ref.read(appDatabaseProvider);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey.shade900 : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: CaixaAppTheme.warmGold),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.handshake_outlined,
+                  color: CaixaAppTheme.warmGold, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Venda fiada — fica em aberto no nome do cliente',
+                style: GoogleFonts.inter(
+                    fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _customerNameController,
+            decoration: InputDecoration(
+              labelText: 'Nome do cliente *',
+              hintText: 'Ex: João da Silva',
+              filled: true,
+              fillColor: isDark ? Colors.black26 : CaixaAppTheme.ivoryCanvas,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            textCapitalization: TextCapitalization.words,
+            onChanged: (_) => setState(() {}),
+          ),
+          FutureBuilder<List<String>>(
+            future: db.customerNameSuggestions(_customerNameController.text),
+            builder: (context, snap) {
+              final suggestions = (snap.data ?? const <String>[])
+                  .where((n) =>
+                      n.toLowerCase() !=
+                      _customerNameController.text.trim().toLowerCase())
+                  .take(4)
+                  .toList();
+              if (suggestions.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: suggestions
+                      .map((n) => ActionChip(
+                            label: Text(n,
+                                style: GoogleFonts.inter(fontSize: 12)),
+                            onPressed: () => setState(
+                                () => _customerNameController.text = n),
+                          ))
+                      .toList(),
+                ),
+              );
+            },
+          ),
+          FutureBuilder<int>(
+            future: _customerNameController.text.trim().isEmpty
+                ? Future.value(0)
+                : db.customerFiadoOpenCents(_customerNameController.text),
+            builder: (context, snap) {
+              final open = snap.data ?? 0;
+              if (open <= 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: Colors.orange.shade800),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${_customerNameController.text.trim()} já deve ${formatCents(open)} em fiados.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.orange.shade800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

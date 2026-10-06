@@ -16,6 +16,7 @@ import '../../providers/event_dashboard_provider.dart';
 import '../../providers/printer_provider.dart';
 import '../../providers/cash_session_provider.dart';
 import '../../utils/money_format.dart';
+import 'fiado_screen.dart';
 
 final _dateTimeFmt = DateFormat.yMd('pt_BR').add_Hm();
 
@@ -528,12 +529,30 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                       loading: () => const Center(child: CircularProgressIndicator()),
                       error: (err, _) => Center(child: Text('Erro: $err')),
                       data: (denomsList) {
+                        return StreamBuilder<List<FiadoSaleInfo>>(
+                          stream: ref
+                              .watch(appDatabaseProvider)
+                              .watchFiadoSales(eventId: eventId),
+                          builder: (context, fiadoSnap) {
+                        final fiadoPaidBySale = {
+                          for (final f
+                              in fiadoSnap.data ?? const <FiadoSaleInfo>[])
+                            f.sale.id: f.paidCents,
+                        };
                         return ListView.separated(
                           padding: kCaixaScreenPadding.copyWith(top: 8, bottom: 24),
                           itemCount: filteredList.length,
                           separatorBuilder: (context, index) => const SizedBox(height: 6),
                           itemBuilder: (context, i) {
                             final s = filteredList[i];
+                            final isFiadoSale =
+                                s.paymentMethod == PaymentMethod.fiado;
+                            final fiadoPaid = fiadoPaidBySale[s.id] ?? 0;
+                            final fiadoOpen = isFiadoSale
+                                ? (s.totalCents - fiadoPaid < 0
+                                    ? 0
+                                    : s.totalCents - fiadoPaid)
+                                : 0;
                       final when = DateTime.fromMillisecondsSinceEpoch(s.soldAtMs);
                       final change = s.amountReceivedCents - s.totalCents;
                       final pay = PaymentMethod.label(s.paymentMethod);
@@ -676,6 +695,48 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                       ],
                                     ),
                                   ),
+                                if (isFiadoSale)
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: fiadoOpen > 0
+                                          ? Colors.red.withValues(alpha: 0.08)
+                                          : Colors.green.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: fiadoOpen > 0
+                                            ? Colors.red.withValues(alpha: 0.4)
+                                            : Colors.green.withValues(alpha: 0.4),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.handshake_outlined,
+                                          size: 18,
+                                          color: fiadoOpen > 0
+                                              ? Colors.red.shade700
+                                              : Colors.green.shade700,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            fiadoOpen > 0
+                                                ? 'Fiado de ${s.customerName ?? 'Sem nome'} — deve ${formatCents(fiadoOpen)}'
+                                                : 'Fiado de ${s.customerName ?? 'Sem nome'} — quitado',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: fiadoOpen > 0
+                                                  ? Colors.red.shade900
+                                                  : Colors.green.shade900,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 Text(
                                   'ITENS',
                                   style: GoogleFonts.outfit(
@@ -733,7 +794,9 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                       style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade600),
                                     ),
                                     Text(
-                                      formatCents(s.amountReceivedCents),
+                                      formatCents(isFiadoSale
+                                          ? fiadoPaid
+                                          : s.amountReceivedCents),
                                       style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold),
                                     ),
                                   ],
@@ -754,6 +817,29 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                                         visualDensity: VisualDensity.compact,
                                       ),
                                     ),
+                                    if (isFiadoSale && fiadoOpen > 0)
+                                      FilledButton.icon(
+                                        onPressed: () => showReceiveFiadoDialog(
+                                          context,
+                                          ref,
+                                          FiadoSaleInfo(
+                                              sale: s, paidCents: fiadoPaid),
+                                        ),
+                                        icon: const Icon(Icons.price_check,
+                                            size: 16),
+                                        label: Text('Receber',
+                                            style: GoogleFonts.inter(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600)),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor:
+                                              Colors.green.shade700,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                      ),
                                     if (isClient)
                                       Padding(
                                         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -810,6 +896,7 @@ class EventSalesRegisterScreen extends ConsumerWidget {
                       );
                     },
                   );
+                      });
                 },
               ),
             ),

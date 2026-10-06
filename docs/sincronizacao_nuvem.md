@@ -123,6 +123,14 @@ os últimos 10 snapshots por evento + 1 por semana por 6 meses.
   perdida), troco em fichas preservado na edição, `openedBy` correto,
   restauração de backup com validação e limpeza de WAL.
 
+## 6b. Venda fiada no sync
+
+Os recebimentos de fiado (`fiado_payments`, schema v10) viajam no agregado
+do evento (formato v2) e no snapshot Wi-Fi; são append-only e se unem por
+UUID, sem conflito. Receber um fiado exige ter o evento no aparelho. Apps
+com versão anterior ao 1.3.0 são bloqueados ("atualize o app") ao receber
+um agregado v2.
+
 ## 7. Limitações conhecidas
 
 - Divergência não tem junção automática (decisão da revisão D2): o usuário

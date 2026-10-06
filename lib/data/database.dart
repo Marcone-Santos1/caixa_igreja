@@ -19,7 +19,7 @@ const _uuid = Uuid();
 
 /// Versão atual do schema. Deve coincidir com [AppDatabase.schemaVersion].
 /// Usada pelo backup/nuvem para bloquear restauração de bases mais novas.
-const kAppSchemaVersion = 9;
+const kAppSchemaVersion = 10;
 
 /// Colunas de sincronização presentes em todas as tabelas (schema v9).
 ///
@@ -154,6 +154,34 @@ class SaleChangeDotAllocations extends Table with SyncColumns {
   TextColumn get dotDenominationId =>
       text().references(EventDotDenominations, #id)();
   IntColumn get qty => integer()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Recebimentos de vendas fiadas (RFC venda fiada).
+///
+/// Append-only, como as movimentações de estoque: cada recebimento (total ou
+/// parcial, inclusive a "entrada" paga na hora da venda) é uma linha. O saldo
+/// devedor é sempre derivado: `sale.totalCents − soma(lançamentos vivos)`.
+/// Lançamento errado se desfaz por tombstone. Na sincronização, as linhas se
+/// unem por UUID — zero conflito entre celulares.
+@DataClassName('FiadoPayment')
+class FiadoPayments extends Table with SyncColumns {
+  TextColumn get id => text()();
+  TextColumn get saleId => text().references(Sales, #id)();
+  IntColumn get amountCents => integer()();
+
+  /// [PaymentMethod.settlementMethods] (nunca 'fiado').
+  TextColumn get method => text()();
+  IntColumn get paidAtMs => integer()();
+
+  /// Sessão de caixa em que o dinheiro entrou (a da venda NÃO vale: fiado
+  /// pode ser recebido semanas depois). Nulo = recebido fora de caixa.
+  TextColumn get sessionId =>
+      text().nullable().references(CashSessions, #id)();
+  TextColumn get notes => text().nullable()();
+  TextColumn get deviceId => text()();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -306,6 +334,33 @@ class EventFinanceSummary {
   }
 }
 
+/// Venda fiada com o total já recebido (saldo devedor derivado).
+class FiadoSaleInfo {
+  const FiadoSaleInfo({required this.sale, required this.paidCents});
+
+  final PosSale sale;
+  final int paidCents;
+
+  int get openCents =>
+      (sale.totalCents - paidCents) < 0 ? 0 : sale.totalCents - paidCents;
+  bool get isSettled => openCents == 0;
+}
+
+/// Saldo devedor consolidado de um cliente (todas as vendas fiadas).
+class FiadoCustomerBalance {
+  const FiadoCustomerBalance({
+    required this.customerName,
+    required this.openCents,
+    required this.openSaleCount,
+    required this.lastSaleAtMs,
+  });
+
+  final String customerName;
+  final int openCents;
+  final int openSaleCount;
+  final int lastSaleAtMs;
+}
+
 /// Contagens de itens com stock baixo (produtos com rastreio + fichas).
 class EventLowStockCounts {
   const EventLowStockCounts({
@@ -329,6 +384,7 @@ class EventLowStockCounts {
     Sales,
     SaleLines,
     SaleChangeDotAllocations,
+    FiadoPayments,
     StockMovements,
   ],
 )
@@ -507,6 +563,10 @@ SELECT lower(hex(randomblob(16))), 1, id, stock_qty, ${StockMovementReason.initi
 FROM event_dot_denominations WHERE stock_qty != 0;
 ''');
           }
+          if (from < 10) {
+            // Venda fiada: lançamentos de recebimento (append-only).
+            await m.createTable(fiadoPayments);
+          }
         },
       );
 
@@ -550,6 +610,7 @@ FROM event_dot_denominations WHERE stock_qty != 0;
       'sales': 'id = NEW.id',
       'sale_lines': 'id = NEW.id',
       'sale_change_dot_allocations': 'id = NEW.id',
+      'fiado_payments': 'id = NEW.id',
       'stock_movements': 'id = NEW.id',
     };
     const bypassOff =
@@ -1131,7 +1192,23 @@ END''');
         }
         totalCents += l.resolveLineTotalCents();
       }
-      if (amountReceivedCents < totalCents) {
+      final isFiado = paymentMethod == PaymentMethod.fiado;
+      if (isFiado) {
+        // Fiado: itens entregues, pagamento em aberto em nome do cliente.
+        // amountReceivedCents aqui é a ENTRADA paga na hora (vira o primeiro
+        // lançamento); na venda fica 0 — o recebido real é derivado dos
+        // lançamentos.
+        if ((customerName ?? '').trim().isEmpty) {
+          throw ArgumentError('Venda fiada exige o nome do cliente');
+        }
+        if (amountReceivedCents < 0 || amountReceivedCents >= totalCents) {
+          throw ArgumentError(
+              'A entrada do fiado deve ser menor que o total (ou zero)');
+        }
+        if (changePending) {
+          throw ArgumentError('Venda fiada não tem troco pendente');
+        }
+      } else if (amountReceivedCents < totalCents) {
         throw ArgumentError('Valor recebido menor que o total');
       }
 
@@ -1192,7 +1269,7 @@ END''');
           sessionId: Value(activeSessionId),
           soldAtMs: soldAt,
           totalCents: totalCents,
-          amountReceivedCents: amountReceivedCents,
+          amountReceivedCents: isFiado ? 0 : amountReceivedCents,
           paymentMethod: Value(paymentMethod),
           notes: Value(notes),
           changePending: Value(changePending),
@@ -1237,6 +1314,22 @@ END''');
         }
       }
 
+      // Entrada do fiado paga na hora: primeiro lançamento de recebimento.
+      if (isFiado && amountReceivedCents > 0) {
+        await into(fiadoPayments).insert(
+          FiadoPaymentsCompanion.insert(
+            id: _uuid.v7(),
+            saleId: newSaleId,
+            amountCents: amountReceivedCents,
+            method: PaymentMethod.dinheiro,
+            paidAtMs: soldAt,
+            sessionId: Value(activeSessionId),
+            notes: const Value('Entrada'),
+            deviceId: DeviceIdentity.deviceId,
+          ),
+        );
+      }
+
       return newSaleId;
     });
   }
@@ -1271,8 +1364,29 @@ END''');
         }
         totalCents += l.resolveLineTotalCents();
       }
-      if (amountReceivedCents < totalCents) {
-        throw ArgumentError('Valor recebido menor que o total');
+      final isFiado = paymentMethod == PaymentMethod.fiado;
+      final paidFiadoCents = await fiadoPaidCents(saleId);
+      if (isFiado) {
+        if ((customerName ?? '').trim().isEmpty) {
+          throw ArgumentError('Venda fiada exige o nome do cliente');
+        }
+        if (changePending) {
+          throw ArgumentError('Venda fiada não tem troco pendente');
+        }
+        if (totalCents < paidFiadoCents) {
+          throw StateError(
+              'O novo total é menor que o valor já recebido deste fiado. '
+              'Estorne os recebimentos antes.');
+        }
+      } else {
+        if (paidFiadoCents > 0) {
+          throw StateError(
+              'Esta venda tem recebimentos de fiado registrados. '
+              'Estorne-os antes de mudar o método de pagamento.');
+        }
+        if (amountReceivedCents < totalCents) {
+          throw ArgumentError('Valor recebido menor que o total');
+        }
       }
 
       // 3. Troco em fichas: se o troco não mudou, as alocações são mantidas
@@ -1381,11 +1495,12 @@ END''');
         }
       }
 
-      // 6. Atualizar os dados da venda original
+      // 6. Atualizar os dados da venda original (fiado guarda recebido = 0;
+      //    o recebido real vem dos lançamentos)
       await updateSaleDetails(
         saleId: saleId,
         paymentMethod: paymentMethod,
-        amountReceivedCents: amountReceivedCents,
+        amountReceivedCents: isFiado ? 0 : amountReceivedCents,
         notes: notes,
         changePending: changePending,
         customerName: customerName,
@@ -1655,6 +1770,7 @@ END''');
     required List<PosSale> salesList,
     required List<PosSaleLine> saleLinesList,
     required List<ChangeDotRow> changeAllocationsList,
+    List<FiadoPayment> fiadoPaymentsList = const [],
   }) async {
     await runWithSyncBypass(() async {
       // 1. Obter informações de produtos e denominações locais antes de limpar
@@ -1680,6 +1796,7 @@ END''');
       // 3. Limpar apenas os dados substituídos pelo snapshot do host
       if (replacedSaleIds.isNotEmpty) {
         await (delete(saleChangeDotAllocations)..where((t) => t.saleId.isIn(replacedSaleIds))).go();
+        await (delete(fiadoPayments)..where((t) => t.saleId.isIn(replacedSaleIds))).go();
         await (delete(saleLines)..where((t) => t.saleId.isIn(replacedSaleIds))).go();
       }
 
@@ -1746,6 +1863,11 @@ END''');
       // 10. Inserir alocações de troco
       for (final ca in changeAllocationsList) {
         await into(saleChangeDotAllocations).insert(ca, mode: InsertMode.insertOrReplace);
+      }
+
+      // 11. Inserir recebimentos de fiado
+      for (final fp in fiadoPaymentsList) {
+        await into(fiadoPayments).insert(fp, mode: InsertMode.insertOrReplace);
       }
     });
   }
@@ -1855,6 +1977,11 @@ END''');
       if (sale == null) return;
       // Já excluída: não reverter estoque duas vezes.
       if (sale.deletedAtMs != null) return;
+      if (sale.paymentMethod == PaymentMethod.fiado &&
+          await fiadoPaidCents(saleId) > 0) {
+        throw StateError(
+            'Este fiado tem recebimentos registrados. Estorne-os antes de excluir a venda.');
+      }
 
       final lines = await (select(saleLines)..where((l) => l.saleId.equals(saleId))).get();
 
@@ -1890,6 +2017,209 @@ END''');
         ),
       );
     });
+  }
+
+  // ─── Venda fiada ─────────────────────────────────────────────────────────
+
+  /// Soma dos recebimentos vivos de um fiado.
+  Future<int> fiadoPaidCents(String saleId) async {
+    final sum = fiadoPayments.amountCents.sum();
+    final q = selectOnly(fiadoPayments)
+      ..addColumns([sum])
+      ..where(fiadoPayments.saleId.equals(saleId) &
+          fiadoPayments.deletedAtMs.isNull());
+    final row = await q.getSingle();
+    return row.read(sum) ?? 0;
+  }
+
+  /// Registra um recebimento (total ou parcial) de uma venda fiada.
+  /// O dinheiro entra na sessão ATIVA do evento da venda, se houver —
+  /// recebimentos fora de caixa ficam com sessão nula.
+  Future<String> registerFiadoPayment({
+    required String saleId,
+    required int amountCents,
+    required String method,
+    String? notes,
+  }) {
+    return transaction(() async {
+      if (amountCents <= 0) throw ArgumentError('Valor inválido');
+      if (method == PaymentMethod.fiado ||
+          !PaymentMethod.settlementMethods.contains(method)) {
+        throw ArgumentError('Método de recebimento inválido');
+      }
+      final sale = await (select(sales)
+            ..where((s) => s.id.equals(saleId) & s.deletedAtMs.isNull()))
+          .getSingleOrNull();
+      if (sale == null) throw StateError('Venda não encontrada');
+      if (sale.paymentMethod != PaymentMethod.fiado) {
+        throw StateError('Esta venda não é fiada');
+      }
+      final paid = await fiadoPaidCents(saleId);
+      final open = sale.totalCents - paid;
+      if (open <= 0) throw StateError('Este fiado já está quitado');
+      if (amountCents > open) {
+        throw ArgumentError(
+            'Valor maior que o saldo devedor (${open / 100} restante)');
+      }
+      final session = await getActiveSession(sale.eventId);
+      final id = _uuid.v7();
+      await into(fiadoPayments).insert(
+        FiadoPaymentsCompanion.insert(
+          id: id,
+          saleId: saleId,
+          amountCents: amountCents,
+          method: method,
+          paidAtMs: DateTime.now().millisecondsSinceEpoch,
+          sessionId: Value(session?.id),
+          notes: Value(notes),
+          deviceId: DeviceIdentity.deviceId,
+        ),
+      );
+      return id;
+    });
+  }
+
+  /// Estorna um lançamento de recebimento (tombstone — o histórico fica).
+  Future<void> undoFiadoPayment(String paymentId) async {
+    await (update(fiadoPayments)..where((p) => p.id.equals(paymentId))).write(
+      FiadoPaymentsCompanion(
+        deletedAtMs: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  /// Recebimentos de fiado do evento (snapshot Wi-Fi; só os vivos, como as
+  /// demais listas do host).
+  Future<List<FiadoPayment>> fiadoPaymentsForEvent(String eventId) async {
+    final q = select(fiadoPayments).join([
+      innerJoin(sales, sales.id.equalsExp(fiadoPayments.saleId),
+          useColumns: false),
+    ])
+      ..where(sales.eventId.equals(eventId) &
+          fiadoPayments.deletedAtMs.isNull());
+    final rows = await q.get();
+    return rows.map((r) => r.readTable(fiadoPayments)).toList();
+  }
+
+  Future<List<FiadoPayment>> fiadoPaymentsForSale(String saleId) {
+    return (select(fiadoPayments)
+          ..where((p) => p.saleId.equals(saleId) & p.deletedAtMs.isNull())
+          ..orderBy([(p) => OrderingTerm.desc(p.paidAtMs)]))
+        .get();
+  }
+
+  /// Vendas fiadas (com total recebido) — reage a vendas E a lançamentos.
+  /// [eventId] nulo = todos os eventos (tela geral); [onlyOpen] filtra as
+  /// que ainda têm saldo devedor.
+  Stream<List<FiadoSaleInfo>> watchFiadoSales({
+    String? eventId,
+    bool onlyOpen = false,
+  }) {
+    final paidSum = fiadoPayments.amountCents.sum();
+    final q = select(sales).join([
+      leftOuterJoin(
+        fiadoPayments,
+        fiadoPayments.saleId.equalsExp(sales.id) &
+            fiadoPayments.deletedAtMs.isNull(),
+        useColumns: false,
+      ),
+      innerJoin(events, events.id.equalsExp(sales.eventId),
+          useColumns: false),
+    ])
+      ..addColumns([paidSum])
+      ..where(sales.paymentMethod.equals(PaymentMethod.fiado) &
+          sales.deletedAtMs.isNull() &
+          (eventId != null
+              ? sales.eventId.equals(eventId)
+              : events.deletedAtMs.isNull()))
+      ..groupBy([sales.id])
+      ..orderBy([OrderingTerm.desc(sales.soldAtMs)]);
+
+    return q.watch().map((rows) {
+      final list = rows.map((row) {
+        final sale = row.readTable(sales);
+        final paid = row.read(paidSum) ?? 0;
+        return FiadoSaleInfo(sale: sale, paidCents: paid);
+      }).toList();
+      return onlyOpen ? list.where((f) => f.openCents > 0).toList() : list;
+    });
+  }
+
+  /// Saldo devedor agrupado por cliente (tela geral "Fiados").
+  Stream<List<FiadoCustomerBalance>> watchFiadoBalancesByCustomer() {
+    return watchFiadoSales(onlyOpen: false).map((all) {
+      final byName = <String, List<FiadoSaleInfo>>{};
+      for (final f in all) {
+        final name = (f.sale.customerName ?? '').trim();
+        byName.putIfAbsent(name.isEmpty ? 'Sem nome' : name, () => []).add(f);
+      }
+      final result = byName.entries
+          .map((e) {
+            final open =
+                e.value.fold<int>(0, (acc, f) => acc + f.openCents);
+            var lastMs = 0;
+            for (final f in e.value) {
+              if (f.sale.soldAtMs > lastMs) lastMs = f.sale.soldAtMs;
+            }
+            return FiadoCustomerBalance(
+              customerName: e.key,
+              openCents: open,
+              openSaleCount:
+                  e.value.where((f) => f.openCents > 0).length,
+              lastSaleAtMs: lastMs,
+            );
+          })
+          .where((b) => b.openCents > 0)
+          .toList()
+        ..sort((a, b) => b.openCents.compareTo(a.openCents));
+      return result;
+    });
+  }
+
+  /// Saldo devedor em aberto de um cliente (aviso no checkout).
+  Future<int> customerFiadoOpenCents(String customerName) async {
+    final name = customerName.trim();
+    if (name.isEmpty) return 0;
+    final fiados = await (select(sales)
+          ..where((s) =>
+              s.paymentMethod.equals(PaymentMethod.fiado) &
+              s.deletedAtMs.isNull() &
+              s.customerName.trim().lower().equals(name.toLowerCase())))
+        .get();
+    var open = 0;
+    for (final sale in fiados) {
+      open += sale.totalCents - await fiadoPaidCents(sale.id);
+    }
+    return open < 0 ? 0 : open;
+  }
+
+  /// Nomes de cliente já usados (autocomplete do checkout).
+  Future<List<String>> customerNameSuggestions(String query) async {
+    final rows = await (selectOnly(sales, distinct: true)
+          ..addColumns([sales.customerName])
+          ..where(sales.customerName.isNotNull() & sales.deletedAtMs.isNull()))
+        .get();
+    final q = query.trim().toLowerCase();
+    final names = rows
+        .map((r) => (r.read(sales.customerName) ?? '').trim())
+        .where((n) => n.isNotEmpty)
+        .toSet()
+        .where((n) => q.isEmpty || n.toLowerCase().contains(q))
+        .toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return names.take(8).toList();
+  }
+
+  /// Fiados recebidos em dinheiro numa sessão (entra na gaveta esperada).
+  Future<int> fiadoCashReceivedForSession(String sessionId) async {
+    final sum = fiadoPayments.amountCents.sum();
+    final q = selectOnly(fiadoPayments)
+      ..addColumns([sum])
+      ..where(fiadoPayments.sessionId.equals(sessionId) &
+          fiadoPayments.method.equals(PaymentMethod.dinheiro) &
+          fiadoPayments.deletedAtMs.isNull());
+    final row = await q.getSingle();
+    return row.read(sum) ?? 0;
   }
 
   /// Salva (cria ou atualiza) um produto simples registrando a diferença de
