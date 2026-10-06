@@ -141,14 +141,27 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
     }
   }
 
-  void _showPairingQr() {
-    final token =
-        ref.read(cloudSyncControllerProvider.notifier).pairingToken();
-    if (token == null) return;
+  /// Gera um CONVITE de uso único no servidor e mostra o QR (admin).
+  Future<void> _showPairingQr() async {
+    setState(() => _working = true);
+    String? token;
+    try {
+      final invite =
+          await ref.read(cloudSyncControllerProvider.notifier).createInvite();
+      token = invite.encode();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+    if (token == null || !mounted) return;
+    final qrToken = token;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Parear outro celular'),
+        title: const Text('Convidar outro celular'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -158,13 +171,13 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
               child: Container(
                 color: Colors.white,
                 padding: const EdgeInsets.all(8),
-                child: QrImageView(data: token),
+                child: QrImageView(data: qrToken),
               ),
             ),
             const SizedBox(height: 12),
             const Text(
-              'No outro celular: Ajustes → Backup na nuvem → '
-              '"Conectar com QR".',
+              'Convite de uso único (vale 48h). No outro celular: '
+              'Ajustes → Backup na nuvem → "Conectar com QR".',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13),
             ),
@@ -173,14 +186,14 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
         actions: [
           TextButton.icon(
             onPressed: () {
-              Clipboard.setData(ClipboardData(text: token));
+              Clipboard.setData(ClipboardData(text: qrToken));
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Código copiado.')),
+                const SnackBar(content: Text('Convite copiado.')),
               );
             },
             icon: const Icon(Icons.copy, size: 18),
-            label: const Text('Copiar código'),
+            label: const Text('Copiar convite'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
@@ -228,14 +241,16 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
                     label: const Text('Verificar agora'),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _showPairingQr,
-                    icon: const Icon(Icons.qr_code_2),
-                    label: const Text('Parear outro celular'),
+                if (state.isAdmin) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: _working || state.busy ? null : _showPairingQr,
+                      icon: const Icon(Icons.qr_code_2),
+                      label: const Text('Convidar celular'),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 16),
@@ -466,6 +481,7 @@ class _AdvancedCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final controller = ref.read(cloudSyncControllerProvider.notifier);
     return Card(
       child: ExpansionTile(
         title: const Text('Avançado'),
@@ -474,13 +490,85 @@ class _AdvancedCard extends ConsumerWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Servidor: ${state.endpoint}\nCódigo da igreja: ${state.churchCode}',
+              'Servidor: ${state.endpoint}\nCódigo da igreja: ${state.churchCode}'
+              '\nEste celular: ${state.isAdmin ? 'administrador' : 'membro'}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.5,
               ),
             ),
           ),
+          if (state.devices.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Celulares da igreja',
+                  style: theme.textTheme.titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+            ),
+            for (final d in state.devices)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: Icon(
+                  d.revoked
+                      ? Icons.phonelink_erase
+                      : d.isAdmin
+                          ? Icons.admin_panel_settings_outlined
+                          : Icons.phone_android,
+                  size: 20,
+                  color: d.revoked ? theme.colorScheme.error : null,
+                ),
+                title: Text(
+                  '${d.name}${d.deviceId == DeviceIdentity.deviceId ? ' (este)' : ''}',
+                ),
+                subtitle: Text(
+                  d.revoked
+                      ? 'Acesso revogado'
+                      : d.isAdmin
+                          ? 'Administrador'
+                          : 'Membro',
+                ),
+                trailing: state.isAdmin && d.deviceId != DeviceIdentity.deviceId
+                    ? PopupMenuButton<String>(
+                        onSelected: (action) {
+                          switch (action) {
+                            case 'revoke':
+                              controller.setDeviceRevoked(d.deviceId, true);
+                            case 'restore':
+                              controller.setDeviceRevoked(d.deviceId, false);
+                            case 'promote':
+                              controller.setDeviceRole(d.deviceId, 'admin');
+                            case 'demote':
+                              controller.setDeviceRole(d.deviceId, 'member');
+                          }
+                        },
+                        itemBuilder: (_) => [
+                          if (!d.revoked)
+                            const PopupMenuItem(
+                              value: 'revoke',
+                              child: Text('Revogar acesso'),
+                            )
+                          else
+                            const PopupMenuItem(
+                              value: 'restore',
+                              child: Text('Restaurar acesso'),
+                            ),
+                          if (!d.isAdmin)
+                            const PopupMenuItem(
+                              value: 'promote',
+                              child: Text('Tornar administrador'),
+                            )
+                          else
+                            const PopupMenuItem(
+                              value: 'demote',
+                              child: Text('Tornar membro'),
+                            ),
+                        ],
+                      )
+                    : null,
+              ),
+          ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () async {

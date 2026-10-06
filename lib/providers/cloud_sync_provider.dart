@@ -140,16 +140,23 @@ class CloudSyncState {
   const CloudSyncState({
     this.endpoint = '',
     this.churchCode = '',
-    this.secretConfigured = false,
+    this.credentialConfigured = false,
+    this.role = 'member',
     this.busy = false,
     this.lastCheckedAt,
     this.globalMessage,
     this.events = const {},
+    this.devices = const [],
+    this.accessRevoked = false,
   });
 
   final String endpoint;
   final String churchCode;
-  final bool secretConfigured;
+  final bool credentialConfigured;
+
+  /// Papel deste celular na igreja: 'admin' (convida, revoga, gerencia tudo)
+  /// ou 'member'.
+  final String role;
   final bool busy;
   final DateTime? lastCheckedAt;
   final String? globalMessage;
@@ -157,8 +164,16 @@ class CloudSyncState {
   /// Por eventId (eventos locais e os que só existem na nuvem).
   final Map<String, CloudEventStatus> events;
 
+  /// Celulares da igreja (para "Quem recebe" e administração).
+  final List<CloudDeviceInfo> devices;
+
+  /// Este celular foi revogado no servidor (precisa de novo convite).
+  final bool accessRevoked;
+
   bool get configured =>
-      endpoint.isNotEmpty && churchCode.isNotEmpty && secretConfigured;
+      endpoint.isNotEmpty && churchCode.isNotEmpty && credentialConfigured;
+
+  bool get isAdmin => role == 'admin';
 
   CloudEventStatus? forEvent(String eventId) => events[eventId];
 
@@ -167,27 +182,34 @@ class CloudSyncState {
       .toList()
     ..sort((a, b) => (b.eventDateMs ?? 0).compareTo(a.eventDateMs ?? 0));
 
-  bool get anyAttention => events.values.any((e) => e.needsAttention);
+  bool get anyAttention =>
+      accessRevoked || events.values.any((e) => e.needsAttention);
 
   CloudSyncState copyWith({
     String? endpoint,
     String? churchCode,
-    bool? secretConfigured,
+    bool? credentialConfigured,
+    String? role,
     bool? busy,
     DateTime? lastCheckedAt,
     String? globalMessage,
     bool clearGlobalMessage = false,
     Map<String, CloudEventStatus>? events,
+    List<CloudDeviceInfo>? devices,
+    bool? accessRevoked,
   }) {
     return CloudSyncState(
       endpoint: endpoint ?? this.endpoint,
       churchCode: churchCode ?? this.churchCode,
-      secretConfigured: secretConfigured ?? this.secretConfigured,
+      credentialConfigured: credentialConfigured ?? this.credentialConfigured,
+      role: role ?? this.role,
       busy: busy ?? this.busy,
       lastCheckedAt: lastCheckedAt ?? this.lastCheckedAt,
       globalMessage:
           clearGlobalMessage ? null : (globalMessage ?? this.globalMessage),
       events: events ?? this.events,
+      devices: devices ?? this.devices,
+      accessRevoked: accessRevoked ?? this.accessRevoked,
     );
   }
 }
@@ -217,7 +239,13 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
 
   static const _kEndpoint = 'cloud.endpoint';
   static const _kChurchCode = 'cloud.churchCode';
-  static const _kSecret = 'cloud.secret';
+  static const _kDeviceToken = 'cloud.deviceToken';
+  static const _kRole = 'cloud.role';
+
+  /// Chave do modelo antigo (segredo único da igreja, v2). Se existir sem
+  /// deviceToken, a config é de uma versão anterior e precisa de novo
+  /// pareamento.
+  static const _kLegacySecret = 'cloud.secret';
 
   /// Espera após a última escrita antes do envio automático (RFC 6.5).
   static const uploadDebounce = Duration(minutes: 3);
@@ -237,10 +265,16 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
 
   void _loadPersisted() {
     final prefs = _ref.read(sharedPreferencesProvider);
+    final hasToken = (prefs.getString(_kDeviceToken) ?? '').isNotEmpty;
+    final hasLegacy = (prefs.getString(_kLegacySecret) ?? '').isNotEmpty;
     state = state.copyWith(
       endpoint: prefs.getString(_kEndpoint) ?? kDefaultCloudEndpoint,
       churchCode: prefs.getString(_kChurchCode) ?? '',
-      secretConfigured: (prefs.getString(_kSecret) ?? '').isNotEmpty,
+      credentialConfigured: hasToken,
+      role: prefs.getString(_kRole) ?? 'member',
+      globalMessage: !hasToken && hasLegacy
+          ? 'O modelo de acesso mudou (credencial por celular). Ative de novo ou peça um convite.'
+          : null,
     );
   }
 
@@ -249,7 +283,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     final config = CloudBackupConfig(
       endpoint: prefs.getString(_kEndpoint) ?? kDefaultCloudEndpoint,
       churchCode: prefs.getString(_kChurchCode) ?? '',
-      secret: prefs.getString(_kSecret) ?? '',
+      deviceId: DeviceIdentity.deviceId,
+      deviceToken: prefs.getString(_kDeviceToken) ?? '',
     );
     return config.isComplete ? config : null;
   }
@@ -259,9 +294,8 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     return config == null ? null : CloudBackupService(config);
   }
 
-  /// "Ativar backup na nuvem": gera código + segredo. O registro no servidor
-  /// acontece sozinho no primeiro request (claim-on-first-use); sem internet
-  /// agora, acontece no próximo gatilho.
+  /// "Ativar backup na nuvem" (1º celular): cria a igreja no servidor e este
+  /// celular vira o administrador, com credencial própria.
   Future<void> activate({String? endpointOverride}) async {
     final endpoint = (endpointOverride?.trim().isNotEmpty ?? false)
         ? endpointOverride!.trim()
@@ -271,38 +305,83 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
           'Informe o endereço do servidor (ou gere o app com CLOUD_SYNC_ENDPOINT).');
     }
     final rng = Random.secure();
-    String randomChars(String alphabet, int n) =>
-        List.generate(n, (_) => alphabet[rng.nextInt(alphabet.length)]).join();
-    final code = 'ig${randomChars('abcdefghijklmnopqrstuvwxyz0123456789', 10)}';
-    final secret = randomChars(
-        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 40);
-    await _saveConfig(
-        CloudBackupConfig(endpoint: endpoint, churchCode: code, secret: secret));
-    unawaited(refreshAll());
+    String randomCode() =>
+        'ig${List.generate(10, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[rng.nextInt(36)]).join()}';
+
+    // Colisão de código é improvável; ainda assim, tenta de novo num 409.
+    CloudBackupException? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final code = randomCode();
+      try {
+        final result = await CloudBackupService.register(
+          endpoint: endpoint,
+          churchCode: code,
+          deviceId: DeviceIdentity.deviceId,
+          deviceName: DeviceIdentity.deviceName,
+        );
+        await _saveCredential(
+          endpoint: endpoint,
+          churchCode: code,
+          deviceToken: result.deviceToken,
+          role: result.role,
+        );
+        unawaited(refreshAll());
+        return;
+      } on CloudBackupException catch (e) {
+        lastError = e;
+        if (!e.message.contains('já está em uso')) rethrow;
+      }
+    }
+    throw lastError ?? CloudBackupException('Não foi possível ativar.');
   }
 
-  /// Pareia este celular a partir do QR/texto de outro.
+  /// Pareia este celular trocando o convite (QR/texto) por credencial própria.
   Future<bool> pairWithToken(String token) async {
-    final config = CloudBackupConfig.fromPairingToken(token);
-    if (config == null) return false;
-    await _saveConfig(config);
+    final invite = CloudInviteToken.decode(token);
+    if (invite == null) return false;
+    final result = await CloudBackupService.join(
+      invite: invite,
+      deviceId: DeviceIdentity.deviceId,
+      deviceName: DeviceIdentity.deviceName,
+    );
+    await _saveCredential(
+      endpoint: invite.endpoint,
+      churchCode: invite.churchCode,
+      deviceToken: result.deviceToken,
+      role: result.role,
+    );
     unawaited(refreshAll());
     return true;
   }
 
-  /// Token exibido no QR de pareamento.
-  String? pairingToken() => currentConfig()?.toPairingToken();
+  /// Gera um convite de uso único para parear outro celular (admin).
+  Future<CloudInviteToken> createInvite() async {
+    final service = _service();
+    if (service == null) {
+      throw CloudBackupException('Backup na nuvem não configurado.');
+    }
+    return service.createInvite();
+  }
 
-  Future<void> _saveConfig(CloudBackupConfig config) async {
+  Future<void> _saveCredential({
+    required String endpoint,
+    required String churchCode,
+    required String deviceToken,
+    required String role,
+  }) async {
     final prefs = _ref.read(sharedPreferencesProvider);
-    await prefs.setString(_kEndpoint, config.endpoint);
-    await prefs.setString(_kChurchCode, config.churchCode);
-    await prefs.setString(_kSecret, config.secret);
+    await prefs.setString(_kEndpoint, endpoint);
+    await prefs.setString(_kChurchCode, churchCode);
+    await prefs.setString(_kDeviceToken, deviceToken);
+    await prefs.setString(_kRole, role);
+    await prefs.remove(_kLegacySecret);
     if (mounted) {
       state = state.copyWith(
-        endpoint: config.endpoint,
-        churchCode: config.churchCode,
-        secretConfigured: true,
+        endpoint: endpoint,
+        churchCode: churchCode,
+        credentialConfigured: true,
+        role: role,
+        accessRevoked: false,
         clearGlobalMessage: true,
       );
     }
@@ -428,6 +507,10 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     final db = _ref.read(appDatabaseProvider);
     try {
       final remoteList = await service.listEvents();
+      final devices = await service.listDevices();
+      if (mounted) {
+        state = state.copyWith(devices: devices, accessRevoked: false);
+      }
       final remoteById = {for (final m in remoteList) m.eventId: m};
       final localEvents = await db.select(db.events).get();
       final localById = {for (final e in localEvents) e.id: e};
@@ -461,6 +544,14 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
           lastCheckedAt: DateTime.now(),
         );
       }
+    } on CloudAccessDeniedException catch (e) {
+      developer.log('Acesso negado na nuvem: $e', name: 'CloudSync');
+      if (mounted) {
+        state = state.copyWith(
+          accessRevoked: true,
+          globalMessage: e.message,
+        );
+      }
     } catch (e) {
       developer.log('Erro na sincronização com a nuvem: $e', name: 'CloudSync');
       if (mounted) {
@@ -469,6 +560,74 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     } finally {
       _busy = false;
       if (mounted) state = state.copyWith(busy: false);
+    }
+  }
+
+  // ─── Compartilhamento e administração (RFC v3) ─────────────────────────
+
+  /// Define a lista de celulares que recebem um evento (dono ou admin).
+  Future<void> setEventSharedWith(
+      String eventId, List<String> sharedWith) async {
+    final service = _service();
+    final current = state.forEvent(eventId);
+    if (service == null || current == null) return;
+    try {
+      final manifest = await service.updateEventAcl(eventId, sharedWith);
+      _setEventStatus(
+        eventId,
+        current.copyWith(
+          remote: manifest,
+          message: sharedWith.isEmpty
+              ? 'Evento privado: backup só deste aparelho.'
+              : 'Compartilhado com ${sharedWith.length} celular(es).',
+        ),
+      );
+    } on CloudBackupException catch (e) {
+      _setEventStatus(
+        eventId,
+        current.copyWith(message: _friendlyError(e)),
+      );
+    }
+  }
+
+  /// Liga/desliga um celular na lista de um evento.
+  Future<void> toggleEventShare(
+      String eventId, String deviceId, bool enabled) async {
+    final current = state.forEvent(eventId)?.remote;
+    if (current == null) return;
+    final set = {...current.sharedWith};
+    if (enabled) {
+      set.add(deviceId);
+    } else {
+      set.remove(deviceId);
+    }
+    await setEventSharedWith(eventId, set.toList());
+  }
+
+  /// Revoga (ou reativa) um celular da igreja inteira (admin).
+  Future<void> setDeviceRevoked(String deviceId, bool revoked) async {
+    final service = _service();
+    if (service == null) return;
+    try {
+      await service.updateDevice(deviceId, revoked: revoked);
+      final devices = await service.listDevices();
+      if (mounted) state = state.copyWith(devices: devices);
+    } on CloudBackupException catch (e) {
+      if (mounted) state = state.copyWith(globalMessage: _friendlyError(e));
+    }
+  }
+
+  /// Promove/rebaixa um celular (admin). Promover um segundo administrador
+  /// cobre o caso do celular principal quebrar.
+  Future<void> setDeviceRole(String deviceId, String role) async {
+    final service = _service();
+    if (service == null) return;
+    try {
+      await service.updateDevice(deviceId, role: role);
+      final devices = await service.listDevices();
+      if (mounted) state = state.copyWith(devices: devices);
+    } on CloudBackupException catch (e) {
+      if (mounted) state = state.copyWith(globalMessage: _friendlyError(e));
     }
   }
 

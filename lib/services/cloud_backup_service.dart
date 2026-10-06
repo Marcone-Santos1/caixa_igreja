@@ -29,6 +29,8 @@ class CloudEventManifest {
     this.baseVersion,
     this.summary,
     this.history = const [],
+    this.ownerDeviceId,
+    this.sharedWith = const [],
   });
 
   final String eventId;
@@ -46,7 +48,13 @@ class CloudEventManifest {
   final Map<String, dynamic>? summary;
   final List<CloudEventManifest> history;
 
+  /// Dono do evento (quem o enviou primeiro) e lista de acesso (RFC v3).
+  final String? ownerDeviceId;
+  final List<String> sharedWith;
+
   bool get isEmpty => version <= 0;
+
+  bool isOwner(String deviceId) => ownerDeviceId == deviceId;
 
   int? get salesCount => (summary?['sales'] as num?)?.toInt();
 
@@ -65,6 +73,10 @@ class CloudEventManifest {
       eventDateMs: (json['eventDateMs'] as num?)?.toInt(),
       baseVersion: (json['baseVersion'] as num?)?.toInt(),
       summary: json['summary'] as Map<String, dynamic>?,
+      ownerDeviceId: json['ownerDeviceId'] as String?,
+      sharedWith: (json['sharedWith'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
       history: (json['history'] as List? ?? const [])
           .whereType<Map<String, dynamic>>()
           .map(CloudEventManifest.fromJson)
@@ -91,35 +103,68 @@ class CloudBackupException implements Exception {
   String toString() => message;
 }
 
-/// Configuração de acesso (gerada pelo app ao ativar; compartilhada por QR).
-class CloudBackupConfig {
-  const CloudBackupConfig({
+/// 401/403 do servidor: credencial inválida ou celular revogado/sem acesso.
+class CloudAccessDeniedException extends CloudBackupException {
+  CloudAccessDeniedException(super.message);
+}
+
+/// Celular registrado na igreja (lista de "conectados").
+class CloudDeviceInfo {
+  const CloudDeviceInfo({
+    required this.deviceId,
+    required this.name,
+    required this.role,
+    this.joinedAt,
+    this.revoked = false,
+  });
+
+  final String deviceId;
+  final String name;
+  final String role;
+  final DateTime? joinedAt;
+  final bool revoked;
+
+  bool get isAdmin => role == 'admin';
+
+  factory CloudDeviceInfo.fromJson(Map<String, dynamic> json) {
+    return CloudDeviceInfo(
+      deviceId: json['deviceId'] as String? ?? '',
+      name: json['name'] as String? ?? 'Celular',
+      role: json['role'] as String? ?? 'member',
+      joinedAt: DateTime.tryParse(json['joinedAt'] as String? ?? ''),
+      revoked: json['revoked'] == true,
+    );
+  }
+}
+
+/// Convite de pareamento (RFC v3): o QR carrega um convite de uso único que o
+/// Worker troca por uma credencial própria do celular — nunca um segredo
+/// compartilhado.
+class CloudInviteToken {
+  const CloudInviteToken({
     required this.endpoint,
     required this.churchCode,
-    required this.secret,
+    required this.inviteId,
+    required this.inviteSecret,
   });
 
   final String endpoint;
   final String churchCode;
-  final String secret;
+  final String inviteId;
+  final String inviteSecret;
 
-  bool get isComplete =>
-      endpoint.trim().isNotEmpty &&
-      churchCode.trim().isNotEmpty &&
-      secret.trim().isNotEmpty;
-
-  /// Token de pareamento (vai no QR e pode ser colado como texto).
-  String toPairingToken() {
+  String encode() {
     final payload = jsonEncode({
-      'v': 1,
+      'v': 3,
       'e': endpoint.trim(),
       'c': churchCode.trim(),
-      's': secret.trim(),
+      'i': inviteId,
+      's': inviteSecret,
     });
     return '$kCloudTokenPrefix${base64Url.encode(utf8.encode(payload))}';
   }
 
-  static CloudBackupConfig? fromPairingToken(String token) {
+  static CloudInviteToken? decode(String token) {
     try {
       var clean = token.trim();
       if (clean.startsWith(kCloudTokenPrefix)) {
@@ -127,16 +172,46 @@ class CloudBackupConfig {
       }
       final map =
           jsonDecode(utf8.decode(base64Url.decode(clean))) as Map<String, dynamic>;
-      final config = CloudBackupConfig(
+      if ((map['v'] as num?)?.toInt() != 3) return null;
+      final invite = CloudInviteToken(
         endpoint: map['e'] as String? ?? '',
         churchCode: map['c'] as String? ?? '',
-        secret: map['s'] as String? ?? '',
+        inviteId: map['i'] as String? ?? '',
+        inviteSecret: map['s'] as String? ?? '',
       );
-      return config.isComplete ? config : null;
+      if (invite.endpoint.isEmpty ||
+          invite.churchCode.isEmpty ||
+          invite.inviteId.isEmpty ||
+          invite.inviteSecret.isEmpty) {
+        return null;
+      }
+      return invite;
     } catch (_) {
       return null;
     }
   }
+}
+
+/// Configuração de acesso deste celular: credencial própria (deviceToken),
+/// obtida no registro (1º celular) ou na troca de um convite.
+class CloudBackupConfig {
+  const CloudBackupConfig({
+    required this.endpoint,
+    required this.churchCode,
+    required this.deviceId,
+    required this.deviceToken,
+  });
+
+  final String endpoint;
+  final String churchCode;
+  final String deviceId;
+  final String deviceToken;
+
+  bool get isComplete =>
+      endpoint.trim().isNotEmpty &&
+      churchCode.trim().isNotEmpty &&
+      deviceId.trim().isNotEmpty &&
+      deviceToken.trim().isNotEmpty;
 
   Uri _uri(String path) {
     var base = endpoint.trim();
@@ -164,7 +239,8 @@ class CloudBackupService {
         .openUrl(method, config._uri(path))
         .timeout(timeout ?? _timeout);
     request.headers.set('x-church-code', config.churchCode.trim());
-    request.headers.set('x-church-secret', config.secret.trim());
+    request.headers.set('x-device-id', config.deviceId.trim());
+    request.headers.set('x-device-token', config.deviceToken.trim());
     return request;
   }
 
@@ -176,11 +252,132 @@ class CloudBackupService {
     } catch (_) {
       message = 'Erro HTTP $status';
     }
+    if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
+      throw CloudAccessDeniedException(message);
+    }
     throw CloudBackupException(message);
   }
 
-  /// Também serve de "registro": o primeiro request de um código novo
-  /// reivindica o espaço da igreja no servidor.
+  Future<Map<String, dynamic>> _json(HttpClientRequest request,
+      {Duration? timeout}) async {
+    final response = await request.close().timeout(timeout ?? _timeout);
+    final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode != HttpStatus.ok) _fail(response.statusCode, body);
+    return jsonDecode(body) as Map<String, dynamic>;
+  }
+
+  /// Registra a igreja + este celular como administrador (1º celular).
+  /// Retorna o deviceToken. Estático: ainda não há config completa.
+  static Future<({String deviceToken, String role})> register({
+    required String endpoint,
+    required String churchCode,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    final bootstrap = CloudBackupConfig(
+      endpoint: endpoint,
+      churchCode: churchCode,
+      deviceId: deviceId,
+      deviceToken: '-',
+    );
+    return _bootstrapCall(bootstrap, '/v1/register', {'deviceName': deviceName});
+  }
+
+  /// Troca um convite pela credencial deste celular.
+  static Future<({String deviceToken, String role})> join({
+    required CloudInviteToken invite,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    final bootstrap = CloudBackupConfig(
+      endpoint: invite.endpoint,
+      churchCode: invite.churchCode,
+      deviceId: deviceId,
+      deviceToken: '-',
+    );
+    return _bootstrapCall(bootstrap, '/v1/join', {
+      'inviteId': invite.inviteId,
+      'inviteSecret': invite.inviteSecret,
+      'deviceName': deviceName,
+    });
+  }
+
+  static Future<({String deviceToken, String role})> _bootstrapCall(
+      CloudBackupConfig config, String path, Map<String, dynamic> body) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 10);
+    final request =
+        await client.openUrl('POST', config._uri(path)).timeout(_timeout);
+    request.headers.contentType = ContentType.json;
+    request.headers.set('x-church-code', config.churchCode.trim());
+    request.headers.set('x-device-id', config.deviceId.trim());
+    request.write(jsonEncode(body));
+    final response = await request.close().timeout(_timeout);
+    final responseBody = await utf8.decoder.bind(response).join();
+    if (response.statusCode != HttpStatus.ok) {
+      String message;
+      try {
+        message = (jsonDecode(responseBody) as Map<String, dynamic>)['error']
+                as String? ??
+            'Erro HTTP ${response.statusCode}';
+      } catch (_) {
+        message = 'Erro HTTP ${response.statusCode}';
+      }
+      throw CloudBackupException(message);
+    }
+    final data = jsonDecode(responseBody) as Map<String, dynamic>;
+    return (
+      deviceToken: data['deviceToken'] as String? ?? '',
+      role: data['role'] as String? ?? 'member',
+    );
+  }
+
+  /// Cria um convite de pareamento (apenas celulares administradores).
+  Future<CloudInviteToken> createInvite() async {
+    final request = await _request('POST', '/v1/invites');
+    request.headers.contentType = ContentType.json;
+    request.write('{}');
+    final data = await _json(request);
+    return CloudInviteToken(
+      endpoint: config.endpoint,
+      churchCode: config.churchCode,
+      inviteId: data['inviteId'] as String? ?? '',
+      inviteSecret: data['inviteSecret'] as String? ?? '',
+    );
+  }
+
+  /// Lista os celulares da igreja (para "Quem recebe" e administração).
+  Future<List<CloudDeviceInfo>> listDevices() async {
+    final data = await _json(await _request('GET', '/v1/devices'));
+    return (data['devices'] as List? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(CloudDeviceInfo.fromJson)
+        .toList();
+  }
+
+  /// Revoga/reativa ou muda o papel de um celular (apenas administradores).
+  Future<void> updateDevice(String deviceId,
+      {bool? revoked, String? role}) async {
+    final request = await _request('PUT', '/v1/devices/$deviceId');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({
+      'revoked': ?revoked,
+      'role': ?role,
+    }));
+    await _json(request);
+  }
+
+  /// Atualiza a lista de acesso de um evento (dono ou administrador).
+  Future<CloudEventManifest> updateEventAcl(
+      String eventId, List<String> sharedWith) async {
+    final request = await _request('PUT', '/v1/events/$eventId/acl');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'sharedWith': sharedWith}));
+    final data = await _json(request);
+    return CloudEventManifest.fromJson(
+        data['manifest'] as Map<String, dynamic>);
+  }
+
   Future<List<CloudEventManifest>> listEvents() async {
     final request = await _request('GET', '/v1/events');
     final response = await request.close().timeout(_timeout);

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../data/device_identity.dart';
 import '../../providers/cloud_sync_provider.dart';
 
 /// Painel da nuvem de UM evento (aberto pelo ☁️ no hub do evento):
@@ -193,6 +194,14 @@ class _EventCloudSheet extends ConsumerWidget {
           const SizedBox(height: 12),
         ],
 
+        // ─── Quem recebe (RFC v3) ───────────────────────────────────────
+        if (isLocal && !paused && remote != null && !remote.isEmpty)
+          _SharingSection(
+            eventId: eventId,
+            state: state,
+            controller: controller,
+          ),
+
         if (applied != null)
           Card(
             child: ListTile(
@@ -298,4 +307,102 @@ class _EventCloudSheet extends ConsumerWidget {
       _ => scheme.onSurfaceVariant,
     };
   }
+}
+
+/// "Quem recebe": lista de celulares da igreja com interruptor por evento.
+/// Dono e administradores gerenciam; os demais veem o estado.
+class _SharingSection extends StatelessWidget {
+  const _SharingSection({
+    required this.eventId,
+    required this.state,
+    required this.controller,
+  });
+
+  final String eventId;
+  final CloudSyncState state;
+  final CloudSyncController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = state.forEvent(eventId);
+    final remote = status?.remote;
+    if (remote == null) return const SizedBox.shrink();
+
+    final canManage =
+        remote.isOwner(DeviceIdentity.deviceId) || state.isAdmin;
+    final others = state.devices
+        .where((d) => !d.revoked && d.deviceId != remote.ownerDeviceId)
+        .toList();
+    final ownerName = state.devices
+        .where((d) => d.deviceId == remote.ownerDeviceId)
+        .map((d) => d.name)
+        .firstOrNull;
+    final sharedCount = remote.sharedWith.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(
+              sharedCount == 0 ? Icons.lock_outline : Icons.group_outlined,
+              size: 18,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Text('Quem recebe este evento',
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          sharedCount == 0
+              ? 'Privado: backup na nuvem só deste evento para '
+                  '${ownerName ?? 'o dono'}. Ligue os celulares que devem receber.'
+              : 'Dono: ${ownerName ?? '?'}. Celulares desligados param de '
+                  'receber novas versões (o que já baixaram permanece lá).',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
+        if (others.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Nenhum outro celular na igreja ainda. Convide em '
+              'Ajustes → Backup na nuvem.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        for (final d in others)
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(
+              '${d.name}${d.deviceId == DeviceIdentity.deviceId ? ' (este)' : ''}',
+            ),
+            value: remote.sharedWith.contains(d.deviceId),
+            onChanged: canManage && !state.busy
+                ? (v) => controller.toggleEventShare(eventId, d.deviceId, v)
+                : null,
+          ),
+        if (!canManage)
+          Text(
+            'Só o dono do evento ou um administrador altera esta lista.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+}
+
+extension<T> on Iterable<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }

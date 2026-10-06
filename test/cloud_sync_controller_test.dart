@@ -48,6 +48,8 @@ class _FakeWorker {
       'eventDateMs': dateMs ?? 0,
       'baseVersion': version - 1,
       'summary': null,
+      'ownerDeviceId': 'outro-device',
+      'sharedWith': ['local'],
       'history': const [],
     };
   }
@@ -61,7 +63,43 @@ class _FakeWorker {
     }
 
     try {
-      if (req.method == 'GET' && path == '/v1/events') {
+      if (req.method == 'GET' && path == '/v1/devices') {
+        json({
+          'devices': [
+            {
+              'deviceId': 'local',
+              'name': 'Este aparelho',
+              'role': 'admin',
+              'joinedAt': DateTime.now().toUtc().toIso8601String(),
+              'revoked': false,
+            },
+            {
+              'deviceId': 'outro-device',
+              'name': 'Celular do Diogo',
+              'role': 'member',
+              'joinedAt': DateTime.now().toUtc().toIso8601String(),
+              'revoked': false,
+            },
+          ],
+        });
+      } else if (req.method == 'PUT' &&
+          RegExp(r'^/v1/events/[^/]+/acl$').hasMatch(path)) {
+        final id = path.split('/')[3];
+        final manifest = manifests[id];
+        if (manifest == null) {
+          json({'error': 'Evento não encontrado'}, 404);
+        } else {
+          final builder = BytesBuilder(copy: false);
+          await for (final chunk in req) {
+            builder.add(chunk);
+          }
+          final body =
+              jsonDecode(utf8.decode(builder.takeBytes())) as Map<String, dynamic>;
+          manifest['sharedWith'] =
+              (body['sharedWith'] as List).map((e) => e.toString()).toList();
+          json({'ok': true, 'manifest': manifest});
+        }
+      } else if (req.method == 'GET' && path == '/v1/events') {
         json({'events': manifests.values.toList()});
       } else if (req.method == 'GET' &&
           RegExp(r'^/v1/events/[^/]+/manifest$').hasMatch(path)) {
@@ -96,7 +134,11 @@ class _FakeWorker {
           final gz = builder.takeBytes();
           final version = current + 1;
           snapshots.putIfAbsent(id, () => {})[version] = gz;
+          final previous = manifests[id];
           manifests[id] = {
+            'ownerDeviceId': previous?['ownerDeviceId'] ??
+                (req.headers.value('x-device-id') ?? 'local'),
+            'sharedWith': previous?['sharedWith'] ?? <String>[],
             'eventId': id,
             'version': version,
             'sha256': sha256.convert(gz).toString(),
@@ -156,7 +198,8 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'cloud.endpoint': worker.url,
       'cloud.churchCode': 'igtest',
-      'cloud.secret': 'segredo-de-teste',
+      'cloud.deviceToken': 'token-de-teste',
+      'cloud.role': 'admin',
     });
     final prefs = await SharedPreferences.getInstance();
     container = ProviderContainer(overrides: [
@@ -359,6 +402,40 @@ void main() {
     status = container.read(cloudSyncControllerProvider).forEvent(eventId);
     expect(status!.phase, CloudEventPhase.upToDate);
     expect(worker.manifests[eventId]!['version'], 1);
+  });
+
+  test('evento novo nasce privado; compartilhar amplia a lista de acesso',
+      () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    final eventId = db.generateUuid();
+    await db.into(db.events).insert(
+          EventsCompanion.insert(
+            id: eventId,
+            title: 'Festa do Padroeiro',
+            dateEpochMs: 123,
+          ),
+        );
+    await controller.refreshAll(allowApply: false);
+
+    // Subiu automaticamente (backup), mas PRIVADO: lista de acesso vazia.
+    expect(worker.manifests[eventId]!['version'], 1);
+    expect(worker.manifests[eventId]!['sharedWith'], isEmpty);
+    expect(worker.manifests[eventId]!['ownerDeviceId'], 'local');
+
+    // Compartilhar = ligar o celular do Diogo na lista.
+    await controller.toggleEventShare(eventId, 'outro-device', true);
+    expect(worker.manifests[eventId]!['sharedWith'], ['outro-device']);
+    var status = container.read(cloudSyncControllerProvider).forEvent(eventId);
+    expect(status!.remote!.sharedWith, ['outro-device']);
+
+    // Desligar remove da lista.
+    await controller.toggleEventShare(eventId, 'outro-device', false);
+    expect(worker.manifests[eventId]!['sharedWith'], isEmpty);
   });
 
   test('download não sobrescreve evento local com alterações pendentes',
