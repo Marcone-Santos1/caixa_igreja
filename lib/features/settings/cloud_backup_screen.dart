@@ -435,7 +435,7 @@ class _EventsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final events = state.events.values.toList()
+    final events = state.visibleEvents
       ..sort((a, b) => (b.eventDateMs ?? 0).compareTo(a.eventDateMs ?? 0));
     return Card(
       child: Padding(
@@ -463,7 +463,8 @@ class _EventsCard extends StatelessWidget {
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                   leading: Icon(icon, color: color),
-                  title: Text(s.title),
+                  title: Text(
+                      s.locallyDeleted ? '${s.title} (excluído)' : s.title),
                   subtitle: Text(_subtitle(s)),
                   onTap: () => showEventCloudSheet(context, s.eventId),
                 );

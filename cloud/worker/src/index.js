@@ -395,6 +395,7 @@ async function handleUpload(request, env, code, eventId, url, current, device) {
     deviceName: device.name,
     eventTitle: request.headers.get('x-event-title') ?? '',
     eventDateMs: parseInt(request.headers.get('x-event-date-ms') ?? '0', 10),
+    eventDeleted: request.headers.get('x-event-deleted') === 'true',
     baseVersion: currentVersion,
     summary,
   };

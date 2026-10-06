@@ -155,6 +155,8 @@ class _FakeWorker {
             'eventTitle': req.headers.value('x-event-title') ?? '',
             'eventDateMs':
                 int.parse(req.headers.value('x-event-date-ms') ?? '0'),
+            'eventDeleted':
+                req.headers.value('x-event-deleted') == 'true',
             'baseVersion': current,
             'summary': null,
             'history': const [],
@@ -439,6 +441,58 @@ void main() {
     // Desligar remove da lista.
     await controller.toggleEventShare(eventId, 'outro-device', false);
     expect(worker.manifests[eventId]!['sharedWith'], isEmpty);
+  });
+
+  test('evento excluído que a nuvem nunca viu não sobe nem aparece',
+      () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    // Evento local criado e EXCLUÍDO antes de qualquer sync (o caso dos
+    // dados de teste apagados "ressuscitando" ao ativar uma igreja nova).
+    final eventId = db.generateUuid();
+    await db.into(db.events).insert(EventsCompanion.insert(
+        id: eventId, title: 'Evento de teste apagado', dateEpochMs: 1));
+    await db.deleteEventCascade(eventId);
+
+    await controller.refreshAll(allowApply: false);
+    expect(worker.manifests.containsKey(eventId), isFalse,
+        reason: 'tombstone sem histórico na nuvem não vira backup');
+    expect(container.read(cloudSyncControllerProvider).forEvent(eventId),
+        isNull, reason: 'nem aparece nas listas');
+  });
+
+  test('excluir evento JÁ sincronizado propaga o tombstone e some das listas',
+      () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    final eventId = db.generateUuid();
+    await db.into(db.events).insert(EventsCompanion.insert(
+        id: eventId, title: 'Quermesse', dateEpochMs: 2));
+    await controller.refreshAll(allowApply: false);
+    expect(worker.manifests[eventId]!['version'], 1);
+    expect(worker.manifests[eventId]!['eventDeleted'], isFalse);
+
+    await db.deleteEventCascade(eventId);
+    await controller.refreshAll(allowApply: false);
+    // A exclusão SOBE (v2 com a marca) para os outros celulares receberem…
+    expect(worker.manifests[eventId]!['version'], 2);
+    expect(worker.manifests[eventId]!['eventDeleted'], isTrue);
+    // …mas sai das listas e do banner deste aparelho.
+    final state = container.read(cloudSyncControllerProvider);
+    final status = state.forEvent(eventId);
+    expect(status, isNotNull);
+    expect(status!.hiddenFromLists, isTrue);
+    expect(state.visibleEvents.map((e) => e.eventId),
+        isNot(contains(eventId)));
+    expect(state.cloudOnlyEvents, isEmpty);
   });
 
   test('banner da home: só compartilhados comigo e não dispensados',

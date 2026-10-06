@@ -93,6 +93,7 @@ class CloudEventStatus {
     this.dirty = false,
     this.message,
     this.lastApplied,
+    this.locallyDeleted = false,
   });
 
   final String eventId;
@@ -105,6 +106,14 @@ class CloudEventStatus {
   final bool dirty;
   final String? message;
   final AppliedCloudUpdate? lastApplied;
+
+  /// O evento está excluído (tombstone) neste aparelho.
+  final bool locallyDeleted;
+
+  /// Excluído (aqui ou na nuvem) e sem nada exigindo atenção: some das
+  /// listas — a sincronização do tombstone continua por baixo dos panos.
+  bool get hiddenFromLists =>
+      (locallyDeleted || (remote?.eventDeleted ?? false)) && !needsAttention;
 
   bool get needsAttention =>
       phase == CloudEventPhase.divergence ||
@@ -142,6 +151,7 @@ class CloudEventStatus {
       message: message ?? this.message,
       lastApplied:
           clearLastApplied ? null : (lastApplied ?? this.lastApplied),
+      locallyDeleted: locallyDeleted,
     );
   }
 }
@@ -192,8 +202,14 @@ class CloudSyncState {
 
   CloudEventStatus? forEvent(String eventId) => events[eventId];
 
+  /// Eventos para as LISTAS (tela da nuvem): sem os excluídos já em paz.
+  List<CloudEventStatus> get visibleEvents =>
+      events.values.where((e) => !e.hiddenFromLists).toList();
+
   List<CloudEventStatus> get cloudOnlyEvents => events.values
-      .where((e) => e.phase == CloudEventPhase.cloudOnly)
+      .where((e) =>
+          e.phase == CloudEventPhase.cloudOnly &&
+          !(e.remote?.eventDeleted ?? false))
       .toList()
     ..sort((a, b) => (b.eventDateMs ?? 0).compareTo(a.eventDateMs ?? 0));
 
@@ -587,7 +603,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
 
       final statuses = Map<String, CloudEventStatus>.from(state.events);
       for (final id in ids) {
-        statuses[id] = await _evaluateEvent(
+        final st = await _evaluateEvent(
           service,
           db,
           eventId: id,
@@ -597,6 +613,11 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
           hadWrites: hadWrites,
           previous: state.forEvent(id),
         );
+        if (st == null) {
+          statuses.remove(id);
+        } else {
+          statuses[id] = st;
+        }
         if (!mounted) return;
         state = state.copyWith(events: Map.of(statuses));
       }
@@ -715,7 +736,9 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     }
   }
 
-  Future<CloudEventStatus> _evaluateEvent(
+  /// Retorna null quando o evento não deve nem aparecer nem sincronizar
+  /// (tombstone local que a nuvem nunca conheceu: nada a propagar).
+  Future<CloudEventStatus?> _evaluateEvent(
     CloudBackupService service,
     AppDatabase db, {
     required String eventId,
@@ -729,6 +752,14 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     final dateMs = local?.dateEpochMs ?? remote?.eventDateMs;
     final storedV = _storedVersion(eventId);
     final applied = _lastApplied[eventId];
+    final locallyDeleted = local?.deletedAtMs != null;
+
+    // Tombstone local de um evento que a nuvem nunca viu: não há exclusão a
+    // propagar — não sobe, não aparece (era o caso dos eventos de teste
+    // excluídos "ressuscitando" na ativação de uma igreja nova).
+    if (locallyDeleted && (remote == null || remote.isEmpty)) {
+      return null;
+    }
 
     CloudEventStatus status(CloudEventPhase phase,
         {bool dirty = false, String? message}) {
@@ -743,6 +774,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
         phase: phase,
         message: message,
         lastApplied: applied,
+        locallyDeleted: locallyDeleted,
       );
     }
 
@@ -849,6 +881,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
         deviceName: DeviceIdentity.deviceName,
         eventTitle: event.title,
         eventDateMs: event.dateEpochMs,
+        eventDeleted: event.deletedAtMs != null,
         summary: {
           'sales': liveSales.length,
           if (lastSaleAt != null)

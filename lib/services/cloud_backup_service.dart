@@ -26,6 +26,7 @@ class CloudEventManifest {
     this.deviceName,
     this.eventTitle,
     this.eventDateMs,
+    this.eventDeleted = false,
     this.baseVersion,
     this.summary,
     this.history = const [],
@@ -44,6 +45,10 @@ class CloudEventManifest {
   final String? deviceName;
   final String? eventTitle;
   final int? eventDateMs;
+
+  /// O evento está EXCLUÍDO (tombstone sincronizado). Não deve virar card de
+  /// baixar nem aparecer nas listas normais.
+  final bool eventDeleted;
   final int? baseVersion;
   final Map<String, dynamic>? summary;
   final List<CloudEventManifest> history;
@@ -71,6 +76,7 @@ class CloudEventManifest {
       deviceName: json['deviceName'] as String?,
       eventTitle: json['eventTitle'] as String?,
       eventDateMs: (json['eventDateMs'] as num?)?.toInt(),
+      eventDeleted: json['eventDeleted'] == true,
       baseVersion: (json['baseVersion'] as num?)?.toInt(),
       summary: json['summary'] as Map<String, dynamic>?,
       ownerDeviceId: json['ownerDeviceId'] as String?,
@@ -436,6 +442,7 @@ class CloudBackupService {
     required String deviceName,
     String? eventTitle,
     int? eventDateMs,
+    bool eventDeleted = false,
     Map<String, dynamic>? summary,
   }) async {
     final digest = sha256.convert(gzipBytes).toString();
@@ -456,6 +463,7 @@ class CloudBackupService {
     if (eventDateMs != null) {
       request.headers.set('x-event-date-ms', '$eventDateMs');
     }
+    request.headers.set('x-event-deleted', '$eventDeleted');
     if (summary != null) {
       request.headers.set('x-summary', jsonEncode(summary));
     }
