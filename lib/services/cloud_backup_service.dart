@@ -484,3 +484,86 @@ class CloudBackupService {
     );
   }
 }
+
+/// Manifest da versão mais nova do app publicada na nuvem
+/// (`cloud/publish_app.sh`).
+class AppUpdateManifest {
+  const AppUpdateManifest({
+    required this.versionCode,
+    required this.versionName,
+    this.sha256,
+    this.sizeBytes,
+    this.notes,
+    this.uploadedAt,
+  });
+
+  final int versionCode;
+  final String versionName;
+  final String? sha256;
+  final int? sizeBytes;
+  final String? notes;
+  final DateTime? uploadedAt;
+
+  bool get isEmpty => versionCode <= 0;
+
+  factory AppUpdateManifest.fromJson(Map<String, dynamic> json) {
+    return AppUpdateManifest(
+      versionCode: (json['versionCode'] as num?)?.toInt() ?? 0,
+      versionName: json['versionName'] as String? ?? '',
+      sha256: json['sha256'] as String?,
+      sizeBytes: (json['sizeBytes'] as num?)?.toInt(),
+      notes: json['notes'] as String?,
+      uploadedAt: DateTime.tryParse(json['uploadedAt'] as String? ?? ''),
+    );
+  }
+}
+
+/// Atualização do app via nuvem (extensão do cliente do Worker).
+extension AppUpdateApi on CloudBackupService {
+  Future<AppUpdateManifest> getAppLatest() async {
+    final request = await _request('GET', '/v1/app/latest');
+    final response = await request.close().timeout(CloudBackupService._timeout);
+    final body = await utf8.decoder.bind(response).join();
+    if (response.statusCode != HttpStatus.ok) _fail(response.statusCode, body);
+    return AppUpdateManifest.fromJson(jsonDecode(body) as Map<String, dynamic>);
+  }
+
+  /// Baixa o APK para [target], com progresso e conferência de sha256.
+  Future<void> downloadApk(
+    int versionCode,
+    File target, {
+    String? expectedSha256,
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final request = await _request('GET', '/v1/app/apk/$versionCode',
+        timeout: const Duration(minutes: 10));
+    final response =
+        await request.close().timeout(const Duration(minutes: 10));
+    if (response.statusCode != HttpStatus.ok) {
+      final body = await utf8.decoder.bind(response).join();
+      _fail(response.statusCode, body);
+    }
+    final total = response.contentLength;
+    if (await target.exists()) await target.delete();
+    final sink = target.openWrite();
+    var received = 0;
+    try {
+      await for (final chunk in response) {
+        sink.add(chunk);
+        received += chunk.length;
+        onProgress?.call(received, total);
+      }
+    } finally {
+      await sink.close();
+    }
+    if (expectedSha256 != null && expectedSha256.isNotEmpty) {
+      final digest =
+          (await sha256.bind(target.openRead()).first).toString();
+      if (digest != expectedSha256.toLowerCase()) {
+        await target.delete();
+        throw CloudBackupException(
+            'Download corrompido (sha256 não confere). Tente novamente.');
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
 import '../../data/database.dart';
 import '../../data/database_seeder.dart';
+import '../../providers/app_update_provider.dart';
 import '../../providers/cloud_sync_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
@@ -183,7 +184,9 @@ class EventsListScreen extends ConsumerWidget {
           if (list.isEmpty) {
             return Column(
               children: [
-                const _CloudEventsBanner(),
+                const _AppUpdateBanner(),
+                const _AppUpdateBanner(),
+              const _CloudEventsBanner(),
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
@@ -434,6 +437,81 @@ class _CloudEventsBanner extends ConsumerWidget {
                 TextButton(
                   onPressed: () => context.push('/settings/cloud'),
                   child: Text('Ver todos (${cloudOnly.length})'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Banner "atualização do app disponível" (atualizador via nossa nuvem).
+class _AppUpdateBanner extends ConsumerWidget {
+  const _AppUpdateBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final update = ref.watch(appUpdateControllerProvider);
+    if (!update.updateAvailable || update.manifest == null) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final m = update.manifest!;
+    final downloading = update.phase == AppUpdatePhase.downloading;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Card(
+        elevation: 0,
+        color: CaixaAppTheme.warmGold.withValues(alpha: 0.15),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.system_update,
+                      size: 20, color: CaixaAppTheme.warmGold),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Atualização ${m.versionName} disponível',
+                      style: theme.textTheme.labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  if (downloading)
+                    Text('${(update.progress * 100).round()}%',
+                        style: theme.textTheme.labelLarge)
+                  else
+                    FilledButton.tonal(
+                      onPressed: () => ref
+                          .read(appUpdateControllerProvider.notifier)
+                          .downloadAndInstall(),
+                      child: const Text('Instalar'),
+                    ),
+                ],
+              ),
+              if ((m.notes ?? '').isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(m.notes!,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                ),
+              if (downloading)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: LinearProgressIndicator(value: update.progress),
+                ),
+              if (update.message != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(update.message!,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.error)),
                 ),
             ],
           ),

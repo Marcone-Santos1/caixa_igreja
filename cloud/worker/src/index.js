@@ -62,6 +62,25 @@ export default {
       if (!auth.ok) return json({ error: auth.error }, auth.status);
       const { code, device } = auth;
 
+      // ─── Distribuição do app (atualizador embutido) ───────────────────
+      // Os arquivos ficam em `_app/` (prefixo impossível como código de
+      // igreja) e são publicados pelo desenvolvedor via cloud/publish_app.sh.
+      if (request.method === 'GET' && path === '/v1/app/latest') {
+        const manifest = await readJson(env, '_app/latest.json');
+        return json(manifest ?? { versionCode: 0 });
+      }
+      const apkMatch = path.match(/^\/v1\/app\/apk\/(\d{1,10})$/);
+      if (request.method === 'GET' && apkMatch) {
+        const obj = await env.BUCKET.get(`_app/cantina-${apkMatch[1]}.apk`);
+        if (!obj) return json({ error: 'APK não encontrado' }, 404);
+        return new Response(obj.body, {
+          headers: {
+            'content-type': 'application/vnd.android.package-archive',
+            'content-length': String(obj.size),
+          },
+        });
+      }
+
       if (request.method === 'GET' && path === '/v1/events') {
         return json({ events: await listAccessibleEvents(env, code, device) });
       }

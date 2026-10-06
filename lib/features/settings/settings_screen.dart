@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/app_theme.dart';
 import '../../data/database_backup.dart';
 import '../../data/database_seeder.dart';
+import '../../providers/app_update_provider.dart';
 import '../../providers/database_provider.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -64,6 +65,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: const Text('Passagem de caixa entre celulares'),
                   onTap: () => context.push('/settings/cloud'),
                 ),
+                const Divider(height: 1),
+                const _AppUpdateTile(),
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.print_outlined),
@@ -383,3 +386,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
+
+
+/// Tile "Atualização do app": versão instalada + verificação manual.
+class _AppUpdateTile extends ConsumerWidget {
+  const _AppUpdateTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final update = ref.watch(appUpdateControllerProvider);
+    final controller = ref.read(appUpdateControllerProvider.notifier);
+    final subtitle = switch (update.phase) {
+      AppUpdatePhase.checking => 'Verificando…',
+      AppUpdatePhase.available ||
+      AppUpdatePhase.downloading =>
+        'Versão ${update.manifest?.versionName ?? ''} disponível!',
+      _ => update.installedVersionName.isNotEmpty
+          ? 'Versão instalada: ${update.installedVersionName}'
+              '${update.message != null ? ' · ${update.message}' : ''}'
+          : (update.message ?? 'Buscar nova versão na nuvem'),
+    };
+    return ListTile(
+      leading: Icon(
+        Icons.system_update,
+        color: update.updateAvailable
+            ? Theme.of(context).colorScheme.error
+            : null,
+      ),
+      title: const Text('Atualização do app'),
+      subtitle: Text(subtitle),
+      trailing: update.updateAvailable
+          ? FilledButton.tonal(
+              onPressed: update.phase == AppUpdatePhase.downloading
+                  ? null
+                  : controller.downloadAndInstall,
+              child: Text(update.phase == AppUpdatePhase.downloading
+                  ? '${(update.progress * 100).round()}%'
+                  : 'Instalar'),
+            )
+          : TextButton(
+              onPressed: update.phase == AppUpdatePhase.checking
+                  ? null
+                  : () => controller.checkNow(),
+              child: const Text('Verificar'),
+            ),
+    );
+  }
+}
