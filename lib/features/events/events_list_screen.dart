@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../app/app_theme.dart';
 import '../../app/ui_kit.dart';
+import '../../utils/date_time_utils.dart';
 import '../../data/database.dart';
 import '../../data/database_seeder.dart';
 import '../../providers/app_update_provider.dart';
@@ -283,6 +284,12 @@ class EventsListScreen extends ConsumerWidget {
                             ),
                             const Spacer(),
                             IconButton(
+                              tooltip: 'Duplicar evento',
+                              icon: const Icon(Icons.copy_outlined, size: 18),
+                              onPressed: () =>
+                                  _showDuplicateDialog(context, ref, e),
+                            ),
+                            IconButton(
                               tooltip: 'Editar evento',
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               onPressed: () async {
@@ -370,6 +377,98 @@ class EventsListScreen extends ConsumerWidget {
         child: const Icon(Icons.add_rounded),
       ),
     );
+  }
+}
+
+/// Diálogo de duplicação: novo título/data + copiar estoques.
+Future<void> _showDuplicateDialog(
+    BuildContext context, WidgetRef ref, ChurchEvent source) async {
+  final titleCtrl = TextEditingController(text: source.title);
+  var date = DateTime.now();
+  var copyStock = true;
+
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        title: const Text('Duplicar evento'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Copia produtos, combos, fichas e a configuração de PIX de '
+              '"${source.title}". Vendas e sessões não vão junto.',
+              style: Theme.of(ctx).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: titleCtrl,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Título do novo evento'),
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              leading: const Icon(Icons.event),
+              title: Text(DateFormat('dd/MM/yyyy').format(date)),
+              trailing: const Icon(Icons.edit_calendar_outlined, size: 18),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: ctx,
+                  initialDate: date,
+                  firstDate: DateTime(date.year - 1),
+                  lastDate: DateTime(date.year + 2),
+                );
+                if (picked != null) setState(() => date = picked);
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Copiar estoques atuais'),
+              subtitle: const Text('Desligado: tudo começa zerado'),
+              value: copyStock,
+              onChanged: (v) => setState(() => copyStock = v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Duplicar'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (ok != true || !context.mounted) return;
+
+  try {
+    final newId = await ref.read(appDatabaseProvider).duplicateEvent(
+          sourceEventId: source.id,
+          title: titleCtrl.text.trim().isEmpty
+              ? '${source.title} (cópia)'
+              : titleCtrl.text.trim(),
+          dateEpochMs: startOfLocalDayMs(date),
+          copyStock: copyStock,
+        );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Evento duplicado! Abrindo…')),
+      );
+      context.go('/event/$newId');
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Erro ao duplicar: $e')));
+    }
   }
 }
 
