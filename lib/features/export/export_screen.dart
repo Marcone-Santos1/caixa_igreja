@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart' show ShareParams, SharePlus, XFile;
@@ -145,17 +144,6 @@ class _ExportScreenState extends ConsumerState<ExportScreen> {
           return ListView(
             padding: kCaixaScreenPadding.copyWith(bottom: 32),
             children: [
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.handshake_outlined),
-                  title: const Text('Fiados'),
-                  subtitle:
-                      const Text('Quem deve, de todos os eventos, e receber'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.push('/fiados'),
-                ),
-              ),
-              const SizedBox(height: 16),
               Text(
                 'Exporta todas as linhas de venda de um evento (itens, totais e troco).',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(

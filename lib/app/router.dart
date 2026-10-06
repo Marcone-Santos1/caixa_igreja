@@ -11,6 +11,7 @@ import '../features/events/events_list_screen.dart';
 import '../features/events/fiado_screen.dart';
 import '../features/events/new_sale_screen.dart';
 import '../features/export/export_screen.dart';
+import '../features/reports/reports_screen.dart';
 import '../features/products/products_list_screen.dart';
 import '../features/events/sync_settings_screen.dart';
 import '../features/settings/appearance_screen.dart';
@@ -43,8 +44,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/export',
-                builder: (context, state) => const ExportScreen(),
+                path: '/reports',
+                builder: (context, state) => const ReportsScreen(),
               ),
             ],
           ),
@@ -94,6 +95,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootKey,
         path: '/fiados',
         builder: (context, state) => const FiadoScreen(),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/reports/export-csv',
+        builder: (context, state) => const ExportScreen(),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

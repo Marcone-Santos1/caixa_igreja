@@ -34,9 +34,9 @@ class MainScaffold extends StatelessWidget {
             label: 'Eventos',
           ),
           NavigationDestination(
-            icon: Icon(Icons.ios_share_outlined),
-            selectedIcon: Icon(Icons.ios_share),
-            label: 'Exportar',
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Relatórios',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
