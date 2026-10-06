@@ -289,6 +289,8 @@ class EventHubScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 10),
                 _FiadoHubButton(eventId: eventId),
+                const SizedBox(height: 10),
+                _ExpensesHubButton(eventId: eventId),
               ],
             );
           },
@@ -543,6 +545,36 @@ class _FiadoHubButton extends ConsumerWidget {
             foregroundColor: totalOpen > 0
                 ? Theme.of(context).colorScheme.error
                 : null,
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+/// Botão "Custos" do hub, com o total lançado e o lucro no rótulo.
+class _ExpensesHubButton extends ConsumerWidget {
+  const _ExpensesHubButton({required this.eventId});
+
+  final String eventId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final db = ref.watch(appDatabaseProvider);
+    return StreamBuilder<List<EventExpense>>(
+      stream: db.watchEventExpenses(eventId),
+      builder: (context, snap) {
+        final total = (snap.data ?? const <EventExpense>[])
+            .fold<int>(0, (a, x) => a + x.amountCents);
+        return OutlinedButton.icon(
+          onPressed: () => context.push('/event/$eventId/custos'),
+          icon: const Icon(Icons.shopping_cart_outlined),
+          label: Text(total > 0
+              ? 'Custos · ${formatCents(total)}'
+              : 'Custos do evento'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
           ),
         );
       },

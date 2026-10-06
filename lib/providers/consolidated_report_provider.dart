@@ -103,6 +103,9 @@ class ConsolidatedReportData {
     required this.avulsosCents,
     required this.fiadoReceivedInPeriodCents,
     required this.fiadoOpenTodayCents,
+    required this.expensesCents,
+    required this.discountCents,
+    required this.courtesyCount,
   });
 
   final ReportPeriod period;
@@ -126,6 +129,16 @@ class ConsolidatedReportData {
   /// Saldo de fiado em aberto HOJE (independe do período).
   final int fiadoOpenTodayCents;
 
+  /// Custos lançados no período (pela data do pagamento do custo).
+  final int expensesCents;
+
+  /// Descontos concedidos nas vendas do período (cortesias incluídas).
+  final int discountCents;
+  final int courtesyCount;
+
+  /// Lucro = faturamento − custos do período.
+  int get profitCents => totalCents - expensesCents;
+
   int get ticketMedioCents => saleCount == 0 ? 0 : totalCents ~/ saleCount;
 
   static ConsolidatedReportData compute({
@@ -135,6 +148,7 @@ class ConsolidatedReportData {
     required List<PosSaleLine> lines,
     required List<ChurchProduct> products,
     required List<FiadoPayment> fiadoPayments,
+    List<EventExpense> expenses = const [],
   }) {
     final liveEventIds = {
       for (final e in events)
@@ -152,12 +166,16 @@ class ConsolidatedReportData {
     final periodSaleIds = {for (final s in periodSales) s.id};
 
     var totalCents = 0;
+    var discountTotal = 0;
+    var courtesyCount = 0;
     final byMethodCents = <String, int>{};
     final byMethodCount = <String, int>{};
     final perEventTotal = <String, int>{};
     final perEventCount = <String, int>{};
     for (final s in periodSales) {
       totalCents += s.totalCents;
+      discountTotal += s.discountCents;
+      if (s.discountCents > 0 && s.totalCents == 0) courtesyCount++;
       byMethodCents[s.paymentMethod] =
           (byMethodCents[s.paymentMethod] ?? 0) + s.totalCents;
       byMethodCount[s.paymentMethod] =
@@ -234,6 +252,14 @@ class ConsolidatedReportData {
       if (open > 0) fiadoOpenToday += open;
     }
 
+    var expensesTotal = 0;
+    for (final x in expenses) {
+      if (x.deletedAtMs != null) continue;
+      if (!liveEventIds.contains(x.eventId)) continue;
+      if (!period.containsMs(x.paidAtMs)) continue;
+      expensesTotal += x.amountCents;
+    }
+
     return ConsolidatedReportData(
       period: period,
       saleCount: periodSales.length,
@@ -247,6 +273,9 @@ class ConsolidatedReportData {
       avulsosCents: avulsosCents,
       fiadoReceivedInPeriodCents: fiadoReceived,
       fiadoOpenTodayCents: fiadoOpenToday,
+      expensesCents: expensesTotal,
+      discountCents: discountTotal,
+      courtesyCount: courtesyCount,
     );
   }
 }
@@ -268,6 +297,7 @@ final consolidatedReportProvider = FutureProvider.autoDispose
   final lines = await db.select(db.saleLines).get();
   final products = await db.select(db.products).get();
   final fiadoPayments = await db.select(db.fiadoPayments).get();
+  final expenses = await db.select(db.eventExpenses).get();
   return ConsolidatedReportData.compute(
     period: period,
     events: events,
@@ -275,5 +305,6 @@ final consolidatedReportProvider = FutureProvider.autoDispose
     lines: lines,
     products: products,
     fiadoPayments: fiadoPayments,
+    expenses: expenses,
   );
 });

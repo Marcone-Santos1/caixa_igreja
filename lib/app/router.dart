@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/events/change_dots_screen.dart';
 import '../features/events/dot_management_screen.dart';
 import '../features/events/event_dashboard_screen.dart';
+import '../features/events/event_expenses_screen.dart';
 import '../features/events/event_hub_screen.dart';
 import '../features/events/event_sales_register_screen.dart';
 import '../features/events/events_list_screen.dart';
@@ -81,6 +82,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final id = state.pathParameters['eventId']!;
           return DotManagementScreen(eventId: id);
+        },
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/event/:eventId/custos',
+        builder: (context, state) {
+          final id = state.pathParameters['eventId']!;
+          return EventExpensesScreen(eventId: id);
         },
       ),
       GoRoute(

@@ -159,6 +159,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           'total_venda',
           'forma_pagamento',
           'cliente',
+          'desconto',
+          'motivo_desconto',
         ],
       ];
       for (final s in sales) {
@@ -174,6 +176,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             formatCents(s.totalCents),
             PaymentMethod.label(s.paymentMethod),
             s.customerName ?? '',
+            s.discountCents > 0 ? formatCents(s.discountCents) : '',
+            s.discountReason ?? '',
           ]);
         }
       }
@@ -244,6 +248,36 @@ class _ReportBody extends StatelessWidget {
                 label: 'Ticket médio',
                 value: formatCents(data.ticketMedioCents),
                 icon: Icons.sell_outlined,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                label: 'Custos',
+                value: formatCents(data.expensesCents),
+                icon: Icons.shopping_cart_outlined,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _StatCard(
+                label: 'Lucro',
+                value: formatCents(data.profitCents),
+                icon: Icons.trending_up,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _StatCard(
+                label: 'Descontos',
+                value: data.courtesyCount > 0
+                    ? '${formatCents(data.discountCents)} · ${data.courtesyCount}🎁'
+                    : formatCents(data.discountCents),
+                icon: Icons.percent,
               ),
             ),
           ],
