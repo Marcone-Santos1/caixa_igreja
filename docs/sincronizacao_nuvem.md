@@ -1,9 +1,28 @@
 # Sincronização pela nuvem (por evento) — como funciona
 
-> Implementa a RFC v2 `rfc_sincronizacao_nuvem_v2_por_evento.md` (que
-> substituiu o transporte "banco inteiro" da Fase A original, mantendo o
-> schema v9 e o fix pack da revisão `rfc_sincronizacao_nuvem_revisao.md`).
+> Implementa a RFC v2 `rfc_sincronizacao_nuvem_v2_por_evento.md` (transporte
+> por evento) + RFC v3 `rfc_sincronizacao_nuvem_v3_compartilhamento.md`
+> (compartilhamento controlado), sobre o schema v9 da revisão
+> `rfc_sincronizacao_nuvem_revisao.md`.
 > Resolve a passagem de caixa entre celulares em dias diferentes.
+
+## 0. Modelo de acesso (RFC v3)
+
+- **Cada celular tem credencial própria.** O 1º celular "Ativa" e vira
+  **administrador**; os demais entram por **convite** (QR de uso único,
+  48h), que o servidor troca por uma credencial do aparelho. Administradores
+  convidam, revogam celulares (efeito imediato, no servidor) e podem
+  promover outro administrador — faça isso cedo, para o caso de o celular
+  principal quebrar.
+- **Todo evento sobe automaticamente como backup PRIVADO** (acesso só do
+  dono). Nada é compartilhado por padrão.
+- **Compartilhar = ampliar a lista.** No painel do evento (☁️), a seção
+  "Quem recebe" liga/desliga cada celular da igreja. Só quem está na lista
+  vê, baixa e envia versões do evento. Dono do evento e administradores
+  gerenciam a lista.
+- **Desligar um celular de um evento** o faz parar de receber novas versões
+  na hora; o que ele já baixou permanece no aparelho dele (não existe
+  apagamento remoto — dito com todas as letras).
 
 ---
 
