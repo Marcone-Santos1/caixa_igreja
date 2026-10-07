@@ -431,14 +431,16 @@ class CloudBackupService {
         .toList();
   }
 
-  /// Revoga/reativa ou muda o papel de um celular (apenas administradores).
+  /// Atualiza um celular: qualquer aparelho renomeia A SI MESMO; revogar e
+  /// mudar papel continuam exclusivos do administrador.
   Future<void> updateDevice(String deviceId,
-      {bool? revoked, String? role}) async {
+      {bool? revoked, String? role, String? name}) async {
     final request = await _request('PUT', '/v1/devices/$deviceId');
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode({
       'revoked': ?revoked,
       'role': ?role,
+      'name': ?name,
     }));
     await _json(request);
   }

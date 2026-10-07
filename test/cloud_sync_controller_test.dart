@@ -23,6 +23,7 @@ class _FakeWorker {
   final Map<String, Map<String, dynamic>> manifests = {};
   String registeredChurchName = '';
   bool recoveryUsed = false;
+  final Map<String, String> renamedDevices = {};
 
   String get url => 'http://127.0.0.1:${_server.port}';
 
@@ -103,6 +104,18 @@ class _FakeWorker {
         } else {
           json({'error': 'Código de recuperação inválido ou já usado'}, 403);
         }
+      } else if (req.method == 'PUT' &&
+          RegExp(r'^/v1/devices/[^/]+$').hasMatch(path)) {
+        final builder = BytesBuilder(copy: false);
+        await for (final chunk in req) {
+          builder.add(chunk);
+        }
+        final body =
+            jsonDecode(utf8.decode(builder.takeBytes())) as Map<String, dynamic>;
+        if (body['name'] is String) {
+          renamedDevices[path.split('/')[3]] = body['name'] as String;
+        }
+        json({'ok': true});
       } else if (req.method == 'GET' && path == '/v1/church') {
         json({'name': 'Igreja de Teste', 'hasRecoveryCode': true});
       } else if (req.method == 'GET' && path == '/v1/devices') {
@@ -568,6 +581,18 @@ void main() {
       ),
       throwsA(isA<CloudBackupException>()),
     );
+  });
+
+  test('renomear o aparelho propaga ao servidor', () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    await controller.setDeviceName('Celular do Diogo');
+    expect(worker.renamedDevices['local'], 'Celular do Diogo',
+        reason: 'o servidor recebe o nome novo (antes ficava só local)');
   });
 
   test('banner da home: só compartilhados comigo e não dispensados',

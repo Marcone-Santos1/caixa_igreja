@@ -7,7 +7,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../data/device_identity.dart';
 import '../../providers/cloud_sync_provider.dart';
-import '../../providers/shared_preferences_provider.dart';
 import '../events/event_cloud_sheet.dart';
 import '../events/qr_scanner_dialog.dart';
 import '../onboarding/church_setup.dart';
@@ -74,6 +73,7 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
   }
 
   Future<void> _pairWith(String token) async {
+    if (!await askDeviceName(context, ref) || !mounted) return;
     setState(() => _working = true);
     try {
       final ok = await ref
@@ -558,8 +558,17 @@ class _AdvancedCard extends ConsumerWidget {
                 ),
               );
               if (name != null && name.trim().isNotEmpty) {
-                await DeviceIdentity.setDeviceName(
-                    ref.read(sharedPreferencesProvider), name);
+                try {
+                  await ref
+                      .read(cloudSyncControllerProvider.notifier)
+                      .setDeviceName(name);
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                            'Nome salvo aqui; falhou ao avisar a nuvem: $e')));
+                  }
+                }
               }
             },
             icon: const Icon(Icons.phone_android),

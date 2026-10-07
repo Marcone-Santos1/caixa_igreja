@@ -439,6 +439,21 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     unawaited(refreshAll());
   }
 
+  /// Renomeia ESTE aparelho: localmente e, se configurado, no servidor
+  /// (é o nome que os outros celulares veem em "Celulares da igreja" e
+  /// "Quem recebe").
+  Future<void> setDeviceName(String name) async {
+    await DeviceIdentity.setDeviceName(
+        _ref.read(sharedPreferencesProvider), name);
+    final service = _service();
+    if (service != null) {
+      await service.updateDevice(DeviceIdentity.deviceId,
+          name: DeviceIdentity.deviceName);
+      final devices = await service.listDevices();
+      if (mounted) state = state.copyWith(devices: devices);
+    }
+  }
+
   /// Renomeia a igreja (admin).
   Future<void> renameChurch(String name) async {
     final service = _service();

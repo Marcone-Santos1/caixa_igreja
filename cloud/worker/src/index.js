@@ -129,7 +129,8 @@ export default {
 
       const devMatch = path.match(/^\/v1\/devices\/([A-Za-z0-9-]{4,64})$/);
       if (request.method === 'PUT' && devMatch) {
-        if (device.role !== 'admin') {
+        // Qualquer celular pode RENOMEAR a si mesmo; revogar/promover é admin.
+        if (device.role !== 'admin' && devMatch[1] !== device.deviceId) {
           return json({ error: 'Só o celular administrador gerencia celulares' }, 403);
         }
         return await updateDevice(request, env, code, devMatch[1], device);
@@ -401,6 +402,14 @@ async function updateDevice(request, env, code, targetId, requester) {
   const record = await readJson(env, `${code}/devices/${targetId}.json`);
   if (!record) return json({ error: 'Celular não encontrado' }, 404);
   const body = await request.json().catch(() => ({}));
+  if (typeof body.name === 'string' && body.name.trim()) {
+    record.name = body.name.trim().slice(0, 60);
+  }
+  if ((typeof body.revoked === 'boolean' ||
+       body.role === 'admin' || body.role === 'member') &&
+      requester.role !== 'admin') {
+    return json({ error: 'Só o celular administrador gerencia celulares' }, 403);
+  }
   if (typeof body.revoked === 'boolean') {
     if (targetId === requester.deviceId && body.revoked) {
       return json({ error: 'Um administrador não pode revogar o próprio celular' }, 400);

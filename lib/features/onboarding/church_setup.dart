@@ -161,6 +161,45 @@ Future<void> showRecoveryCodeDialog(BuildContext context, String code,
   );
 }
 
+/// Pergunta o nome deste aparelho (antes de entrar com convite): é o nome
+/// que os outros celulares veem. Retorna false se cancelado.
+Future<bool> askDeviceName(BuildContext context, WidgetRef ref) async {
+  final ctrl = TextEditingController(
+    text: DeviceIdentity.deviceName == 'Este aparelho'
+        ? ''
+        : DeviceIdentity.deviceName,
+  );
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Nome deste aparelho'),
+      content: TextField(
+        controller: ctrl,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Ex: Celular do Diogo',
+          helperText: 'É assim que os outros celulares vão te ver.',
+        ),
+        textCapitalization: TextCapitalization.words,
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar')),
+        FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar')),
+      ],
+    ),
+  );
+  if (ok != true) return false;
+  if (ctrl.text.trim().isNotEmpty) {
+    await DeviceIdentity.setDeviceName(
+        ref.read(sharedPreferencesProvider), ctrl.text);
+  }
+  return true;
+}
+
 /// "Perdi o acesso": recupera o posto de administrador neste aparelho com o
 /// código da igreja + código de recuperação. Retorna true se concluiu.
 Future<bool> showRecoverAdminFlow(BuildContext context, WidgetRef ref) async {

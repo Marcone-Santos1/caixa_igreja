@@ -41,6 +41,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   }
 
   Future<bool> _joinWithInvite() async {
+    if (!await askDeviceName(context, ref) || !mounted) return false;
     final raw = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const QrScannerDialog()),
     );
@@ -57,6 +58,7 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
   }
 
   Future<bool> _joinWithPastedInvite() async {
+    if (!await askDeviceName(context, ref) || !mounted) return false;
     final ctrl = TextEditingController();
     final token = await showDialog<String>(
       context: context,
