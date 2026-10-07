@@ -186,8 +186,7 @@ class EventsListScreen extends ConsumerWidget {
             return Column(
               children: [
                 const _AppUpdateBanner(),
-                const _AppUpdateBanner(),
-              const _CloudEventsBanner(),
+                const _CloudEventsBanner(),
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
@@ -230,6 +229,7 @@ class EventsListScreen extends ConsumerWidget {
           }
           return Column(
             children: [
+              const _AppUpdateBanner(),
               const _CloudEventsBanner(),
               Expanded(
                 child: ListView.separated(
