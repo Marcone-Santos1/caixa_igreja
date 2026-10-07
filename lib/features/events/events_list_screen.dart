@@ -512,38 +512,61 @@ class _CloudEventsBanner extends ConsumerWidget {
                 ],
               ),
               for (final s in cloudOnly.take(3))
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                  visualDensity: VisualDensity.compact,
-                  title: Text(s.title),
-                  subtitle: Text(
-                    '${s.eventDateMs != null ? dateFmt.format(DateTime.fromMillisecondsSinceEpoch(s.eventDateMs!)) : ''}'
-                    '${s.remote?.deviceName != null ? ' · ${s.remote!.deviceName}' : ''}'
-                    '${s.remote?.salesCount != null ? ' · ${s.remote!.salesCount} vendas' : ''}',
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
                     children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () =>
+                              showEventCloudSheet(context, s.eventId),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(s.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
+                              Text(
+                                '${s.eventDateMs != null ? dateFmt.format(DateTime.fromMillisecondsSinceEpoch(s.eventDateMs!)) : ''}'
+                                '${s.remote?.deviceName != null ? ' · ${s.remote!.deviceName}' : ''}'
+                                '${s.remote?.salesCount != null ? ' · ${s.remote!.salesCount} vendas' : ''}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       FilledButton.tonal(
                         onPressed: state.busy
                             ? null
                             : () => ref
                                 .read(cloudSyncControllerProvider.notifier)
                                 .downloadEvent(s.eventId),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 12),
+                        ),
                         child: const Text('Baixar'),
                       ),
                       IconButton(
                         tooltip: 'Dispensar (fica na tela da nuvem)',
                         icon: const Icon(Icons.close, size: 18),
                         visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 36, minHeight: 36),
                         onPressed: () => ref
                             .read(cloudSyncControllerProvider.notifier)
                             .dismissCloudEvent(s.eventId),
                       ),
                     ],
                   ),
-                  onTap: () => showEventCloudSheet(context, s.eventId),
                 ),
               if (cloudOnly.length > 3)
                 TextButton(
