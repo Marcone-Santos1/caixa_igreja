@@ -167,18 +167,20 @@ class _EventCloudSheet extends ConsumerWidget {
         ] else if (!paused) ...[
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: state.busy
-                      ? null
-                      : () => controller.uploadEventNow(eventId),
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Enviar agora'),
+              // "Enviar agora" só faz sentido para evento que EXISTE aqui.
+              if (isLocal)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: state.busy
+                        ? null
+                        : () => controller.uploadEventNow(eventId),
+                    icon: const Icon(Icons.cloud_upload_outlined),
+                    label: const Text('Enviar agora'),
+                  ),
                 ),
-              ),
               if (status?.phase == CloudEventPhase.updateAvailable ||
                   status?.phase == CloudEventPhase.cloudOnly) ...[
-                const SizedBox(width: 8),
+                if (isLocal) const SizedBox(width: 8),
                 Expanded(
                   child: FilledButton.tonalIcon(
                     onPressed: state.busy
