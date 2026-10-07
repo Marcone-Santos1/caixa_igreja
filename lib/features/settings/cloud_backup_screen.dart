@@ -206,6 +206,36 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
             ),
             const SizedBox(height: 16),
             _EventsCard(state: state, fmtWhen: _fmtWhen),
+            if (state.deletedEvents.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Card(
+                child: ExpansionTile(
+                  leading: const Icon(Icons.delete_outline),
+                  title: Text(
+                      'Eventos excluídos (${state.deletedEvents.length})'),
+                  subtitle: const Text('Dá para restaurar pelo histórico'),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  children: [
+                    for (final s in state.deletedEvents)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(s.title),
+                        subtitle: Text(
+                            'Excluído · última versão viva no histórico'),
+                        trailing: TextButton(
+                          onPressed: state.busy
+                              ? null
+                              : () => ref
+                                  .read(cloudSyncControllerProvider.notifier)
+                                  .restoreDeletedEvent(s.eventId),
+                          child: const Text('Restaurar'),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             _AdvancedCard(state: state),
           ],

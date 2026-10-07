@@ -2039,6 +2039,57 @@ END''');
     );
   }
 
+  /// Remove o evento e TODOS os dados dele apenas DESTE aparelho — exclusão
+  /// física, sem tombstone: nada é propagado (o caminho "sair do evento" de
+  /// um membro). Para excluir para todos, use [deleteEventCascade].
+  Future<void> purgeEventLocally(String eventId) async {
+    await transaction(() async {
+      final productRows = await (select(products)
+            ..where((p) => p.eventId.equals(eventId)))
+          .get();
+      final productIds = productRows.map((p) => p.id).toList();
+      final denomRows = await (select(eventDotDenominations)
+            ..where((d) => d.eventId.equals(eventId)))
+          .get();
+      final denomIds = denomRows.map((d) => d.id).toList();
+      final saleRows =
+          await (select(sales)..where((s) => s.eventId.equals(eventId))).get();
+      final saleIds = saleRows.map((s) => s.id).toList();
+
+      await (delete(stockMovements)
+            ..where((m) =>
+                (m.itemType.equals(kStockItemProduct) &
+                    m.itemId.isIn(productIds)) |
+                (m.itemType.equals(kStockItemDot) & m.itemId.isIn(denomIds))))
+          .go();
+      if (saleIds.isNotEmpty) {
+        await (delete(fiadoPayments)..where((f) => f.saleId.isIn(saleIds)))
+            .go();
+        await (delete(saleChangeDotAllocations)
+              ..where((a) => a.saleId.isIn(saleIds)))
+            .go();
+        await (delete(saleLines)..where((l) => l.saleId.isIn(saleIds))).go();
+      }
+      await (delete(sales)..where((s) => s.eventId.equals(eventId))).go();
+      await (delete(cashSessions)..where((s) => s.eventId.equals(eventId)))
+          .go();
+      await (delete(eventExpenses)..where((x) => x.eventId.equals(eventId)))
+          .go();
+      if (productIds.isNotEmpty) {
+        await (delete(productComboItems)
+              ..where((c) =>
+                  c.comboProductId.isIn(productIds) |
+                  c.childProductId.isIn(productIds)))
+            .go();
+      }
+      await (delete(products)..where((p) => p.eventId.equals(eventId))).go();
+      await (delete(eventDotDenominations)
+            ..where((d) => d.eventId.equals(eventId)))
+          .go();
+      await (delete(events)..where((e) => e.id.equals(eventId))).go();
+    });
+  }
+
   /// Exclusão lógica da venda (tombstone) devolvendo produtos e fichas ao
   /// estoque. As linhas e alocações são mantidas no histórico; as consultas
   /// filtram pelo tombstone da venda.

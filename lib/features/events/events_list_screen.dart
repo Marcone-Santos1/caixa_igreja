@@ -14,7 +14,7 @@ import '../../providers/cloud_sync_provider.dart';
 import '../../providers/database_provider.dart';
 import '../../providers/sync_provider.dart';
 import 'event_cloud_sheet.dart';
-import 'event_delete_dialog.dart';
+import 'event_delete_flow.dart';
 import 'event_form_screen.dart';
 import 'qr_scanner_dialog.dart';
 
@@ -307,16 +307,8 @@ class EventsListScreen extends ConsumerWidget {
                                 size: 18,
                                 color: Theme.of(context).colorScheme.error,
                               ),
-                              onPressed: () async {
-                                final sure = await confirmDeleteEventDialog(
-                                  context,
-                                  eventTitle: e.title,
-                                );
-                                if (!sure || !context.mounted) return;
-                                await ref
-                                    .read(appDatabaseProvider)
-                                    .deleteEventCascade(e.id);
-                              },
+                              onPressed: () =>
+                                  confirmAndDeleteEvent(context, ref, e),
                             ),
                           ],
                         ),

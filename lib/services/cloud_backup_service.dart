@@ -445,6 +445,14 @@ class CloudBackupService {
     await _json(request);
   }
 
+  /// Remove ESTE aparelho da lista do evento (sair sem afetar os demais).
+  Future<void> leaveEvent(String eventId) async {
+    final request = await _request('POST', '/v1/events/$eventId/leave');
+    request.headers.contentType = ContentType.json;
+    request.write('{}');
+    await _json(request);
+  }
+
   /// Atualiza a lista de acesso de um evento (dono ou administrador).
   Future<CloudEventManifest> updateEventAcl(
       String eventId, List<String> sharedWith) async {

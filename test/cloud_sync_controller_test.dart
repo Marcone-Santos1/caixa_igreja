@@ -116,6 +116,16 @@ class _FakeWorker {
           renamedDevices[path.split('/')[3]] = body['name'] as String;
         }
         json({'ok': true});
+      } else if (req.method == 'POST' &&
+          RegExp(r'^/v1/events/[^/]+/leave$').hasMatch(path)) {
+        final id = path.split('/')[3];
+        final manifest = manifests[id];
+        if (manifest != null) {
+          manifest['sharedWith'] = (manifest['sharedWith'] as List)
+              .where((d) => d != 'local')
+              .toList();
+        }
+        json({'ok': true});
       } else if (req.method == 'GET' && path == '/v1/church') {
         json({'name': 'Igreja de Teste', 'hasRecoveryCode': true});
       } else if (req.method == 'GET' && path == '/v1/devices') {
@@ -190,7 +200,7 @@ class _FakeWorker {
           final version = current + 1;
           snapshots.putIfAbsent(id, () => {})[version] = gz;
           final previous = manifests[id];
-          manifests[id] = {
+          final entry = <String, dynamic>{
             'ownerDeviceId': previous?['ownerDeviceId'] ??
                 (req.headers.value('x-device-id') ?? 'local'),
             'sharedWith': previous?['sharedWith'] ?? <String>[],
@@ -211,7 +221,14 @@ class _FakeWorker {
                 req.headers.value('x-event-deleted') == 'true',
             'baseVersion': current,
             'summary': null,
-            'history': const [],
+          };
+          manifests[id] = {
+            ...entry,
+            'history': [
+              Map<String, dynamic>.from(entry),
+              ...?(previous?['history'] as List?)
+                  ?.map((h) => Map<String, dynamic>.from(h as Map)),
+            ],
           };
           json({'ok': true, 'manifest': manifests[id]!});
         }
@@ -593,6 +610,67 @@ void main() {
     await controller.setDeviceName('Celular do Diogo');
     expect(worker.renamedDevices['local'], 'Celular do Diogo',
         reason: 'o servidor recebe o nome novo (antes ficava só local)');
+  });
+
+  test('"remover deste aparelho": sai da lista e limpa local sem propagar',
+      () async {
+    final (eventId, gz) = await buildRemoteEvent();
+    worker.seed(eventId, gz, title: 'Compartilhado');
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+    await controller.downloadEvent(eventId);
+    expect(
+        (await (db.select(db.events)..where((e) => e.id.equals(eventId)))
+                .get()),
+        hasLength(1));
+    final versionBefore = worker.manifests[eventId]!['version'];
+
+    await controller.leaveEventLocally(eventId);
+
+    // Local limpo FISICAMENTE (sem tombstone que pudesse subir).
+    expect(
+        (await (db.select(db.events)..where((e) => e.id.equals(eventId)))
+                .get()),
+        isEmpty);
+    // Saiu da lista do evento na nuvem; a versão NÃO mudou (nada propagado).
+    expect(worker.manifests[eventId]!['sharedWith'], isEmpty);
+    expect(worker.manifests[eventId]!['version'], versionBefore);
+    expect(worker.manifests[eventId]!['eventDeleted'], isNot(isTrue));
+    // E some do estado/banner.
+    expect(container.read(cloudSyncControllerProvider).forEvent(eventId),
+        isNull);
+  });
+
+  test('restaurar evento excluído volta à última versão viva', () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    final eventId = db.generateUuid();
+    await db.into(db.events).insert(EventsCompanion.insert(
+        id: eventId, title: 'Quermesse', dateEpochMs: 2));
+    await controller.refreshAll(allowApply: false); // v1 viva
+    await db.deleteEventCascade(eventId);
+    await controller.refreshAll(allowApply: false); // v2 excluída
+    expect(worker.manifests[eventId]!['eventDeleted'], isTrue);
+    expect(container.read(cloudSyncControllerProvider).deletedEvents
+            .map((e) => e.eventId),
+        contains(eventId));
+
+    await controller.restoreDeletedEvent(eventId);
+    final ev = await (db.select(db.events)..where((e) => e.id.equals(eventId)))
+        .getSingle();
+    expect(ev.deletedAtMs, isNull, reason: 'voltou vivo localmente');
+
+    // Pendente de envio: o próximo ciclo propaga a restauração (v3 viva).
+    await controller.refreshAll(allowApply: false);
+    expect(worker.manifests[eventId]!['version'], 3);
+    expect(worker.manifests[eventId]!['eventDeleted'], isFalse);
   });
 
   test('banner da home: só compartilhados comigo e não dispensados',

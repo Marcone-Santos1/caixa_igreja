@@ -210,6 +210,13 @@ class CloudSyncState {
   List<CloudEventStatus> get visibleEvents =>
       events.values.where((e) => !e.hiddenFromLists).toList();
 
+  /// Eventos excluídos (tombstone sincronizado) — para a seção de
+  /// restauração na tela da nuvem.
+  List<CloudEventStatus> get deletedEvents => events.values
+      .where((e) => e.hiddenFromLists)
+      .toList()
+    ..sort((a, b) => (b.eventDateMs ?? 0).compareTo(a.eventDateMs ?? 0));
+
   List<CloudEventStatus> get cloudOnlyEvents => events.values
       .where((e) =>
           e.phase == CloudEventPhase.cloudOnly &&
@@ -753,6 +760,55 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     }
   }
 
+  /// "Remover só deste aparelho": sai da lista do evento na nuvem (se
+  /// estiver nela) e apaga a cópia local FISICAMENTE — nada é propagado aos
+  /// outros celulares. É o caminho de exclusão de quem não é dono/admin.
+  Future<void> leaveEventLocally(String eventId) async {
+    final service = _service();
+    if (service != null) {
+      try {
+        await service.leaveEvent(eventId);
+      } catch (e) {
+        // Não estar na lista (admin que vê por poder) não impede a limpeza.
+        developer.log('leaveEvent: $e', name: 'CloudSync');
+      }
+    }
+    final db = _ref.read(appDatabaseProvider);
+    _applying = true;
+    try {
+      await db.purgeEventLocally(eventId);
+    } finally {
+      Future<void>.delayed(
+          const Duration(milliseconds: 500), () => _applying = false);
+    }
+    final prefs = _ref.read(sharedPreferencesProvider);
+    await prefs.remove('cloud.ev.$eventId.v');
+    await prefs.remove('cloud.ev.$eventId.fp');
+    await prefs.remove('cloud.ev.$eventId.paused');
+    if (mounted) {
+      final events = Map<String, CloudEventStatus>.from(state.events)
+        ..remove(eventId);
+      state = state.copyWith(events: events);
+    }
+  }
+
+  /// Restaura um evento EXCLUÍDO para a última versão viva do histórico
+  /// (e, no próximo envio, a restauração propaga para todos).
+  Future<void> restoreDeletedEvent(String eventId) async {
+    final status = state.forEvent(eventId);
+    final history = status?.remote?.history ?? const [];
+    final alive = history.where((h) => !h.eventDeleted).toList();
+    if (alive.isEmpty) {
+      if (mounted) {
+        state = state.copyWith(
+            globalMessage:
+                'Não há versão anterior viva deste evento no histórico.');
+      }
+      return;
+    }
+    await restoreEventVersion(eventId, alive.first.version);
+  }
+
   /// Tira um evento da nuvem do banner da home (continua na tela da nuvem).
   Future<void> dismissCloudEvent(String eventId) async {
     final dismissed = {...state.dismissedEventIds, eventId};
@@ -1080,15 +1136,24 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     }
   }
 
+  /// Arquiva o agregado local antes de substituí-lo. Falha aqui NÃO pode
+  /// derrubar a operação: o histórico na nuvem é a rede de segurança real.
   Future<String> _archiveAggregate(
       String eventId, int version, Map<String, dynamic> json) async {
-    final dir = await backupsDirectory();
-    final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final shortId = eventId.length > 8 ? eventId.substring(0, 8) : eventId;
-    final path = p.join(dir.path, 'evento-$shortId-prev$version-$stamp.json.gz');
-    await File(path)
-        .writeAsBytes(gzip.encode(utf8.encode(jsonEncode(json))), flush: true);
-    return path;
+    try {
+      final dir = await backupsDirectory();
+      final stamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final shortId = eventId.length > 8 ? eventId.substring(0, 8) : eventId;
+      final path =
+          p.join(dir.path, 'evento-$shortId-prev$version-$stamp.json.gz');
+      await File(path).writeAsBytes(
+          gzip.encode(utf8.encode(jsonEncode(json))),
+          flush: true);
+      return path;
+    } catch (e) {
+      developer.log('Arquivo local de segurança falhou: $e', name: 'CloudSync');
+      return '';
+    }
   }
 
   // ─── Ações do usuário ──────────────────────────────────────────────────

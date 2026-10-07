@@ -8,7 +8,7 @@ import '../../app/app_theme.dart';
 import '../../data/database.dart';
 import '../../providers/database_provider.dart';
 import '../../utils/date_time_utils.dart';
-import 'event_delete_dialog.dart';
+import 'event_delete_flow.dart';
 
 class EventFormScreen extends ConsumerStatefulWidget {
   const EventFormScreen({super.key, this.eventId});
@@ -112,12 +112,12 @@ class _EventFormScreenState extends ConsumerState<EventFormScreen> {
   Future<void> _confirmDeleteEvent() async {
     final id = widget.eventId;
     if (id == null) return;
-    final title = _title.text.trim().isEmpty ? 'este evento' : _title.text.trim();
-    final sure = await confirmDeleteEventDialog(context, eventTitle: title);
-    if (!sure || !mounted) return;
     final db = ref.read(appDatabaseProvider);
-    await db.deleteEventCascade(id);
-    if (!mounted) return;
+    final event = await (db.select(db.events)..where((e) => e.id.equals(id)))
+        .getSingleOrNull();
+    if (event == null || !mounted) return;
+    final done = await confirmAndDeleteEvent(context, ref, event);
+    if (!done || !mounted) return;
     context.go('/events');
   }
 

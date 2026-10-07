@@ -137,7 +137,7 @@ export default {
       }
 
       const evMatch = path.match(
-        /^\/v1\/events\/([A-Za-z0-9-]{4,64})\/(manifest|snapshot|acl)(?:\/(\d+))?$/,
+        /^\/v1\/events\/([A-Za-z0-9-]{4,64})\/(manifest|snapshot|acl|leave)(?:\/(\d+))?$/,
       );
       if (!evMatch) return json({ error: 'Rota não encontrada' }, 404);
       const [, eventId, kind, versionStr] = evMatch;
@@ -162,7 +162,35 @@ export default {
       if (request.method === 'PUT' && kind === 'snapshot' && !versionStr) {
         // Evento novo: quem envia vira o dono. Existente: precisa de acesso.
         if (manifest && !access) return json({ error: 'Sem acesso a este evento' }, 403);
+        // EXCLUIR o evento (para todos) é governança: só dono ou admin.
+        const markingDeleted = request.headers.get('x-event-deleted') === 'true';
+        const wasDeleted = manifest?.eventDeleted === true;
+        if (markingDeleted && !wasDeleted && manifest &&
+            manifest.ownerDeviceId !== device.deviceId &&
+            device.role !== 'admin') {
+          return json({
+            error: 'Só o dono do evento ou um administrador pode excluí-lo para todos. '
+              + 'Você pode removê-lo apenas deste aparelho.',
+          }, 403);
+        }
         return await handleUpload(request, env, code, eventId, url, manifest, device);
+      }
+      if (request.method === 'POST' && kind === 'leave') {
+        if (!manifest) return json({ error: 'Evento não encontrado' }, 404);
+        if (manifest.ownerDeviceId === device.deviceId) {
+          return json({ error: 'O dono não sai do próprio evento; exclua-o para todos.' }, 400);
+        }
+        const sharedWith = (manifest.sharedWith ?? [])
+          .filter((d) => d !== device.deviceId);
+        const updated = { ...publicManifest(manifest), sharedWith };
+        const put = await env.BUCKET.put(
+          manifestKey(code, eventId),
+          JSON.stringify(updated),
+          { onlyIf: { etagMatches: manifest._etag },
+            httpMetadata: { contentType: 'application/json' } },
+        );
+        if (put === null) return json({ error: 'conflict' }, 409);
+        return json({ ok: true });
       }
       if (request.method === 'PUT' && kind === 'acl') {
         if (!manifest) return json({ error: 'Evento não encontrado' }, 404);
