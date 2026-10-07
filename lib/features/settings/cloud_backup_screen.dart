@@ -8,9 +8,9 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../data/device_identity.dart';
 import '../../providers/cloud_sync_provider.dart';
 import '../../providers/shared_preferences_provider.dart';
-import '../../services/cloud_backup_service.dart';
 import '../events/event_cloud_sheet.dart';
 import '../events/qr_scanner_dialog.dart';
+import '../onboarding/church_setup.dart';
 
 /// Tela "Backup na nuvem" (RFC v2): ativação de 1 toque, pareamento por QR e
 /// visão geral dos eventos sincronizados. As ações de cada evento ficam no
@@ -29,62 +29,12 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
       dt == null ? '—' : DateFormat('dd/MM HH:mm').format(dt.toLocal());
 
   Future<void> _activate() async {
-    final controller = ref.read(cloudSyncControllerProvider.notifier);
-    String? endpoint;
-    final stored = ref.read(cloudSyncControllerProvider).endpoint;
-    if (kDefaultCloudEndpoint.isEmpty && stored.isEmpty) {
-      endpoint = await _askEndpoint();
-      if (endpoint == null || endpoint.trim().isEmpty) return;
-    } else if (kDefaultCloudEndpoint.isEmpty) {
-      endpoint = stored;
-    }
     setState(() => _working = true);
     try {
-      await controller.activate(endpointOverride: endpoint);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Backup ativado! Use "Parear outro celular" nos demais aparelhos.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
-      }
+      await showCreateChurchFlow(context, ref);
     } finally {
       if (mounted) setState(() => _working = false);
     }
-  }
-
-  Future<String?> _askEndpoint() {
-    final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Endereço do servidor'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.url,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'https://cantina-....workers.dev',
-            helperText: 'Pedido só uma vez; o QR leva aos outros celulares.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text),
-            child: const Text('Continuar'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _scanToPair() async {
@@ -227,6 +177,7 @@ class _CloudBackupScreenState extends ConsumerState<CloudBackupScreen> {
               onActivate: _activate,
               onScan: _scanToPair,
               onPaste: _pasteToPair,
+              onRecover: () => showRecoverAdminFlow(context, ref),
             )
           else ...[
             _OverviewCard(state: state, fmtWhen: _fmtWhen),
@@ -281,12 +232,14 @@ class _ActivationCard extends StatelessWidget {
     required this.onActivate,
     required this.onScan,
     required this.onPaste,
+    required this.onRecover,
   });
 
   final bool working;
   final VoidCallback onActivate;
   final VoidCallback onScan;
   final VoidCallback onPaste;
+  final VoidCallback onRecover;
 
   @override
   Widget build(BuildContext context) {
@@ -326,7 +279,7 @@ class _ActivationCard extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.cloud_done_outlined),
-              label: const Text('Ativar backup na nuvem'),
+              label: const Text('Cadastrar minha igreja'),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -337,6 +290,11 @@ class _ActivationCard extends StatelessWidget {
             TextButton(
               onPressed: working ? null : onPaste,
               child: const Text('Colar código de pareamento'),
+            ),
+            TextButton(
+              onPressed: working ? null : onRecover,
+              child:
+                  const Text('Perdi o acesso — tenho o código de recuperação'),
             ),
           ],
         ),
@@ -380,7 +338,7 @@ class _OverviewCard extends StatelessWidget {
               ?.copyWith(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          'Igreja: ${state.churchCode} · Aparelho: ${DeviceIdentity.deviceName}\n'
+          'Igreja: ${state.churchName.isNotEmpty ? state.churchName : state.churchCode} · Aparelho: ${DeviceIdentity.deviceName}\n'
           'Última verificação: ${fmtWhen(state.lastCheckedAt)}'
           '${state.globalMessage != null ? '\n${state.globalMessage}' : ''}',
           style: theme.textTheme.bodySmall?.copyWith(height: 1.4),
@@ -607,6 +565,80 @@ class _AdvancedCard extends ConsumerWidget {
             icon: const Icon(Icons.phone_android),
             label: Text('Nome do aparelho: ${DeviceIdentity.deviceName}'),
           ),
+          if (state.isAdmin) ...[
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final ctrl = TextEditingController(text: state.churchName);
+                final name = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Nome da igreja'),
+                    content: TextField(
+                      controller: ctrl,
+                      autofocus: true,
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar')),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(ctx, ctrl.text),
+                          child: const Text('Salvar')),
+                    ],
+                  ),
+                );
+                if (name != null && name.trim().isNotEmpty) {
+                  await ref
+                      .read(cloudSyncControllerProvider.notifier)
+                      .renameChurch(name);
+                }
+              },
+              icon: const Icon(Icons.church_outlined),
+              label: Text(state.churchName.isEmpty
+                  ? 'Dar nome à igreja'
+                  : 'Renomear igreja'),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final go = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Gerar novo código de recuperação?'),
+                    content: const Text(
+                        'O código anterior (se houver) deixa de valer. O novo '
+                        'aparece UMA vez — guarde em lugar seguro.'),
+                    actions: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancelar')),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Gerar')),
+                    ],
+                  ),
+                );
+                if (go != true || !context.mounted) return;
+                try {
+                  final code = await ref
+                      .read(cloudSyncControllerProvider.notifier)
+                      .regenerateRecoveryCode();
+                  if (context.mounted) {
+                    await showRecoveryCodeDialog(context, code);
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context)
+                        .showSnackBar(SnackBar(content: Text('$e')));
+                  }
+                }
+              },
+              icon: const Icon(Icons.key_outlined),
+              label: const Text('Gerar código de recuperação'),
+            ),
+          ],
           const SizedBox(height: 8),
           OutlinedButton.icon(
             style: OutlinedButton.styleFrom(

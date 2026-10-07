@@ -50,7 +50,17 @@ ficam no histórico do evento.
 A junção automática de bases divergentes (Fase B da RFC) continua **não**
 construída: observar 4+ semanas de uso real antes de decidir.
 
-## 2. Configuração (1 toque + QR)
+## 2. Configuração (onboarding + QR)
+
+Na **primeira abertura** o app pergunta como começar: **Cadastrar minha
+igreja** (nome da igreja + nome do aparelho → este celular vira o
+administrador e recebe o **código de recuperação**, mostrado uma única vez
+— guarde!), **Entrar com convite** (QR/colar) ou **Usar sem nuvem por
+enquanto** (ativa depois em Ajustes). O código de recuperação devolve o
+posto de administrador num aparelho novo se o principal quebrar; é de uso
+único e pode ser regenerado em Avançado.
+
+### 2b. Deploy do servidor (desenvolvedor)
 
 O deploy do Worker é tarefa **única do desenvolvedor**
 (`cloud/worker/README.md`); a URL vai embutida no build

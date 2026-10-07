@@ -15,20 +15,39 @@ import '../features/export/export_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/products/products_list_screen.dart';
 import '../features/events/sync_settings_screen.dart';
+import '../features/onboarding/welcome_screen.dart';
 import '../features/settings/appearance_screen.dart';
 import '../features/settings/cloud_backup_screen.dart';
 import '../features/settings/printer_setup_screen.dart';
 import '../features/settings/security_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/shell/main_scaffold.dart';
+import '../providers/shared_preferences_provider.dart';
 
 final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 final goRouterProvider = Provider<GoRouter>((ref) {
+  final prefs = ref.watch(sharedPreferencesProvider);
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/events',
+    // Primeira abertura: cadastro/convite antes de tudo (com saída "usar sem
+    // nuvem"). Quem já tem credencial ou já passou pelo onboarding não vê.
+    redirect: (context, state) {
+      final done = prefs.getBool(kOnboardingDoneKey) ?? false;
+      final configured =
+          (prefs.getString('cloud.deviceToken') ?? '').isNotEmpty;
+      final atWelcome = state.matchedLocation == '/welcome';
+      if (!done && !configured && !atWelcome) return '/welcome';
+      if ((done || configured) && atWelcome) return '/events';
+      return null;
+    },
     routes: [
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/welcome',
+        builder: (context, state) => const WelcomeScreen(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainScaffold(navigationShell: navigationShell);

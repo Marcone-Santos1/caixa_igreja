@@ -198,6 +198,23 @@ class CloudInviteToken {
   }
 }
 
+/// Resultado do cadastro/convite/recuperação: credencial + contexto.
+class CloudBootstrapResult {
+  const CloudBootstrapResult({
+    required this.deviceToken,
+    required this.role,
+    this.churchName = '',
+    this.recoveryCode,
+  });
+
+  final String deviceToken;
+  final String role;
+  final String churchName;
+
+  /// Presente só no cadastro/regeneração — mostrar UMA vez para guardar.
+  final String? recoveryCode;
+}
+
 /// Configuração de acesso deste celular: credencial própria (deviceToken),
 /// obtida no registro (1º celular) ou na troca de um convite.
 class CloudBackupConfig {
@@ -272,11 +289,12 @@ class CloudBackupService {
     return jsonDecode(body) as Map<String, dynamic>;
   }
 
-  /// Registra a igreja + este celular como administrador (1º celular).
-  /// Retorna o deviceToken. Estático: ainda não há config completa.
-  static Future<({String deviceToken, String role})> register({
+  /// Registra a igreja (com NOME) + este celular como administrador.
+  /// Retorna o deviceToken e o código de recuperação (mostrado uma vez).
+  static Future<CloudBootstrapResult> register({
     required String endpoint,
     required String churchCode,
+    required String churchName,
     required String deviceId,
     required String deviceName,
   }) async {
@@ -286,11 +304,14 @@ class CloudBackupService {
       deviceId: deviceId,
       deviceToken: '-',
     );
-    return _bootstrapCall(bootstrap, '/v1/register', {'deviceName': deviceName});
+    return _bootstrapCall(bootstrap, '/v1/register', {
+      'deviceName': deviceName,
+      'churchName': churchName,
+    });
   }
 
   /// Troca um convite pela credencial deste celular.
-  static Future<({String deviceToken, String role})> join({
+  static Future<CloudBootstrapResult> join({
     required CloudInviteToken invite,
     required String deviceId,
     required String deviceName,
@@ -308,7 +329,28 @@ class CloudBackupService {
     });
   }
 
-  static Future<({String deviceToken, String role})> _bootstrapCall(
+  /// Recupera o posto de ADMINISTRADOR num aparelho novo via código de
+  /// recuperação (uso único — o servidor o consome).
+  static Future<CloudBootstrapResult> recoverAdmin({
+    required String endpoint,
+    required String churchCode,
+    required String recoveryCode,
+    required String deviceId,
+    required String deviceName,
+  }) async {
+    final bootstrap = CloudBackupConfig(
+      endpoint: endpoint,
+      churchCode: churchCode,
+      deviceId: deviceId,
+      deviceToken: '-',
+    );
+    return _bootstrapCall(bootstrap, '/v1/recover', {
+      'recoveryCode': recoveryCode.trim().toUpperCase(),
+      'deviceName': deviceName,
+    });
+  }
+
+  static Future<CloudBootstrapResult> _bootstrapCall(
       CloudBackupConfig config, String path, Map<String, dynamic> body) async {
     final client = HttpClient();
     client.connectionTimeout = const Duration(seconds: 10);
@@ -332,10 +374,38 @@ class CloudBackupService {
       throw CloudBackupException(message);
     }
     final data = jsonDecode(responseBody) as Map<String, dynamic>;
-    return (
+    return CloudBootstrapResult(
       deviceToken: data['deviceToken'] as String? ?? '',
       role: data['role'] as String? ?? 'member',
+      churchName: data['churchName'] as String? ?? '',
+      recoveryCode: data['recoveryCode'] as String?,
     );
+  }
+
+  /// Informações da igreja (nome, se há código de recuperação ativo).
+  Future<({String name, bool hasRecoveryCode})> getChurchInfo() async {
+    final data = await _json(await _request('GET', '/v1/church'));
+    return (
+      name: data['name'] as String? ?? '',
+      hasRecoveryCode: data['hasRecoveryCode'] == true,
+    );
+  }
+
+  /// Renomeia a igreja (apenas administradores).
+  Future<void> renameChurch(String name) async {
+    final request = await _request('PUT', '/v1/church');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'name': name.trim()}));
+    await _json(request);
+  }
+
+  /// Gera um NOVO código de recuperação (invalida o anterior; admin).
+  Future<String> regenerateRecoveryCode() async {
+    final request = await _request('POST', '/v1/church/recovery-code');
+    request.headers.contentType = ContentType.json;
+    request.write('{}');
+    final data = await _json(request);
+    return data['recoveryCode'] as String? ?? '';
   }
 
   /// Cria um convite de pareamento (apenas celulares administradores).

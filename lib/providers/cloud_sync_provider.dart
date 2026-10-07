@@ -160,6 +160,7 @@ class CloudSyncState {
   const CloudSyncState({
     this.endpoint = '',
     this.churchCode = '',
+    this.churchName = '',
     this.credentialConfigured = false,
     this.role = 'member',
     this.busy = false,
@@ -173,6 +174,9 @@ class CloudSyncState {
 
   final String endpoint;
   final String churchCode;
+
+  /// Nome humano da igreja (cadastro). O código fica em Avançado.
+  final String churchName;
   final bool credentialConfigured;
 
   /// Papel deste celular na igreja: 'admin' (convida, revoga, gerencia tudo)
@@ -225,6 +229,7 @@ class CloudSyncState {
   CloudSyncState copyWith({
     String? endpoint,
     String? churchCode,
+    String? churchName,
     bool? credentialConfigured,
     String? role,
     bool? busy,
@@ -239,6 +244,7 @@ class CloudSyncState {
     return CloudSyncState(
       endpoint: endpoint ?? this.endpoint,
       churchCode: churchCode ?? this.churchCode,
+      churchName: churchName ?? this.churchName,
       credentialConfigured: credentialConfigured ?? this.credentialConfigured,
       role: role ?? this.role,
       busy: busy ?? this.busy,
@@ -279,6 +285,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
 
   static const _kEndpoint = 'cloud.endpoint';
   static const _kChurchCode = 'cloud.churchCode';
+  static const _kChurchName = 'cloud.churchName';
   static const _kDeviceToken = 'cloud.deviceToken';
   static const _kRole = 'cloud.role';
 
@@ -327,6 +334,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     state = state.copyWith(
       endpoint: prefs.getString(_kEndpoint) ?? kDefaultCloudEndpoint,
       churchCode: prefs.getString(_kChurchCode) ?? '',
+      churchName: prefs.getString(_kChurchName) ?? '',
       credentialConfigured: hasToken,
       role: prefs.getString(_kRole) ?? 'member',
       dismissedEventIds: dismissed,
@@ -352,15 +360,21 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     return config == null ? null : CloudBackupService(config);
   }
 
-  /// "Ativar backup na nuvem" (1º celular): cria a igreja no servidor e este
-  /// celular vira o administrador, com credencial própria.
-  Future<void> activate({String? endpointOverride}) async {
+  /// Cadastra a IGREJA (1º celular): este aparelho vira o administrador.
+  /// Retorna o código de recuperação, que a UI mostra UMA vez para guardar.
+  Future<String?> activate({
+    required String churchName,
+    String? endpointOverride,
+  }) async {
     final endpoint = (endpointOverride?.trim().isNotEmpty ?? false)
         ? endpointOverride!.trim()
         : kDefaultCloudEndpoint;
     if (endpoint.isEmpty) {
       throw CloudBackupException(
           'Informe o endereço do servidor (ou gere o app com CLOUD_SYNC_ENDPOINT).');
+    }
+    if (churchName.trim().isEmpty) {
+      throw CloudBackupException('Dê um nome à igreja/cantina.');
     }
     final rng = Random.secure();
     String randomCode() =>
@@ -374,6 +388,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
         final result = await CloudBackupService.register(
           endpoint: endpoint,
           churchCode: code,
+          churchName: churchName.trim(),
           deviceId: DeviceIdentity.deviceId,
           deviceName: DeviceIdentity.deviceName,
         );
@@ -382,15 +397,65 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
           churchCode: code,
           deviceToken: result.deviceToken,
           role: result.role,
+          churchName: result.churchName,
         );
         unawaited(refreshAll());
-        return;
+        return result.recoveryCode;
       } on CloudBackupException catch (e) {
         lastError = e;
         if (!e.message.contains('já está em uso')) rethrow;
       }
     }
     throw lastError ?? CloudBackupException('Não foi possível ativar.');
+  }
+
+  /// Recupera o posto de administrador neste aparelho via código de
+  /// recuperação (uso único). Depois, gere um novo em Avançado.
+  Future<void> recoverAdmin({
+    required String churchCode,
+    required String recoveryCode,
+    String? endpointOverride,
+  }) async {
+    final endpoint = (endpointOverride?.trim().isNotEmpty ?? false)
+        ? endpointOverride!.trim()
+        : (state.endpoint.isNotEmpty ? state.endpoint : kDefaultCloudEndpoint);
+    if (endpoint.isEmpty) {
+      throw CloudBackupException('Informe o endereço do servidor.');
+    }
+    final result = await CloudBackupService.recoverAdmin(
+      endpoint: endpoint,
+      churchCode: churchCode.trim().toLowerCase(),
+      recoveryCode: recoveryCode,
+      deviceId: DeviceIdentity.deviceId,
+      deviceName: DeviceIdentity.deviceName,
+    );
+    await _saveCredential(
+      endpoint: endpoint,
+      churchCode: churchCode.trim().toLowerCase(),
+      deviceToken: result.deviceToken,
+      role: result.role,
+      churchName: result.churchName,
+    );
+    unawaited(refreshAll());
+  }
+
+  /// Renomeia a igreja (admin).
+  Future<void> renameChurch(String name) async {
+    final service = _service();
+    if (service == null) return;
+    await service.renameChurch(name);
+    await _ref.read(sharedPreferencesProvider).setString(_kChurchName, name.trim());
+    if (mounted) state = state.copyWith(churchName: name.trim());
+  }
+
+  /// Gera um novo código de recuperação (invalida o anterior; admin).
+  /// Mostrar UMA vez e guardar.
+  Future<String> regenerateRecoveryCode() async {
+    final service = _service();
+    if (service == null) {
+      throw CloudBackupException('Backup na nuvem não configurado.');
+    }
+    return service.regenerateRecoveryCode();
   }
 
   /// Pareia este celular trocando o convite (QR/texto) por credencial própria.
@@ -407,6 +472,7 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
       churchCode: invite.churchCode,
       deviceToken: result.deviceToken,
       role: result.role,
+      churchName: result.churchName,
     );
     unawaited(refreshAll());
     return true;
@@ -426,17 +492,20 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     required String churchCode,
     required String deviceToken,
     required String role,
+    String churchName = '',
   }) async {
     final prefs = _ref.read(sharedPreferencesProvider);
     await prefs.setString(_kEndpoint, endpoint);
     await prefs.setString(_kChurchCode, churchCode);
     await prefs.setString(_kDeviceToken, deviceToken);
     await prefs.setString(_kRole, role);
+    await prefs.setString(_kChurchName, churchName);
     await prefs.remove(_kLegacySecret);
     if (mounted) {
       state = state.copyWith(
         endpoint: endpoint,
         churchCode: churchCode,
+        churchName: churchName,
         credentialConfigured: true,
         role: role,
         accessRevoked: false,
@@ -589,8 +658,18 @@ class CloudSyncController extends StateNotifier<CloudSyncState>
     try {
       final remoteList = await service.listEvents();
       final devices = await service.listDevices();
+      final church = await service.getChurchInfo();
+      if (church.name.isNotEmpty && church.name != state.churchName) {
+        await _ref
+            .read(sharedPreferencesProvider)
+            .setString(_kChurchName, church.name);
+      }
       if (mounted) {
-        state = state.copyWith(devices: devices, accessRevoked: false);
+        state = state.copyWith(
+          devices: devices,
+          accessRevoked: false,
+          churchName: church.name.isNotEmpty ? church.name : null,
+        );
       }
       final remoteById = {for (final m in remoteList) m.eventId: m};
       final localEvents = await db.select(db.events).get();

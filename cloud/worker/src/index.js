@@ -57,6 +57,9 @@ export default {
       if (request.method === 'POST' && path === '/v1/join') {
         return await handleJoin(request, env);
       }
+      if (request.method === 'POST' && path === '/v1/recover') {
+        return await handleRecover(request, env);
+      }
 
       const auth = await authenticate(request, env);
       if (!auth.ok) return json({ error: auth.error }, auth.status);
@@ -86,6 +89,36 @@ export default {
       }
       if (request.method === 'GET' && path === '/v1/devices') {
         return json({ devices: await listDevices(env, code) });
+      }
+      if (request.method === 'GET' && path === '/v1/church') {
+        const church = await readJson(env, `${code}/church.json`);
+        return json({
+          name: church?.name ?? '',
+          hasRecoveryCode: Boolean(church?.recoveryHash),
+          createdAt: church?.createdAt ?? null,
+        });
+      }
+      if (request.method === 'PUT' && path === '/v1/church') {
+        if (device.role !== 'admin') {
+          return json({ error: 'Só o celular administrador renomeia a igreja' }, 403);
+        }
+        const body = await request.json().catch(() => ({}));
+        const church = (await readJson(env, `${code}/church.json`)) ?? {};
+        if (typeof body.name === 'string') {
+          church.name = body.name.slice(0, 80);
+        }
+        await writeJson(env, `${code}/church.json`, church);
+        return json({ ok: true, name: church.name ?? '' });
+      }
+      if (request.method === 'POST' && path === '/v1/church/recovery-code') {
+        if (device.role !== 'admin') {
+          return json({ error: 'Só o celular administrador gera o código de recuperação' }, 403);
+        }
+        const church = (await readJson(env, `${code}/church.json`)) ?? {};
+        const recoveryCode = formatRecoveryCode(randomToken().slice(0, 20));
+        church.recoveryHash = await sha256Hex(new TextEncoder().encode(recoveryCode));
+        await writeJson(env, `${code}/church.json`, church);
+        return json({ ok: true, recoveryCode });
       }
       if (request.method === 'POST' && path === '/v1/invites') {
         if (device.role !== 'admin') {
@@ -185,11 +218,21 @@ async function handleRegister(request, env) {
   if (!id) return json({ error: 'Código da igreja ou id do celular inválidos' }, 400);
   const body = await request.json().catch(() => ({}));
   const deviceName = String(body.deviceName ?? 'Celular').slice(0, 60);
+  const churchName = String(body.churchName ?? '').slice(0, 80);
+
+  // Código de recuperação: mostrado UMA vez no cadastro; o hash fica aqui.
+  // Com ele dá para recuperar o posto de administrador num aparelho novo
+  // (/v1/recover) se o celular principal quebrar.
+  const recoveryCode = formatRecoveryCode(randomToken().slice(0, 20));
 
   // Reivindica a igreja: só se ainda não existir.
   const claimed = await env.BUCKET.put(
     `${id.code}/church.json`,
-    JSON.stringify({ createdAt: new Date().toISOString() }),
+    JSON.stringify({
+      name: churchName,
+      recoveryHash: await sha256Hex(new TextEncoder().encode(recoveryCode)),
+      createdAt: new Date().toISOString(),
+    }),
     { onlyIf: { etagDoesNotMatch: '*' }, httpMetadata: { contentType: 'application/json' } },
   );
   if (claimed === null) {
@@ -206,7 +249,64 @@ async function handleRegister(request, env) {
     revoked: false,
   };
   await writeJson(env, `${id.code}/devices/${id.deviceId}.json`, record);
-  return json({ ok: true, deviceToken: token, role: 'admin' });
+  return json({
+    ok: true,
+    deviceToken: token,
+    role: 'admin',
+    churchName,
+    recoveryCode,
+  });
+}
+
+function formatRecoveryCode(raw) {
+  const clean = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+  return clean.replace(/(.{4})(?=.)/g, '$1-');
+}
+
+/// Recupera o posto de administrador num aparelho novo via código de
+/// recuperação. O código é de USO ÚNICO: consumido, precisa gerar outro.
+async function handleRecover(request, env) {
+  const id = parseIdentity(request);
+  if (!id) return json({ error: 'Código da igreja ou id do celular inválidos' }, 400);
+  const body = await request.json().catch(() => ({}));
+  const recoveryCode = String(body.recoveryCode ?? '').toUpperCase().trim();
+  const deviceName = String(body.deviceName ?? 'Celular').slice(0, 60);
+
+  const obj = await env.BUCKET.get(`${id.code}/church.json`);
+  if (!obj) return json({ error: 'Igreja não encontrada' }, 404);
+  const church = await obj.json();
+  const hash = await sha256Hex(new TextEncoder().encode(recoveryCode));
+  if (!church.recoveryHash || !timingSafeEqual(hash, church.recoveryHash)) {
+    return json({ error: 'Código de recuperação inválido ou já usado' }, 403);
+  }
+
+  // Consome o código (uso único), com CAS contra corrida.
+  church.recoveryHash = null;
+  church.recoveredAt = new Date().toISOString();
+  const put = await env.BUCKET.put(`${id.code}/church.json`, JSON.stringify(church), {
+    onlyIf: { etagMatches: obj.etag },
+    httpMetadata: { contentType: 'application/json' },
+  });
+  if (put === null) {
+    return json({ error: 'Código de recuperação inválido ou já usado' }, 403);
+  }
+
+  const token = randomToken();
+  await writeJson(env, `${id.code}/devices/${id.deviceId}.json`, {
+    deviceId: id.deviceId,
+    name: deviceName,
+    tokenHash: await sha256Hex(new TextEncoder().encode(token)),
+    role: 'admin',
+    joinedAt: new Date().toISOString(),
+    revoked: false,
+  });
+  return json({
+    ok: true,
+    deviceToken: token,
+    role: 'admin',
+    churchName: church.name ?? '',
+    recoveryCodeConsumed: true,
+  });
 }
 
 async function createInvite(env, code) {
@@ -270,7 +370,13 @@ async function handleJoin(request, env) {
     revoked: false,
   };
   await writeJson(env, `${id.code}/devices/${id.deviceId}.json`, record);
-  return json({ ok: true, deviceToken: token, role: record.role });
+  const church = await readJson(env, `${id.code}/church.json`);
+  return json({
+    ok: true,
+    deviceToken: token,
+    role: record.role,
+    churchName: church?.name ?? '',
+  });
 }
 
 async function listDevices(env, code) {

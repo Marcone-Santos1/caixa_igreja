@@ -12,6 +12,7 @@ import 'package:caixa_igreja/data/event_cloud_aggregate.dart';
 import 'package:caixa_igreja/data/sale_line_draft.dart';
 import 'package:caixa_igreja/domain/payment_method.dart';
 import 'package:caixa_igreja/providers/cloud_sync_provider.dart';
+import 'package:caixa_igreja/services/cloud_backup_service.dart';
 import 'package:caixa_igreja/providers/database_provider.dart';
 import 'package:caixa_igreja/providers/shared_preferences_provider.dart';
 
@@ -20,6 +21,8 @@ class _FakeWorker {
   late HttpServer _server;
   final Map<String, Map<int, Uint8List>> snapshots = {};
   final Map<String, Map<String, dynamic>> manifests = {};
+  String registeredChurchName = '';
+  bool recoveryUsed = false;
 
   String get url => 'http://127.0.0.1:${_server.port}';
 
@@ -66,7 +69,43 @@ class _FakeWorker {
     }
 
     try {
-      if (req.method == 'GET' && path == '/v1/devices') {
+      if (req.method == 'POST' && path == '/v1/register') {
+        final builder = BytesBuilder(copy: false);
+        await for (final chunk in req) {
+          builder.add(chunk);
+        }
+        final body =
+            jsonDecode(utf8.decode(builder.takeBytes())) as Map<String, dynamic>;
+        registeredChurchName = body['churchName'] as String? ?? '';
+        json({
+          'ok': true,
+          'deviceToken': 'token-novo',
+          'role': 'admin',
+          'churchName': registeredChurchName,
+          'recoveryCode': 'AAAA-BBBB-CCCC-DDDD',
+        });
+      } else if (req.method == 'POST' && path == '/v1/recover') {
+        final builder = BytesBuilder(copy: false);
+        await for (final chunk in req) {
+          builder.add(chunk);
+        }
+        final body =
+            jsonDecode(utf8.decode(builder.takeBytes())) as Map<String, dynamic>;
+        if (body['recoveryCode'] == 'AAAA-BBBB-CCCC-DDDD' && !recoveryUsed) {
+          recoveryUsed = true;
+          json({
+            'ok': true,
+            'deviceToken': 'token-recuperado',
+            'role': 'admin',
+            'churchName': registeredChurchName,
+            'recoveryCodeConsumed': true,
+          });
+        } else {
+          json({'error': 'Código de recuperação inválido ou já usado'}, 403);
+        }
+      } else if (req.method == 'GET' && path == '/v1/church') {
+        json({'name': 'Igreja de Teste', 'hasRecoveryCode': true});
+      } else if (req.method == 'GET' && path == '/v1/devices') {
         json({
           'devices': [
             {
@@ -493,6 +532,42 @@ void main() {
     expect(state.visibleEvents.map((e) => e.eventId),
         isNot(contains(eventId)));
     expect(state.cloudOnlyEvents, isEmpty);
+  });
+
+  test('cadastro com nome devolve código de recuperação; recuperação é uso único',
+      () async {
+    final controller = container.read(cloudSyncControllerProvider.notifier);
+    await _waitUntil(() {
+      final s = container.read(cloudSyncControllerProvider);
+      return s.lastCheckedAt != null && !s.busy;
+    });
+
+    final recoveryCode = await controller.activate(
+      churchName: 'Paróquia N. Sra. Aparecida',
+      endpointOverride: worker.url,
+    );
+    expect(recoveryCode, 'AAAA-BBBB-CCCC-DDDD');
+    var state = container.read(cloudSyncControllerProvider);
+    expect(state.churchName, 'Paróquia N. Sra. Aparecida');
+    expect(state.isAdmin, isTrue);
+
+    // Recuperação num "aparelho novo" (mesmo container, credencial trocada).
+    await controller.recoverAdmin(
+      churchCode: state.churchCode,
+      recoveryCode: 'aaaa-bbbb-cccc-dddd', // caixa não importa
+    );
+    state = container.read(cloudSyncControllerProvider);
+    expect(state.isAdmin, isTrue);
+    expect(worker.recoveryUsed, isTrue);
+
+    // Uso único: segunda tentativa falha.
+    expect(
+      () => controller.recoverAdmin(
+        churchCode: state.churchCode,
+        recoveryCode: 'AAAA-BBBB-CCCC-DDDD',
+      ),
+      throwsA(isA<CloudBackupException>()),
+    );
   });
 
   test('banner da home: só compartilhados comigo e não dispensados',
